@@ -2,6 +2,19 @@ import { supabase, supabaseAdmin } from "../config/supabaseClient.js";
 import { calculateStudentScore } from "../utils/helpers.js";
 
 export class UserService {
+  static parseSafeDate(dateString) {
+    if (!dateString) return null;
+    let d = new Date(dateString);
+    if (isNaN(d.getTime()) && dateString.includes('/')) {
+      const parts = dateString.split('/');
+      if (parts.length === 3) {
+        // DD/MM/YYYY
+        d = new Date(`${parts[2]}-${parts[1]}-${parts[0]}`);
+      }
+    }
+    return isNaN(d.getTime()) ? null : d.toISOString().split('T')[0];
+  }
+
   static async createUser(data) {
     const { connections, classId, classes, ...userData } = data;
 
@@ -314,21 +327,45 @@ export class UserService {
         throw new Error(`Missing required fields for user: ${JSON.stringify(user)}. Name: ${user.name}, Email: ${user.email}, Password: ${user.password}, Type: ${user.type}`);
       }
       
+      const metadata = {
+        name: user.name,
+        type: user.type,
+        phone: user.phone,
+        gender: user.gender,
+        dob: user.dob,
+        status: user.status || 'active'
+      };
+      
+      // Strip out empty string values to prevent Supabase 500 internal triggers from crashing on Date typecasts
+      Object.keys(metadata).forEach(key => {
+        if (metadata[key] == null || String(metadata[key]).trim() === '' || String(metadata[key]).trim() === 'undefined') {
+          delete metadata[key];
+        } else if (key === 'dob') {
+          const validDate = UserService.parseSafeDate(metadata[key]);
+          if (!validDate) {
+            console.warn(`Invalid DOB format ignored: ${metadata[key]}`);
+            delete metadata[key];
+          } else {
+            metadata[key] = validDate; // Standardize to YYYY-MM-DD
+          }
+        }
+      });
+
+      console.log(`Creating user with metadata:`, metadata);
+
       const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
         email: user.email,
         password: user.password,
         email_confirm: true,
-        user_metadata: {
-          name: user.name,
-          type: user.type,
-          phone: user.phone,
-          gender: user.gender,
-          dob: user.dob,
-          status: user.status || 'active'
-        }
+        user_metadata: metadata
       });
       
-      if (!authError && authData?.user) {
+      if (authError) {
+        console.error("Auth creation failed for user:", user.email, authError);
+        throw new Error(`Failed to create Auth user for ${user.email}: ${authError.message || JSON.stringify(authError)}`);
+      }
+
+      if (authData?.user) {
         if (user.type === 'student') {
           const studentFields = {
             admission_number: user.admission_number,
@@ -337,17 +374,17 @@ export class UserService {
             mother_name: user.mother_name,
             monthly_fee: user.monthly_fee || 0,
             bus_fee: user.bus_fee || 0,
-            admission_date: user.admission_date,
+            admission_date: UserService.parseSafeDate(user.admission_date),
             alternate_number: user.alternate_number,
             form_submitted: user.form_submitted === 'true' || user.form_submitted === true,
             address: user.address,
             leave_school: user.leave_school === 'true' || user.leave_school === true,
             tc_received: user.tc_received === 'true' || user.tc_received === true,
-            tc_date: user.tc_date,
+            tc_date: UserService.parseSafeDate(user.tc_date),
             slc_received: user.slc_received === 'true' || user.slc_received === true,
-            slc_date: user.slc_date,
+            slc_date: UserService.parseSafeDate(user.slc_date),
             character_certificate_received: user.character_certificate_received === 'true' || user.character_certificate_received === true,
-            character_certificate_date: user.character_certificate_date,
+            character_certificate_date: UserService.parseSafeDate(user.character_certificate_date),
             tc_document_url: user.tc_document_url,
             slc_document_url: user.slc_document_url,
             character_certificate_document_url: user.character_certificate_document_url
@@ -355,7 +392,11 @@ export class UserService {
           Object.keys(studentFields).forEach(key => (studentFields[key] === undefined || studentFields[key] === '') && delete studentFields[key]);
           
           if (Object.keys(studentFields).length > 0) {
-            await supabase.from("user").update(studentFields).eq("id", authData.user.id);
+            const { error: updateError } = await supabase.from("user").update(studentFields).eq("id", authData.user.id);
+            if (updateError) {
+              await supabaseAdmin.auth.admin.deleteUser(authData.user.id); // Rollback auth creation
+              throw new Error(`Failed to save student profile for ${user.email}: ${updateError.message}`);
+            }
           }
 
           // Handle Class Mapping

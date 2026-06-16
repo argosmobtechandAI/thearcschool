@@ -169,6 +169,7 @@ const UserManagement = () => {
         { key: "house", label: "House" },
         { key: "father_name", label: "Father's Name" },
         { key: "mother_name", label: "Mother's Name" },
+        { key: "alternate_number", label: "Alternate Number" },
         { key: "address", label: "Address" },
         { key: "monthly_fee", label: "Monthly Fee" },
         { key: "bus_fee", label: "Bus Fee" },
@@ -226,7 +227,7 @@ const UserManagement = () => {
     } else {
       setEditingUser(null);
       setFormData({ 
-        name: "", email: "", password: "", phone: "", type: type, connections: [], classId: "", classes: [],
+        name: "", email: "", password: "", phone: "", alternate_number: "", type: type, connections: [], classId: "", classes: [],
         admission_number: "", house: "", father_name: "", mother_name: "", monthly_fee: "", bus_fee: "",
         admission_date: "", form_submitted: false, address: "", leave_school: false, tc_received: false, tc_date: "",
         slc_received: false, slc_date: "", character_certificate_received: false, character_certificate_date: "",
@@ -299,8 +300,8 @@ const UserManagement = () => {
         const sheetName = workbook.SheetNames[0];
         const sheet = workbook.Sheets[sheetName];
         
-        // Parse sheet to JSON array
-        const rawJsonRows = XLSX.utils.sheet_to_json(sheet, { defval: "" });
+        // Parse sheet to JSON array, formatting dates properly as YYYY-MM-DD
+        const rawJsonRows = XLSX.utils.sheet_to_json(sheet, { defval: "", raw: false, dateNF: "yyyy-mm-dd" });
         if (rawJsonRows.length === 0) return toast.error("Excel sheet is empty");
 
         // Normalize keys (trim whitespace from headers)
@@ -409,6 +410,7 @@ const UserManagement = () => {
       addIfSelected("name", u.name);
       addIfSelected("email", u.email);
       addIfSelected("phone", u.phone || "N/A");
+      addIfSelected("alternate_number", u.alternate_number || "N/A");
       addIfSelected("gender", u.gender || "N/A");
       addIfSelected("associations", getAssociations(u));
 
@@ -446,6 +448,7 @@ const UserManagement = () => {
       addIfSelected("name", u.name);
       addIfSelected("email", u.email);
       addIfSelected("phone", u.phone || "N/A");
+      addIfSelected("alternate_number", u.alternate_number || "N/A");
       addIfSelected("gender", u.gender || "N/A");
       addIfSelected("associations", getAssociations(u));
 
@@ -475,6 +478,7 @@ const UserManagement = () => {
       case "name": return <span style={{ fontWeight: "500" }}>{user.name}</span>;
       case "email": return user.email;
       case "phone": return user.phone || "N/A";
+      case "alternate_number": return user.alternate_number || "N/A";
       case "gender": return user.gender || "N/A";
       case "associations": 
         if (type === "student" && user.classes?.length > 0) {
@@ -596,7 +600,7 @@ const UserManagement = () => {
             
             <div style={{ display: "flex", alignItems: "center", gap: "1.5rem" }}>
               <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                <span style={{ fontSize: "0.875rem" }}>Rows per page:</span>
+                <span style={{ fontSize: "0.875rem" } }>Rows per page:</span>
                 <select 
                   className="input-glass" 
                   style={{ padding: "4px 8px", fontSize: "0.875rem", minWidth: "70px" }}
@@ -659,6 +663,10 @@ const UserManagement = () => {
                 <div>
                   <label style={{ display: "block", marginBottom: "0.5rem", fontSize: "0.875rem" }}>Phone Number</label>
                   <input className="input-glass" value={formData.phone} onChange={(e) => setFormData({ ...formData, phone: e.target.value })} />
+                </div>
+                <div>
+                  <label style={{ display: "block", marginBottom: "0.5rem", fontSize: "0.875rem" }}>Alternate Number</label>
+                  <input className="input-glass" value={formData.alternate_number} onChange={(e) => setFormData({ ...formData, alternate_number: e.target.value })} />
                 </div>
                 {type === 'student' && (
                   <div>
