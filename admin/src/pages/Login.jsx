@@ -45,9 +45,12 @@ const Login = () => {
   return (
     <div className="animate-fade-in" style={{ display: "flex", justifyContent: "center", alignItems: "center", height: "100vh" }}>
       <div className="glass-panel" style={{ width: "100%", maxWidth: "400px", padding: "2.5rem" }}>
-        <div style={{ textAlign: "center", marginBottom: "2rem" }}>
-          <h2 style={{ fontSize: "1.875rem", fontWeight: "700", marginBottom: "0.5rem" }}>Admin Portal</h2>
-          <p style={{ color: "var(--text-secondary)" }}>Sign in to manage your school</p>
+        <div style={{ textAlign: "center", marginBottom: "2rem", display: "flex", flexDirection: "column", alignItems: "center", gap: "1rem" }}>
+          <img src="/thearcschoollogo.jpeg" alt="The Arc School" style={{ height: "64px", width: "64px", borderRadius: "50%", objectFit: "cover", boxShadow: "0 4px 12px rgba(0,0,0,0.1)" }} />
+          <div>
+            <h2 style={{ fontSize: "1.875rem", fontWeight: "700", marginBottom: "0.25rem", lineHeight: 1.2 }}>The Arc School</h2>
+            <p style={{ color: "var(--text-secondary)" }}>Sign in to manage your school</p>
+          </div>
         </div>
 
         <form onSubmit={handleLogin} style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>

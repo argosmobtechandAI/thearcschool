@@ -12,6 +12,8 @@ import {
   uploadBulkUser,
   updateMarks,
   updateAttendance,
+  getAttendance,
+  bulkUpdateAttendance,
   addFee,
   submitFees,
   getTopper,
@@ -31,6 +33,8 @@ router.get("/getUserById/:id", auth, getUserById);
 router.get("/getMyself", auth, getMySelf);
 router.put("/updateMarks", auth, updateMarks);
 router.put("/updateAttendace/:id", auth, updateAttendance);
+router.post("/attendance/bulk", auth, bulkUpdateAttendance);
+router.get("/attendance", auth, getAttendance);
 router.post("/createFees", auth, addFee);
 router.put("/submitFees/:studentId/:feeId", auth, submitFees);
 router.delete("/deleteUser/:id", auth, deleteUser);

@@ -1,24 +1,28 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { fetchUsers, fetchClasses, fetchInfo } from "../features/dataSlice";
-import api, { uploadFile } from "../services/api";
+import { 
+    uploadFile, updateSettings, 
+    addChampion, updateChampion, deleteChampion, 
+    addGalleryImage, deleteGalleryImage, 
+    addNewsletter, deleteNewsletter 
+} from "../services/api";
 import { toast } from "react-toastify";
 import { Link2, Trophy, Image as ImageIcon, FileText, Plus, Trash2, Edit, CheckCircle } from "lucide-react";
 
 const SchoolInfo = () => {
-    const { info, users, classes } = useSelector((state) => state.data);
+    const { infoSettings, infoChampions, infoGallery, infoNewsletters, users, classes } = useSelector((state) => state.data);
     const dispatch = useDispatch();
 
     const [modal, setModal] = useState(null);
-    const [social, setNewSocial] = useState({ insta: "", whatsapp: "", linkedin: "", twitter: "" });
-    const [news, setNewNews] = useState([]);
-    const [champ, setNewChamp] = useState({ studentId: "", gameName: "", type: "", marks: "" });
-    const [gallery, setNewGallery] = useState([]);
+    const [editId, setEditId] = useState(null); 
+    const [social, setNewSocial] = useState({ instagram_url: "", whatsapp_url: "", linkedin_url: "", twitter_url: "" });
+    const [champ, setNewChamp] = useState({ student_id: "", game_name: "", achievement_level: "", marks_score: "" });
     const [searchQuery, setSearchQuery] = useState("");
 
     useEffect(() => {
         if (!users || users.length === 0) dispatch(fetchUsers());
-        if (!info || info.length === 0) dispatch(fetchInfo());
+        if (!infoSettings && !infoChampions?.length) dispatch(fetchInfo());
         if (!classes || classes.length === 0) dispatch(fetchClasses());
     }, [dispatch]);
 
@@ -27,27 +31,6 @@ const SchoolInfo = () => {
     const showToast = (message, type = "success") => {
         if (type === "success") toast.success(message);
         else toast.error(message);
-    };
-
-    const handleSubmit = async (submitData) => {
-        try {
-            const { id, ...data } = submitData;
-            let res;
-            if (id) {
-                res = await api.updateInfo(submitData);
-            } else {
-                res = await api.createInfo(data);
-            }
-            showToast(res.data?.message || "Success", "success");
-            dispatch(fetchInfo());
-            setModal(null);
-            setNewChamp({ studentId: "", gameName: "", type: "", marks: "" });
-            setNewGallery([]);
-            setNewNews([]);
-            setNewSocial({ insta: "", whatsapp: "", linkedin: "", twitter: "" });
-        } catch (error) {
-            showToast(error.response?.data?.message || "An error occurred", "error");
-        }
     };
 
     const handleFileUpload = async (fileUpload, bucket = "school") => {
@@ -62,10 +45,14 @@ const SchoolInfo = () => {
         }
     };
 
-    const deleteItem = async (id) => {
+    const handleDelete = async (type, id) => {
         if (!window.confirm("Are you sure you want to delete this record?")) return;
         try {
-            const res = await api.deleteInfo(id);
+            let res;
+            if (type === 'champion') res = await deleteChampion(id);
+            else if (type === 'gallery') res = await deleteGalleryImage(id);
+            else if (type === 'newsletter') res = await deleteNewsletter(id);
+            
             showToast(res.data?.message || "Deleted successfully", "success");
             dispatch(fetchInfo());
         } catch (error) {
@@ -73,271 +60,255 @@ const SchoolInfo = () => {
         }
     };
 
-    return (
-        <div className="space-y-8">
+    const handleSaveSocial = async () => {
+        try {
+            const res = await updateSettings(social);
+            showToast(res.data?.message || "Settings updated", "success");
+            dispatch(fetchInfo());
+            setModal(null);
+        } catch (error) {
+            showToast(error.response?.data?.message || "Error saving settings", "error");
+        }
+    };
 
+    const handleSaveChamp = async () => {
+        try {
+            let res;
+            if (editId) res = await updateChampion(editId, champ);
+            else res = await addChampion(champ);
+            showToast(res.data?.message || "Champion saved", "success");
+            dispatch(fetchInfo());
+            setModal(null);
+            setEditId(null);
+        } catch (error) {
+            showToast(error.response?.data?.message || "Error saving champion", "error");
+        }
+    };
+
+    const handleUploadGallery = async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const url = await handleFileUpload(file);
+        if (!url) return;
+        try {
+            const res = await addGalleryImage({ image_url: url });
+            showToast(res.data?.message || "Image added", "success");
+            dispatch(fetchInfo());
+        } catch (error) {
+            showToast(error.response?.data?.message || "Error saving image", "error");
+        }
+    };
+
+    const handleUploadNews = async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const url = await handleFileUpload(file);
+        if (!url) return;
+        try {
+            const res = await addNewsletter({ document_url: url });
+            showToast(res.data?.message || "Newsletter added", "success");
+            dispatch(fetchInfo());
+        } catch (error) {
+            showToast(error.response?.data?.message || "Error saving newsletter", "error");
+        }
+    };
+
+    return (
+        <div style={{ display: "flex", flexDirection: "column", gap: "2rem" }}>
             <div>
-                <h1 className="text-2xl font-bold text-slate-900">School Information Manager</h1>
-                <p className="text-slate-600 text-sm">Manage social links, outstanding students, gallery, and newsletters.</p>
+                <h1 style={{ fontSize: "2rem", fontWeight: "800", color: "var(--text-primary)", marginBottom: "0.5rem" }}>School Information Manager</h1>
+                <p style={{ color: "var(--text-secondary)", fontSize: "1rem" }}>Manage social links, outstanding students, gallery, and newsletters.</p>
             </div>
 
-            <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(400px, 1fr))", gap: "2rem" }}>
                 {/* SOCIAL MEDIA */}
-                <section className="bg-white/80 backdrop-blur-md shadow-sm rounded-2xl p-6 border border-slate-200">
-                    <div className="flex justify-between items-center mb-6">
-                        <div className="flex items-center gap-3">
-                            <div className="p-2.5 bg-pink-100 text-pink-600 rounded-xl"><Link2 size={20} /></div>
-                            <h2 className="text-lg font-bold text-slate-800">Social Media</h2>
+                <section className="glass-panel" style={{ padding: "1.5rem" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.5rem" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
+                            <div style={{ padding: "0.5rem", background: "rgba(236, 72, 153, 0.1)", color: "#ec4899", borderRadius: "12px" }}><Link2 size={20} /></div>
+                            <h2 style={{ fontSize: "1.25rem", fontWeight: "700", color: "var(--text-primary)" }}>Social Media</h2>
                         </div>
-                        <button onClick={() => setModal("social")} className="bg-slate-900 hover:bg-slate-800 text-white px-4 py-2 rounded-xl text-sm font-medium transition-all shadow-sm flex items-center gap-2">
-                            <Plus size={16} /> Add Links
+                        <button onClick={() => { 
+                            setModal("social"); 
+                            setNewSocial(infoSettings || { instagram_url: "", whatsapp_url: "", linkedin_url: "", twitter_url: "" }); 
+                        }} className="btn btn-primary" style={{ display: "flex", alignItems: "center", gap: "0.5rem", fontSize: "0.875rem", padding: "0.5rem 1rem" }}>
+                            <Edit size={16} /> Edit Links
                         </button>
                     </div>
-                    <div className="space-y-3">
-                        {info?.map((item) => {
-                            if (!item?.social || Array.isArray(item.social)) return null;
-                            return (
-                                <div key={item.id} className="flex flex-col sm:flex-row justify-between sm:items-center border border-slate-200 bg-white rounded-xl p-4 hover:shadow-md transition-shadow gap-4">
-                                    <div className="flex flex-wrap gap-3 text-sm">
-                                        {item.social?.insta && <a href={item.social.insta} target="_blank" rel="noreferrer" className="px-3 py-1.5 bg-pink-50 text-pink-700 rounded-lg font-medium hover:bg-pink-100 transition-colors">Instagram</a>}
-                                        {item.social?.whatsapp && <a href={item.social.whatsapp} target="_blank" rel="noreferrer" className="px-3 py-1.5 bg-green-50 text-green-700 rounded-lg font-medium hover:bg-green-100 transition-colors">WhatsApp</a>}
-                                        {item.social?.linkedin && <a href={item.social.linkedin} target="_blank" rel="noreferrer" className="px-3 py-1.5 bg-blue-50 text-blue-700 rounded-lg font-medium hover:bg-blue-100 transition-colors">LinkedIn</a>}
-                                        {item.social?.twitter && <a href={item.social.twitter} target="_blank" rel="noreferrer" className="px-3 py-1.5 bg-sky-50 text-sky-700 rounded-lg font-medium hover:bg-sky-100 transition-colors">Twitter</a>}
-                                    </div>
-                                    <div className="flex gap-2">
-                                        <button onClick={() => { setModal("social"); setNewSocial(item.social); }} className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"><Edit size={16} /></button>
-                                        <button onClick={() => deleteItem(item.id)} className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"><Trash2 size={16} /></button>
-                                    </div>
-                                </div>
-                            );
-                        })}
-                        {info?.filter(i => i.social && !Array.isArray(i.social)).length === 0 && <p className="text-sm text-slate-400 p-4 text-center border border-dashed rounded-xl">No social links added yet.</p>}
+                    <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+                        {infoSettings ? (
+                            <div style={{ display: "flex", flexWrap: "wrap", gap: "0.75rem", padding: "1rem", background: "var(--bg-secondary)", border: "1px solid var(--glass-border)", borderRadius: "12px" }}>
+                                {infoSettings.instagram_url && <a href={infoSettings.instagram_url} target="_blank" rel="noreferrer" style={{ padding: "0.25rem 0.75rem", background: "rgba(236, 72, 153, 0.1)", color: "#ec4899", borderRadius: "8px", fontSize: "0.875rem", fontWeight: "600", textDecoration: "none" }}>Instagram</a>}
+                                {infoSettings.whatsapp_url && <a href={infoSettings.whatsapp_url} target="_blank" rel="noreferrer" style={{ padding: "0.25rem 0.75rem", background: "rgba(34, 197, 94, 0.1)", color: "#22c55e", borderRadius: "8px", fontSize: "0.875rem", fontWeight: "600", textDecoration: "none" }}>WhatsApp</a>}
+                                {infoSettings.linkedin_url && <a href={infoSettings.linkedin_url} target="_blank" rel="noreferrer" style={{ padding: "0.25rem 0.75rem", background: "rgba(59, 130, 246, 0.1)", color: "#3b82f6", borderRadius: "8px", fontSize: "0.875rem", fontWeight: "600", textDecoration: "none" }}>LinkedIn</a>}
+                                {infoSettings.twitter_url && <a href={infoSettings.twitter_url} target="_blank" rel="noreferrer" style={{ padding: "0.25rem 0.75rem", background: "rgba(14, 165, 233, 0.1)", color: "#0ea5e9", borderRadius: "8px", fontSize: "0.875rem", fontWeight: "600", textDecoration: "none" }}>Twitter</a>}
+                            </div>
+                        ) : (
+                            <p style={{ fontSize: "0.875rem", color: "var(--text-secondary)", padding: "1rem", textAlign: "center", border: "1px dashed var(--glass-border)", borderRadius: "12px" }}>No social links added yet.</p>
+                        )}
                     </div>
                 </section>
 
                 {/* CHAMPION STUDENTS */}
-                <section className="bg-white/80 backdrop-blur-md shadow-sm rounded-2xl p-6 border border-slate-200">
-                    <div className="flex justify-between items-center mb-6">
-                        <div className="flex items-center gap-3">
-                            <div className="p-2.5 bg-amber-100 text-amber-600 rounded-xl"><Trophy size={20} /></div>
-                            <h2 className="text-lg font-bold text-slate-800">Champion Students</h2>
+                <section className="glass-panel" style={{ padding: "1.5rem" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.5rem" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
+                            <div style={{ padding: "0.5rem", background: "rgba(245, 158, 11, 0.1)", color: "#f59e0b", borderRadius: "12px" }}><Trophy size={20} /></div>
+                            <h2 style={{ fontSize: "1.25rem", fontWeight: "700", color: "var(--text-primary)" }}>Champion Students</h2>
                         </div>
-                        <button onClick={() => setModal("champ")} className="bg-slate-900 hover:bg-slate-800 text-white px-4 py-2 rounded-xl text-sm font-medium transition-all shadow-sm flex items-center gap-2">
+                        <button onClick={() => { setModal("champ"); setEditId(null); setNewChamp({ student_id: "", game_name: "", achievement_level: "", marks_score: "" }); }} className="btn btn-primary" style={{ display: "flex", alignItems: "center", gap: "0.5rem", fontSize: "0.875rem", padding: "0.5rem 1rem" }}>
                             <Plus size={16} /> Add Champion
                         </button>
                     </div>
-                    <div className="space-y-3">
-                        {info?.map((item) => {
-                            if (!item?.champ || Array.isArray(item.champ)) return null;
-                            const student = users?.find((c) => c.id === item.champ?.studentId);
+                    <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+                        {infoChampions?.length > 0 ? infoChampions.map((champItem) => {
+                            const student = users?.find((c) => c.id === champItem.student_id);
                             return (
-                                <div key={item.id} className="flex justify-between items-center border border-slate-200 bg-white rounded-xl p-4 hover:shadow-md transition-shadow">
-                                    <div className="flex items-center gap-4">
-                                        <div className="h-10 w-10 bg-amber-50 rounded-full flex items-center justify-center font-bold text-amber-600 border border-amber-100">{student?.name?.charAt(0) || "U"}</div>
+                                <div key={champItem.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "1rem", background: "var(--bg-secondary)", border: "1px solid var(--glass-border)", borderRadius: "12px" }}>
+                                    <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
+                                        <div style={{ width: "40px", height: "40px", background: "rgba(245, 158, 11, 0.1)", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: "bold", color: "#f59e0b" }}>{student?.name?.charAt(0) || "U"}</div>
                                         <div>
-                                            <p className="font-bold text-slate-900">{student?.name || "Unknown Student"}</p>
-                                            <p className="text-xs font-medium text-slate-500 bg-slate-100 px-2 py-0.5 rounded-md mt-1 inline-block">{item.champ?.gameName} • <span className="text-amber-600">{item.champ?.marks} Marks</span></p>
+                                            <p style={{ fontWeight: "700", color: "var(--text-primary)", marginBottom: "0.25rem" }}>{student?.name || "Unknown Student"}</p>
+                                            <p style={{ fontSize: "0.75rem", color: "var(--text-secondary)", background: "var(--bg-primary)", padding: "0.25rem 0.5rem", borderRadius: "6px", display: "inline-block" }}>{champItem.game_name} • <span style={{ color: "#f59e0b" }}>{champItem.marks_score}</span></p>
                                         </div>
                                     </div>
-                                    <div className="flex gap-2">
-                                        <button onClick={() => { setModal("champ"); setNewChamp(item.champ); }} className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"><Edit size={16} /></button>
-                                        <button onClick={() => deleteItem(item.id)} className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"><Trash2 size={16} /></button>
+                                    <div style={{ display: "flex", gap: "0.5rem" }}>
+                                        <button onClick={() => { setModal("champ"); setEditId(champItem.id); setNewChamp(champItem); }} style={{ padding: "0.5rem", color: "var(--text-secondary)", background: "transparent", border: "none", cursor: "pointer", borderRadius: "8px" }}><Edit size={16} /></button>
+                                        <button onClick={() => handleDelete('champion', champItem.id)} style={{ padding: "0.5rem", color: "#ef4444", background: "rgba(239, 68, 68, 0.1)", border: "none", cursor: "pointer", borderRadius: "8px" }}><Trash2 size={16} /></button>
                                     </div>
                                 </div>
                             );
-                        })}
-                        {info?.filter(i => i.champ && !Array.isArray(i.champ)).length === 0 && <p className="text-sm text-slate-400 p-4 text-center border border-dashed rounded-xl">No champions recorded yet.</p>}
+                        }) : (
+                            <p style={{ fontSize: "0.875rem", color: "var(--text-secondary)", padding: "1rem", textAlign: "center", border: "1px dashed var(--glass-border)", borderRadius: "12px" }}>No champions recorded yet.</p>
+                        )}
                     </div>
                 </section>
             </div>
 
             {/* GALLERY */}
-            <section className="bg-white/80 backdrop-blur-md shadow-sm rounded-2xl p-6 border border-slate-200">
-                <div className="flex justify-between items-center mb-6">
-                    <div className="flex items-center gap-3">
-                        <div className="p-2.5 bg-indigo-100 text-indigo-600 rounded-xl"><ImageIcon size={20} /></div>
-                        <h2 className="text-lg font-bold text-slate-800">School Gallery</h2>
+            <section className="glass-panel" style={{ padding: "1.5rem" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.5rem" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
+                        <div style={{ padding: "0.5rem", background: "rgba(99, 102, 241, 0.1)", color: "#6366f1", borderRadius: "12px" }}><ImageIcon size={20} /></div>
+                        <h2 style={{ fontSize: "1.25rem", fontWeight: "700", color: "var(--text-primary)" }}>School Gallery</h2>
                     </div>
-                    <button onClick={() => setModal("gallery")} className="bg-slate-900 hover:bg-slate-800 text-white px-4 py-2 rounded-xl text-sm font-medium transition-all shadow-sm flex items-center gap-2">
-                        <Plus size={16} /> Upload Media
-                    </button>
+                    <div>
+                        <input type="file" id="galUploadDirect" accept="image/*" style={{ display: "none" }} onChange={handleUploadGallery} />
+                        <label htmlFor="galUploadDirect" className="btn btn-primary" style={{ display: "inline-flex", alignItems: "center", gap: "0.5rem", fontSize: "0.875rem", padding: "0.5rem 1rem", cursor: "pointer" }}>
+                            <Plus size={16} /> Upload Media
+                        </label>
+                    </div>
                 </div>
-                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
-                    {info?.map((item) =>
-                        item?.gallery?.length > 0 ? item.gallery.map((glry, ind) => (
-                            <div key={`${item.id}-${ind}`} className="relative rounded-xl overflow-hidden border border-slate-200 group shadow-sm bg-slate-100 aspect-square">
-                                <img src={glry?.url} alt="Gallery" className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
-                                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                                    <button onClick={() => {
-                                        const remaining = item.gallery.filter((e) => e.url !== glry?.url);
-                                        handleSubmit({ ...item, gallery: remaining });
-                                    }} className="bg-rose-600 hover:bg-rose-700 text-white p-2 rounded-full shadow-lg transform translate-y-4 group-hover:translate-y-0 transition-all">
-                                        <Trash2 size={18} />
-                                    </button>
-                                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))", gap: "1rem" }}>
+                    {infoGallery?.length > 0 && infoGallery.map((glry) => (
+                        <div key={glry.id} style={{ position: "relative", borderRadius: "12px", overflow: "hidden", border: "1px solid var(--glass-border)", background: "var(--bg-primary)", aspectRatio: "1/1" }}>
+                            <img src={glry.image_url} alt="Gallery" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                            <div style={{ position: "absolute", top: "0.5rem", right: "0.5rem" }}>
+                                <button onClick={() => handleDelete('gallery', glry.id)} style={{ background: "#ef4444", color: "white", padding: "0.5rem", borderRadius: "50%", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                                    <Trash2 size={16} />
+                                </button>
                             </div>
-                        )) : null
-                    )}
+                        </div>
+                    ))}
                 </div>
-                {!info?.some(i => i.gallery?.length > 0) && <p className="text-sm text-slate-400 p-8 text-center border border-dashed rounded-xl">No images in gallery.</p>}
+                {(!infoGallery || infoGallery.length === 0) && <p style={{ fontSize: "0.875rem", color: "var(--text-secondary)", padding: "2rem", textAlign: "center", border: "1px dashed var(--glass-border)", borderRadius: "12px" }}>No images in gallery.</p>}
             </section>
 
             {/* NEWSLETTER */}
-            <section className="bg-white/80 backdrop-blur-md shadow-sm rounded-2xl p-6 border border-slate-200">
-                <div className="flex justify-between items-center mb-6">
-                    <div className="flex items-center gap-3">
-                        <div className="p-2.5 bg-emerald-100 text-emerald-600 rounded-xl"><FileText size={20} /></div>
-                        <h2 className="text-lg font-bold text-slate-800">Newsletters</h2>
+            <section className="glass-panel" style={{ padding: "1.5rem" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.5rem" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
+                        <div style={{ padding: "0.5rem", background: "rgba(16, 185, 129, 0.1)", color: "#10b981", borderRadius: "12px" }}><FileText size={20} /></div>
+                        <h2 style={{ fontSize: "1.25rem", fontWeight: "700", color: "var(--text-primary)" }}>Newsletters</h2>
                     </div>
-                    <button onClick={() => setModal("news")} className="bg-slate-900 hover:bg-slate-800 text-white px-4 py-2 rounded-xl text-sm font-medium transition-all shadow-sm flex items-center gap-2">
-                        <Plus size={16} /> Upload Newsletter
-                    </button>
+                    <div>
+                        <input type="file" id="newsUploadDirect" accept=".pdf,.doc,.docx" style={{ display: "none" }} onChange={handleUploadNews} />
+                        <label htmlFor="newsUploadDirect" className="btn btn-primary" style={{ display: "inline-flex", alignItems: "center", gap: "0.5rem", fontSize: "0.875rem", padding: "0.5rem 1rem", cursor: "pointer" }}>
+                            <Plus size={16} /> Upload Newsletter
+                        </label>
+                    </div>
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {info?.map((item) =>
-                        item?.news?.length > 0 ? item.news.map((news, index) => (
-                            <div key={`${item.id}-${index}`} className="flex items-center gap-4 border border-slate-200 bg-white rounded-xl p-4 hover:shadow-md transition-shadow group">
-                                <div className="h-12 w-12 bg-emerald-50 rounded-xl flex items-center justify-center text-emerald-600 border border-emerald-100">
-                                    <FileText size={24} />
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                    <a href={news?.letter} target="_blank" rel="noreferrer" className="text-sm font-bold text-slate-800 hover:text-emerald-600 truncate block transition-colors">
-                                        Newsletter Document {index + 1}
-                                    </a>
-                                    <p className="text-xs text-slate-500 mt-1 uppercase tracking-wider">PDF / DOC</p>
-                                </div>
-                                <button onClick={() => {
-                                    const remaining = item.news.filter((e) => e.letter !== news?.letter);
-                                    handleSubmit({ ...item, news: remaining });
-                                }} className="p-2 text-slate-400 hover:bg-rose-50 hover:text-rose-600 rounded-lg opacity-0 group-hover:opacity-100 transition-all">
-                                    <Trash2 size={18} />
-                                </button>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(250px, 1fr))", gap: "1rem" }}>
+                    {infoNewsletters?.length > 0 && infoNewsletters.map((n, index) => (
+                        <div key={n.id} style={{ display: "flex", alignItems: "center", gap: "1rem", border: "1px solid var(--glass-border)", background: "var(--bg-secondary)", borderRadius: "12px", padding: "1rem" }}>
+                            <div style={{ width: "48px", height: "48px", background: "rgba(16, 185, 129, 0.1)", borderRadius: "12px", display: "flex", alignItems: "center", justifyContent: "center", color: "#10b981" }}>
+                                <FileText size={24} />
                             </div>
-                        )) : null
-                    )}
+                            <div style={{ flex: 1, overflow: "hidden" }}>
+                                <a href={n.document_url} target="_blank" rel="noreferrer" style={{ fontSize: "0.875rem", fontWeight: "700", color: "var(--text-primary)", textDecoration: "none", display: "block", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                                    Newsletter Document
+                                </a>
+                                <p style={{ fontSize: "0.75rem", color: "var(--text-secondary)", marginTop: "0.25rem", textTransform: "uppercase", letterSpacing: "0.05em" }}>PDF / DOC</p>
+                            </div>
+                            <button onClick={() => handleDelete('newsletter', n.id)} style={{ padding: "0.5rem", color: "#ef4444", background: "rgba(239, 68, 68, 0.1)", border: "none", cursor: "pointer", borderRadius: "8px" }}>
+                                <Trash2 size={16} />
+                            </button>
+                        </div>
+                    ))}
                 </div>
-                {!info?.some(i => i.news?.length > 0) && <p className="text-sm text-slate-400 p-8 text-center border border-dashed rounded-xl">No newsletters uploaded.</p>}
+                {(!infoNewsletters || infoNewsletters.length === 0) && <p style={{ fontSize: "0.875rem", color: "var(--text-secondary)", padding: "2rem", textAlign: "center", border: "1px dashed var(--glass-border)", borderRadius: "12px" }}>No newsletters uploaded.</p>}
             </section>
 
             {/* MODALS */}
             {modal && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm animate-in fade-in duration-200" onClick={() => setModal(null)}>
-                    <div className="bg-white rounded-2xl w-full max-w-xl shadow-2xl overflow-hidden border border-slate-200" onClick={e => e.stopPropagation()}>
+                <div style={{ position: "fixed", inset: 0, zIndex: 50, display: "flex", alignItems: "center", justifyContent: "center", padding: "1rem", background: "rgba(15, 23, 42, 0.4)", backdropFilter: "blur(4px)" }} onClick={() => setModal(null)}>
+                    <div style={{ background: "var(--bg-secondary)", borderRadius: "16px", width: "100%", maxWidth: "500px", boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.25)", overflow: "hidden", border: "1px solid var(--glass-border)" }} onClick={e => e.stopPropagation()}>
                         
                         {/* Header */}
-                        <div className="p-6 border-b border-slate-100 bg-slate-50 flex justify-between items-center">
-                            <h3 className="text-lg font-bold text-slate-900">
-                                {modal === 'social' ? 'Social Media Links' : modal === 'champ' ? 'Champion Student' : modal === 'news' ? 'Upload Newsletter' : 'Upload Gallery Media'}
+                        <div style={{ padding: "1.5rem", borderBottom: "1px solid var(--glass-border)", display: "flex", justifyContent: "space-between", alignItems: "center", background: "var(--bg-primary)" }}>
+                            <h3 style={{ fontSize: "1.125rem", fontWeight: "700", color: "var(--text-primary)" }}>
+                                {modal === 'social' ? 'Social Media Links' : 'Champion Student'}
                             </h3>
-                            <button onClick={() => setModal(null)} className="text-slate-400 hover:bg-white hover:text-slate-700 p-1.5 rounded-lg border border-transparent hover:border-slate-200 transition-all">✕</button>
+                            <button onClick={() => { setModal(null); }} style={{ background: "transparent", border: "none", fontSize: "1.25rem", cursor: "pointer", color: "var(--text-secondary)" }}>✕</button>
                         </div>
 
-                        <div className="p-6">
+                        <div style={{ padding: "1.5rem", display: "flex", flexDirection: "column", gap: "1rem" }}>
                             {/* SOCIAL MODAL */}
                             {modal === "social" && (
-                                <div className="space-y-4">
-                                    {[{ name: "Instagram", variable: "insta", color: "pink" }, { name: "Whatsapp", variable: "whatsapp", color: "green" }, { name: "Linkedin", variable: "linkedin", color: "blue" }, { name: "Twitter", variable: "twitter", color: "sky" }].map((item) => (
+                                <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+                                    {[{ name: "Instagram", variable: "instagram_url", color: "#ec4899" }, { name: "Whatsapp", variable: "whatsapp_url", color: "#22c55e" }, { name: "Linkedin", variable: "linkedin_url", color: "#3b82f6" }, { name: "Twitter", variable: "twitter_url", color: "#0ea5e9" }].map((item) => (
                                         <div key={item.variable}>
-                                            <label className={`text-sm font-bold text-${item.color}-600 mb-1.5 block`}>{item.name}</label>
-                                            <input type="url" placeholder={`https://${item.name.toLowerCase()}.com/...`} value={social?.[item.variable] || ""} onChange={(e) => setNewSocial({ ...social, [item.variable]: e.target.value })} className="w-full border border-slate-300 rounded-xl p-3 focus:ring-4 focus:ring-slate-100 focus:border-slate-500 outline-none transition-all shadow-sm" />
+                                            <label style={{ fontSize: "0.875rem", fontWeight: "700", color: item.color, marginBottom: "0.5rem", display: "block" }}>{item.name}</label>
+                                            <input type="url" placeholder={`https://${item.name.toLowerCase()}.com/...`} value={social?.[item.variable] || ""} onChange={(e) => setNewSocial({ ...social, [item.variable]: e.target.value })} style={{ width: "100%", border: "1px solid var(--glass-border)", borderRadius: "8px", padding: "0.75rem", outline: "none", fontSize: "0.875rem", background: "var(--bg-primary)", color: "var(--text-primary)" }} />
                                         </div>
                                     ))}
                                 </div>
                             )}
 
-                            {/* NEWSLETTER MODAL */}
-                            {modal === "news" && (
-                                <div className="space-y-6">
-                                    <div className="border-2 border-dashed border-emerald-200 bg-emerald-50/30 rounded-2xl p-8 text-center hover:bg-emerald-50 transition-colors">
-                                        <input type="file" id="newsUpload" accept=".pdf,.doc,.docx" className="hidden" onChange={async (e) => {
-                                            const file = e.target.files[0];
-                                            if (!file) return;
-                                            const url = await handleFileUpload(file);
-                                            if (url) setNewNews([...news, { letter: url }]);
-                                        }} />
-                                        <label htmlFor="newsUpload" className="cursor-pointer flex flex-col items-center justify-center">
-                                            <div className="p-4 bg-white rounded-full shadow-sm mb-4 text-emerald-600"><Plus size={24} /></div>
-                                            <p className="font-bold text-slate-800">Click to upload document</p>
-                                            <p className="text-xs text-slate-500 mt-1">PDF or DOCX only</p>
-                                        </label>
-                                    </div>
-                                    {news.length > 0 && (
-                                        <div className="space-y-2">
-                                            <p className="text-sm font-bold text-slate-700">Files to upload:</p>
-                                            {news.map((item, i) => (
-                                                <div key={i} className="flex justify-between items-center p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm">
-                                                    <span className="truncate text-blue-600 font-medium">Document {i+1} Ready</span>
-                                                    <button onClick={() => { const u = [...news]; u.splice(i, 1); setNewNews(u); }} className="text-rose-500"><Trash2 size={16} /></button>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    )}
-                                </div>
-                            )}
-
-                            {/* GALLERY MODAL */}
-                            {modal === "gallery" && (
-                                <div className="space-y-6">
-                                    <div className="border-2 border-dashed border-indigo-200 bg-indigo-50/30 rounded-2xl p-8 text-center hover:bg-indigo-50 transition-colors">
-                                        <input type="file" id="galUpload" accept="image/*" className="hidden" onChange={async (e) => {
-                                            const file = e.target.files[0];
-                                            if (!file) return;
-                                            const url = await handleFileUpload(file);
-                                            if (url) setNewGallery([...gallery, { url }]);
-                                        }} />
-                                        <label htmlFor="galUpload" className="cursor-pointer flex flex-col items-center justify-center">
-                                            <div className="p-4 bg-white rounded-full shadow-sm mb-4 text-indigo-600"><ImageIcon size={24} /></div>
-                                            <p className="font-bold text-slate-800">Click to upload image</p>
-                                            <p className="text-xs text-slate-500 mt-1">JPG, PNG, GIF</p>
-                                        </label>
-                                    </div>
-                                    {gallery.length > 0 && (
-                                        <div className="grid grid-cols-4 gap-3">
-                                            {gallery.map((item, i) => (
-                                                <div key={i} className="relative aspect-square rounded-xl overflow-hidden border border-slate-200">
-                                                    <img src={item.url} className="w-full h-full object-cover" alt="Preview" />
-                                                    <button onClick={() => { const u = [...gallery]; u.splice(i, 1); setNewGallery(u); }} className="absolute top-1 right-1 bg-rose-500 text-white p-1 rounded-md shadow-sm"><Trash2 size={12}/></button>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    )}
-                                </div>
-                            )}
-
                             {/* CHAMPION MODAL */}
                             {modal === "champ" && (
-                                <div className="space-y-5">
+                                <div style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
                                     <div>
-                                        <label className="text-sm font-bold text-slate-700 mb-1.5 block">Search Student</label>
-                                        <input placeholder="Search by name..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full border border-slate-300 rounded-xl p-3 focus:ring-4 focus:ring-blue-100 focus:border-blue-500 outline-none transition-all shadow-sm" />
+                                        <label style={{ fontSize: "0.875rem", fontWeight: "700", color: "var(--text-primary)", marginBottom: "0.5rem", display: "block" }}>Search Student</label>
+                                        <input placeholder="Search by name..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} style={{ width: "100%", border: "1px solid var(--glass-border)", borderRadius: "8px", padding: "0.75rem", outline: "none", fontSize: "0.875rem", background: "var(--bg-primary)", color: "var(--text-primary)" }} />
                                     </div>
-                                    <div className="border border-slate-200 rounded-xl max-h-48 overflow-y-auto bg-slate-50/50">
+                                    <div style={{ border: "1px solid var(--glass-border)", borderRadius: "8px", maxHeight: "200px", overflowY: "auto", background: "var(--bg-primary)" }}>
                                         {students?.filter((s) => s.name.toLowerCase().includes(searchQuery.toLowerCase())).map((stud) => {
                                             const classe = classes?.find((c) => c.id == stud.classes?.[0]);
-                                            const isSelected = champ?.studentId == stud.id;
+                                            const isSelected = champ?.student_id == stud.id;
                                             return (
-                                                <div key={stud.id} onClick={() => setNewChamp({ ...champ, studentId: stud.id })} className={`flex justify-between items-center p-3 cursor-pointer border-b border-slate-100 transition-colors ${isSelected ? "bg-amber-50" : "hover:bg-white"}`}>
+                                                <div key={stud.id} onClick={() => setNewChamp({ ...champ, student_id: stud.id })} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "0.75rem", cursor: "pointer", borderBottom: "1px solid var(--glass-border)", background: isSelected ? "var(--accent-light)" : "transparent" }}>
                                                     <div>
-                                                        <p className={`text-sm ${isSelected ? 'font-bold text-amber-900' : 'font-medium text-slate-800'}`}>{stud.name}</p>
-                                                        <p className="text-xs text-slate-500">{classe ? `Class ${classe.className}-${classe.section}` : "No Class"}</p>
+                                                        <p style={{ fontSize: "0.875rem", fontWeight: isSelected ? "700" : "500", color: isSelected ? "var(--accent-primary)" : "var(--text-primary)" }}>{stud.name}</p>
+                                                        <p style={{ fontSize: "0.75rem", color: "var(--text-secondary)" }}>{classe ? `Class ${classe.className}-${classe.section}` : "No Class"}</p>
                                                     </div>
-                                                    {isSelected && <span className="text-amber-600"><CheckCircle size={18} /></span>}
+                                                    {isSelected && <span style={{ color: "var(--accent-primary)" }}><CheckCircle size={18} /></span>}
                                                 </div>
                                             );
                                         })}
                                     </div>
                                     <div>
-                                        <label className="text-sm font-bold text-slate-700 mb-1.5 block">Achievement / Game Name</label>
-                                        <input placeholder="e.g. 100m Sprint" value={champ?.gameName || ""} onChange={(e) => setNewChamp({ ...champ, gameName: e.target.value })} className="w-full border border-slate-300 rounded-xl p-3 focus:ring-4 focus:ring-blue-100 focus:border-blue-500 outline-none transition-all shadow-sm" />
+                                        <label style={{ fontSize: "0.875rem", fontWeight: "700", color: "var(--text-primary)", marginBottom: "0.5rem", display: "block" }}>Achievement / Game Name</label>
+                                        <input placeholder="e.g. 100m Sprint" value={champ?.game_name || ""} onChange={(e) => setNewChamp({ ...champ, game_name: e.target.value })} style={{ width: "100%", border: "1px solid var(--glass-border)", borderRadius: "8px", padding: "0.75rem", outline: "none", fontSize: "0.875rem", background: "var(--bg-primary)", color: "var(--text-primary)" }} />
                                     </div>
-                                    <div className="grid grid-cols-2 gap-4">
+                                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
                                         <div>
-                                            <label className="text-sm font-bold text-slate-700 mb-1.5 block">Level</label>
-                                            <input placeholder="State / National" value={champ?.type || ""} onChange={(e) => setNewChamp({ ...champ, type: e.target.value })} className="w-full border border-slate-300 rounded-xl p-3 focus:ring-4 focus:ring-blue-100 focus:border-blue-500 outline-none transition-all shadow-sm" />
+                                            <label style={{ fontSize: "0.875rem", fontWeight: "700", color: "var(--text-primary)", marginBottom: "0.5rem", display: "block" }}>Level</label>
+                                            <input placeholder="State / National" value={champ?.achievement_level || ""} onChange={(e) => setNewChamp({ ...champ, achievement_level: e.target.value })} style={{ width: "100%", border: "1px solid var(--glass-border)", borderRadius: "8px", padding: "0.75rem", outline: "none", fontSize: "0.875rem", background: "var(--bg-primary)", color: "var(--text-primary)" }} />
                                         </div>
                                         <div>
-                                            <label className="text-sm font-bold text-slate-700 mb-1.5 block">Score / Detail</label>
-                                            <input placeholder="e.g. Gold Medal" value={champ?.marks || ""} onChange={(e) => setNewChamp({ ...champ, marks: e.target.value })} className="w-full border border-slate-300 rounded-xl p-3 focus:ring-4 focus:ring-blue-100 focus:border-blue-500 outline-none transition-all shadow-sm" />
+                                            <label style={{ fontSize: "0.875rem", fontWeight: "700", color: "var(--text-primary)", marginBottom: "0.5rem", display: "block" }}>Score / Detail</label>
+                                            <input placeholder="e.g. Gold Medal" value={champ?.marks_score || ""} onChange={(e) => setNewChamp({ ...champ, marks_score: e.target.value })} style={{ width: "100%", border: "1px solid var(--glass-border)", borderRadius: "8px", padding: "0.75rem", outline: "none", fontSize: "0.875rem", background: "var(--bg-primary)", color: "var(--text-primary)" }} />
                                         </div>
                                     </div>
                                 </div>
@@ -345,14 +316,9 @@ const SchoolInfo = () => {
                         </div>
 
                         {/* Footer Action */}
-                        <div className="p-4 bg-slate-50 border-t border-slate-100 flex justify-end gap-3">
-                            <button onClick={() => setModal(null)} className="px-5 py-2.5 hover:bg-slate-200 rounded-xl text-slate-700 font-medium transition-colors">Cancel</button>
-                            <button onClick={() => {
-                                if (modal === 'social') handleSubmit({ social });
-                                else if (modal === 'champ') handleSubmit({ champ });
-                                else if (modal === 'news') handleSubmit({ news });
-                                else if (modal === 'gallery') handleSubmit({ gallery });
-                            }} className="px-6 py-2.5 bg-slate-900 text-white rounded-xl hover:bg-slate-800 font-medium shadow-md shadow-slate-900/20 transition-all active:scale-95 flex items-center gap-2">
+                        <div style={{ padding: "1rem 1.5rem", background: "var(--bg-primary)", borderTop: "1px solid var(--glass-border)", display: "flex", justifyContent: "flex-end", gap: "0.75rem" }}>
+                            <button onClick={() => { setModal(null); }} className="btn btn-ghost" style={{ padding: "0.5rem 1rem", fontSize: "0.875rem" }}>Cancel</button>
+                            <button onClick={modal === 'social' ? handleSaveSocial : handleSaveChamp} className="btn btn-primary" style={{ padding: "0.5rem 1.5rem", fontSize: "0.875rem" }}>
                                 Save
                             </button>
                         </div>

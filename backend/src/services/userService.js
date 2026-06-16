@@ -192,7 +192,6 @@ export class UserService {
     // Fetch users with all their related normalized data to match frontend expectations
     const { data: users, error } = await supabase.from("user").select(`
       *,
-      attendance:attendance!student_id(*),
       grade:grades!student_id(*),
       fees:student_fees!student_id(*),
       notification:notifications(*),
@@ -235,7 +234,6 @@ export class UserService {
       .from("user")
       .select(`
         *,
-        attendance:attendance!student_id(*),
         grade:grades!student_id(*),
         fees:student_fees!student_id(*),
         notification:notifications(*),
@@ -306,8 +304,15 @@ export class UserService {
   static async uploadBulkUser(data) {
     const createdUsers = [];
     if (!supabaseAdmin) throw new Error("Supabase Admin client missing for bulk uploads.");
+
+    // Fetch all existing classes
+    const { data: existingClasses } = await supabase.from("class").select("id, name, section");
+    let currentClasses = existingClasses || [];
+
     for (let user of data) {
-      if (!user.email || !user.password || !user.name || !user.type) continue;
+      if (!user.email || !user.password || !user.name || !user.type) {
+        throw new Error(`Missing required fields for user: ${JSON.stringify(user)}. Name: ${user.name}, Email: ${user.email}, Password: ${user.password}, Type: ${user.type}`);
+      }
       
       const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
         email: user.email,
@@ -333,6 +338,7 @@ export class UserService {
             monthly_fee: user.monthly_fee || 0,
             bus_fee: user.bus_fee || 0,
             admission_date: user.admission_date,
+            alternate_number: user.alternate_number,
             form_submitted: user.form_submitted === 'true' || user.form_submitted === true,
             address: user.address,
             leave_school: user.leave_school === 'true' || user.leave_school === true,
@@ -350,6 +356,29 @@ export class UserService {
           
           if (Object.keys(studentFields).length > 0) {
             await supabase.from("user").update(studentFields).eq("id", authData.user.id);
+          }
+
+          // Handle Class Mapping
+          let targetClassName = user.className || user.class;
+          let targetSection = user.section || user.sec;
+          
+          if (targetClassName) {
+            targetClassName = String(targetClassName).trim().toUpperCase();
+            targetSection = targetSection ? String(targetSection).trim().toUpperCase() : "A";
+
+            let matchedClass = currentClasses.find(c => String(c.name).toUpperCase() === targetClassName && String(c.section).toUpperCase() === targetSection);
+            
+            if (!matchedClass) {
+              const { data: newClassData } = await supabase.from("class").insert([{ name: targetClassName, section: targetSection }]).select("id, name, section");
+              if (newClassData && newClassData.length > 0) {
+                matchedClass = newClassData[0];
+                currentClasses.push(matchedClass);
+              }
+            }
+            
+            if (matchedClass) {
+              await supabase.from("class_students").insert([{ class_id: matchedClass.id, student_id: authData.user.id }]);
+            }
           }
         }
         createdUsers.push(authData.user);
@@ -376,6 +405,12 @@ export class UserService {
   }
 
   static async updateAttendance(id, data) {
+    if (!data.status || data.status === "delete" || data.status === "unmarked") {
+      const { error } = await supabase.from("attendance").delete().match({ student_id: id, date: data.date });
+      if (error) throw new Error("Could not delete attendance: " + error.message);
+      return true;
+    }
+
     const { error } = await supabase.from("attendance").upsert(
       {
         student_id: id,
@@ -387,6 +422,32 @@ export class UserService {
     );
     if (error) throw new Error("Could not update attendance: " + error.message);
     return true;
+  }
+
+  static async bulkUpdateAttendance(records) {
+    // records: [{ student_id: uuid, date: string, status: string }]
+    const { error } = await supabase.from("attendance").upsert(
+      records,
+      { onConflict: 'student_id,date' }
+    );
+    if (error) throw new Error("Could not bulk update attendance: " + error.message);
+    return true;
+  }
+
+  static async getAttendance(startDate, endDate, classId) {
+    let query = supabase.from("attendance").select("*");
+    
+    if (startDate) {
+      query = query.gte("date", startDate);
+    }
+    if (endDate) {
+      query = query.lte("date", endDate);
+    }
+    
+    const { data, error } = await query;
+    if (error) throw new Error("Could not fetch attendance: " + error.message);
+    
+    return data;
   }
 
   static async addFee(data) {
@@ -435,8 +496,12 @@ export class UserService {
   }
 
   static async submitFees(studentId, feeId, data) {
-    const { error } = await supabase.from("student_fees")
-      .update({ status: data.status, amount_paid: data.paidAmount || data.amount_paid, payment_date: new Date().toISOString().split('T')[0] })
+      const d = new Date();
+      const localDateStr = d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, '0') + "-" + String(d.getDate()).padStart(2, '0');
+      
+      const { data: updatedFee, error } = await supabase
+      .from("student_fees")
+      .update({ status: data.status, amount_paid: data.paidAmount || data.amount_paid, payment_date: localDateStr })
       .match({ student_id: studentId, fee_id: feeId });
     if (error) throw new Error("Could not submit fee: " + error.message);
     return true;
@@ -477,7 +542,7 @@ export class UserService {
   }
 
   static async getTeacherWeek() {
-    const { data: teachers, error: teachersError } = await supabase.from("user").select("*, attendance:attendance!student_id(*)").eq("type", "teacher");
+    const { data: teachers, error: teachersError } = await supabase.from("user").select("*").eq("type", "teacher");
     if (teachersError) throw teachersError;
 
     // Return the first teacher for now

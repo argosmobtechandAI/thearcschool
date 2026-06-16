@@ -8,6 +8,7 @@ import api from "../services/api";
 import { exportToExcel, exportToPDF } from "../utils/exportUtils";
 import TableFilterHeader from "../components/TableFilterHeader";
 import { useSortableData } from "../hooks/useSortableData";
+import * as XLSX from "xlsx";
 
 const UserManagement = () => {
   const { type } = useParams(); // 'student', 'teacher', 'principal'
@@ -293,29 +294,94 @@ const UserManagement = () => {
     const reader = new FileReader();
     reader.onload = async (event) => {
       try {
-        const text = event.target.result;
-        const lines = text.split('\n').filter(l => l.trim() !== '');
-        if (lines.length < 2) return toast.error("CSV must contain a header and at least one row");
+        const dataBuffer = new Uint8Array(event.target.result);
+        const workbook = XLSX.read(dataBuffer, { type: 'array' });
+        const sheetName = workbook.SheetNames[0];
+        const sheet = workbook.Sheets[sheetName];
         
-        const headers = lines[0].split(',').map(h => h.trim());
-        const data = lines.slice(1).map(line => {
-          const values = line.split(',').map(v => v.trim());
-          const obj = { type };
-          headers.forEach((h, i) => {
-            if (h && values[i]) obj[h] = values[i];
-          });
-          return obj;
+        // Parse sheet to JSON array
+        const rawJsonRows = XLSX.utils.sheet_to_json(sheet, { defval: "" });
+        if (rawJsonRows.length === 0) return toast.error("Excel sheet is empty");
+
+        // Normalize keys (trim whitespace from headers)
+        const jsonRows = rawJsonRows.map(row => {
+          const normalizedRow = {};
+          for (let key in row) {
+            normalizedRow[key.trim()] = row[key];
+          }
+          return normalizedRow;
         });
 
-        await api.post("/user/bulkUser", { data });
-        toast.success(`${data.length} users uploaded successfully`);
+        // Map Excel headers to expected JSON keys
+        const mappedData = jsonRows.map(row => {
+          return {
+            type: type, // from useParams ('student', 'teacher', etc)
+            name: String(row["NAME"] || ""),
+            admission_number: String(row["AD NO"] || ""),
+            className: String(row["CLASS"] || ""),
+            section: String(row["SEC"] || ""),
+            house: String(row["HOUSE"] || ""),
+            father_name: String(row["FATHER"] || ""),
+            mother_name: String(row["MOTHER"] || ""),
+            phone: String(row["MOB"] || ""),
+            alternate_number: String(row["ALTERNATE NUMBER"] || ""),
+            dob: String(row["DOB"] || ""),
+            monthly_fee: Number(row["MONTHLY FEE"]) || 0,
+            bus_fee: Number(row["BUS"]) || 0,
+            admission_date: String(row["DATE OF ADMISSION"] || ""),
+            form_submitted: String(row["FORM SUBMITTED"]).trim().toUpperCase() === "SUBMITTED" || String(row["FORM SUBMITTED"]).trim().toLowerCase() === "true",
+            address: String(row["ADDRESS"] || ""),
+            leave_school: String(row["LEAVE SCHOOL"]).trim().toUpperCase() === "YES" || String(row["LEAVE SCHOOL"]).trim().toLowerCase() === "true",
+            tc_received: Boolean(row["TC"]),
+            tc_date: String(row["DATE"] || ""), 
+            slc_received: Boolean(row["SLC"]),
+            slc_date: String(row["DATE_1"] || ""),
+            character_certificate_received: Boolean(row["CHARACTER CERTIFICATE"]),
+            character_certificate_date: String(row["DATE_2"] || ""),
+            // Provide auto-generated login credentials if missing (Required by Auth)
+            email: `student_${String(row["AD NO"] || Math.floor(Math.random()*10000))}@thearcschool.in`,
+            password: `pass@${String(row["AD NO"] || "1234")}`,
+          };
+        });
+
+        await api.post("/user/bulkUser", { data: mappedData });
+        toast.success(`${mappedData.length} users uploaded successfully`);
         dispatch(fetchUsers());
       } catch (error) {
+        console.error("Bulk upload error:", error);
         toast.error(error.response?.data?.message || "Failed to upload bulk users");
       }
     };
-    reader.readAsText(file);
+    reader.readAsArrayBuffer(file);
     e.target.value = null; // reset input
+  };
+
+  const handleDownloadSample = () => {
+    const sampleData = [{
+      "AD NO": "1001",
+      "NAME": "John Doe",
+      "CLASS": "PLAY",
+      "SEC": "A",
+      "HOUSE": "RED",
+      "FATHER": "Richard Doe",
+      "MOTHER": "Jane Doe",
+      "MOB": "9876543210",
+      "ALTERNATE NUMBER": "9876543211",
+      "DOB": "2015-05-20",
+      "MONTHLY FEE": "1500",
+      "BUS": "500",
+      "DATE OF ADMISSION": "2020-04-01",
+      "FORM SUBMITTED": "SUBMITTED",
+      "ADDRESS": "123 Main St, City",
+      "LEAVE SCHOOL": "NO",
+      "TC": "",
+      "DATE": "",
+      "SLC": "",
+      "DATE_1": "",
+      "CHARACTER CERTIFICATE": "",
+      "DATE_2": ""
+    }];
+    exportToExcel(sampleData, `${type}_bulk_upload_format`);
   };
 
   const getClassName = (classId) => {
@@ -445,9 +511,12 @@ const UserManagement = () => {
           <p style={{ color: "var(--text-secondary)" }}>Manage your {type} accounts</p>
         </div>
         <div style={{ display: "flex", gap: "0.5rem" }}>
-          <label className="btn btn-ghost" style={{ cursor: "pointer", display: "flex", alignItems: "center", gap: "0.5rem" }}>
-            <Upload size={18} /> Bulk CSV
-            <input type="file" accept=".csv" onChange={handleBulkUpload} style={{ display: "none" }} />
+          <button onClick={handleDownloadSample} className="btn btn-ghost" style={{ display: "flex", alignItems: "center" }}>
+            <FileSpreadsheet size={18} style={{ marginRight: "0.5rem" }} /> Download Format
+          </button>
+          <label className="btn btn-secondary" style={{ cursor: "pointer", display: "flex", alignItems: "center" }}>
+            <Upload size={18} style={{ marginRight: "0.5rem" }} /> Bulk Upload Excel
+            <input type="file" accept=".xlsx, .xls, .csv" onChange={handleBulkUpload} style={{ display: "none" }} />
           </label>
           <button onClick={() => handleOpenModal()} className="btn btn-primary">
             <Plus size={18} /> Add {type}

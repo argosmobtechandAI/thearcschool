@@ -1,5 +1,5 @@
 import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
-import api from "../services/api";
+import api, { getCommunication, getInfo } from "../services/api";
 
 export const fetchUsers = createAsyncThunk(
   "data/fetchUsers",
@@ -101,12 +101,12 @@ export const fetchEvents = createAsyncThunk('data/fetchEvents', async () => {
 });
 
 export const fetchCommunication = createAsyncThunk('data/fetchCommunication', async (type) => {
-    const response = await api.getCommunication(type);
+    const response = await getCommunication(type);
     return response.data;
 });
 
 export const fetchInfo = createAsyncThunk('data/fetchInfo', async () => {
-    const response = await api.getInfo();
+    const response = await getInfo();
     return response.data;
 });
 
@@ -122,7 +122,10 @@ const initialState = {
   timeTables: [],
   events: [],
   chats: [],
-  info: [],
+  infoSettings: null,
+  infoChampions: [],
+  infoGallery: [],
+  infoNewsletters: [],
   loading: false,
   loadingUsers: false,
   loadingClasses: false,
@@ -261,7 +264,11 @@ export const dataSlice = createSlice({
       })
       .addCase(fetchInfo.fulfilled, (state, action) => {
           state.loading = false;
-          state.info = action.payload.info || action.payload || [];
+          const data = action.payload?.data || {};
+          state.infoSettings = data.settings || null;
+          state.infoChampions = data.champions || [];
+          state.infoGallery = data.gallery || [];
+          state.infoNewsletters = data.newsletters || [];
       })
       .addCase(fetchInfo.rejected, (state, action) => {
           state.loading = false;

@@ -63,9 +63,12 @@ const TimeTable = () => {
     if (!activeTimeTable || !activeTimeTable.dates) return [];
     const times = new Set();
     Object.values(activeTimeTable.dates).forEach(periodsForDate => {
-      periodsForDate.forEach(p => times.add(p.time));
+      periodsForDate.forEach(p => {
+        if (p && p.time) times.add(p.time);
+      });
     });
     return Array.from(times).sort((a, b) => {
+      if (!a || !b) return 0;
       const startA = a.split(" - ")[0];
       const startB = b.split(" - ")[0];
       return startA.localeCompare(startB);
@@ -85,6 +88,34 @@ const TimeTable = () => {
     }
     return dates;
   }, [dateRange]);
+
+  const handlePrevInterval = () => {
+    if (!dateRange.start || !dateRange.end) {
+      setDateRange(getThisWeek());
+      return;
+    }
+    const s = new Date(dateRange.start);
+    const e = new Date(dateRange.end);
+    const intervalDays = Math.round((e - s) / (1000 * 60 * 60 * 24)) + 1;
+    
+    s.setDate(s.getDate() - intervalDays);
+    e.setDate(e.getDate() - intervalDays);
+    setDateRange({ start: formatDate(s), end: formatDate(e) });
+  };
+
+  const handleNextInterval = () => {
+    if (!dateRange.start || !dateRange.end) {
+      setDateRange(getThisWeek());
+      return;
+    }
+    const s = new Date(dateRange.start);
+    const e = new Date(dateRange.end);
+    const intervalDays = Math.round((e - s) / (1000 * 60 * 60 * 24)) + 1;
+    
+    s.setDate(s.getDate() + intervalDays);
+    e.setDate(e.getDate() + intervalDays);
+    setDateRange({ start: formatDate(s), end: formatDate(e) });
+  };
 
   const handleAddPeriod = () => {
     if (!newTimeTable.date || !timeSubject.initialTime || !timeSubject.finalTime) {
@@ -248,7 +279,6 @@ const TimeTable = () => {
           <p style={{ color: "var(--text-secondary)" }}>Manage daily class routines</p>
         </div>
         <div style={{ display: "flex", gap: "1rem", alignItems: "center" }}>
-          <DateRangePicker onRangeChange={setDateRange} initialPreset="This Week" />
           <button 
             onClick={() => {
               if (!selectedClass) {
@@ -276,12 +306,35 @@ const TimeTable = () => {
               ))}
             </select>
           </div>
+          
+          <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
+            <button 
+              onClick={handlePrevInterval}
+              style={{ display: "flex", alignItems: "center", justifyContent: "center", width: "36px", height: "36px", borderRadius: "8px", background: "var(--glass-bg)", border: "1px solid var(--glass-border)", color: "var(--text-secondary)", cursor: "pointer", transition: "all 0.2s" }}
+              className="hover-bg"
+              title="Previous"
+            >
+              <ChevronLeft size={18} />
+            </button>
+            
+            <DateRangePicker value={dateRange} onRangeChange={setDateRange} initialPreset="This Week" />
+            
+            <button 
+              onClick={handleNextInterval}
+              style={{ display: "flex", alignItems: "center", justifyContent: "center", width: "36px", height: "36px", borderRadius: "8px", background: "var(--glass-bg)", border: "1px solid var(--glass-border)", color: "var(--text-secondary)", cursor: "pointer", transition: "all 0.2s" }}
+              className="hover-bg"
+              title="Next"
+            >
+              <ChevronRight size={18} />
+            </button>
+          </div>
         </div>
       </div>
 
       {selectedClass ? (
         <div className="glass-panel" style={{ padding: "1.5rem", overflowX: "auto" }}>
           {allTimeSlots.length > 0 ? (
+            <>
             <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "center", minWidth: "800px" }}>
               <thead>
                 <tr>
@@ -336,6 +389,29 @@ const TimeTable = () => {
                 ))}
               </tbody>
             </table>
+            
+            <button 
+              onClick={() => {
+                setNewTimeTable({ date: formatDate(new Date()), timeTables: [] });
+                setOpenModal(true);
+              }}
+              className="btn btn-ghost hover-bg"
+              style={{ 
+                width: "100%", 
+                marginTop: "1rem", 
+                padding: "1rem", 
+                border: "2px dashed var(--glass-border)", 
+                borderRadius: "8px",
+                display: "flex",
+                justifyContent: "center",
+                alignItems: "center",
+                gap: "0.5rem",
+                color: "var(--accent-primary)"
+              }}
+            >
+              <Plus size={18} /> Add New Time Slots
+            </button>
+            </>
           ) : (
             <div style={{ padding: "3rem", textAlign: "center", color: "var(--text-secondary)" }}>
               <Calendar size={48} style={{ margin: "0 auto 1rem", opacity: 0.5 }} />

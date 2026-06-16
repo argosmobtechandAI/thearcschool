@@ -3,7 +3,7 @@ import { Search, DollarSign, Calendar, CheckCircle, Clock, Filter, CreditCard, E
 import { toast } from 'react-toastify';
 import { exportToExcel, exportToPDF } from '../utils/exportUtils';
 import TableFilterHeader from '../components/TableFilterHeader';
-import DateRangePicker from '../components/DateRangePicker';
+import DateRangePicker, { formatDate } from '../components/DateRangePicker';
 
 const SalaryManagement = () => {
     const [searchQuery, setSearchQuery] = useState('');
@@ -49,7 +49,7 @@ const SalaryManagement = () => {
         }
         if (window.confirm(`Are you sure you want to process payments for ${pendingCount} employees?`)) {
             setSalaries(salaries.map(s =>
-                s.status !== 'Paid' ? { ...s, status: 'Paid', lastPaid: new Date().toISOString().split('T')[0] } : s
+                s.status !== 'Paid' ? { ...s, status: 'Paid', lastPaid: formatDate(new Date()) } : s
             ));
             showToast(`Successfully processed ${pendingCount} payments`);
         }
@@ -85,7 +85,7 @@ const SalaryManagement = () => {
     const confirmPayment = () => {
         if (!selectedTeacher) return;
         setSalaries(salaries.map(s =>
-            s.id === selectedTeacher.id ? { ...s, status: 'Paid', lastPaid: new Date().toISOString().split('T')[0] } : s
+            s.id === selectedTeacher.id ? { ...s, status: 'Paid', lastPaid: formatDate(new Date()) } : s
         ));
         showToast(`Salary processed for ${selectedTeacher.name}`);
         setIsModalOpen(false);

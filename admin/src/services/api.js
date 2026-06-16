@@ -46,10 +46,18 @@ export const createCommunication = (data) => api.post('/communication/createChat
 export const getCommunication = (type) => api.get(`/communication/getChat/${type}`);
 
 // School Info API
-export const createInfo = (data) => api.post('/info/createInfo', data);
-export const getInfo = () => api.get('/info/getInfo');
-export const updateInfo = (data) => api.put('/info/updateInfo', data);
-export const deleteInfo = (id) => api.delete(`/info/deleteInfo/${id}`);
+export const getInfo = () => api.get('/info/getAll');
+export const updateSettings = (data) => api.put('/info/settings', data);
+
+export const addChampion = (data) => api.post('/info/champion', data);
+export const updateChampion = (id, data) => api.put(`/info/champion/${id}`, data);
+export const deleteChampion = (id) => api.delete(`/info/champion/${id}`);
+
+export const addGalleryImage = (data) => api.post('/info/gallery', data);
+export const deleteGalleryImage = (id) => api.delete(`/info/gallery/${id}`);
+
+export const addNewsletter = (data) => api.post('/info/newsletter', data);
+export const deleteNewsletter = (id) => api.delete(`/info/newsletter/${id}`);
 
 // Notification API
 export const updateNotification = (id) => api.put(`/user/updateNotification/${id}`);

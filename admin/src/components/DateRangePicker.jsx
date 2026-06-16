@@ -26,22 +26,32 @@ const presets = [
   { label: "All Time", getValue: () => ({ start: "", end: "" }) },
 ];
 
-const DateRangePicker = ({ onRangeChange, initialPreset = "All Time" }) => {
+const DateRangePicker = ({ value, onRangeChange, initialPreset = "All Time" }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [activePreset, setActivePreset] = useState(initialPreset);
-  const [customRange, setCustomRange] = useState({ start: "", end: "" });
+  const [customRange, setCustomRange] = useState(value || { start: "", end: "" });
   const wrapperRef = useRef(null);
 
   useEffect(() => {
-    if (initialPreset !== "All Time") {
+    if (initialPreset !== "All Time" && !value) {
         const preset = presets.find(p => p.label === initialPreset);
         if (preset) {
             const range = preset.getValue();
             setCustomRange(range);
-            // Don't call onRangeChange here to avoid loop, it should be called by parent initially if needed
         }
     }
   }, []);
+
+  useEffect(() => {
+    if (value && (value.start !== customRange.start || value.end !== customRange.end)) {
+      setCustomRange(value);
+      // If the passed value doesn't exactly match the current preset, switch to Custom Range
+      const currentPresetVal = presets.find(p => p.label === activePreset)?.getValue();
+      if (!currentPresetVal || currentPresetVal.start !== value.start || currentPresetVal.end !== value.end) {
+        setActivePreset("Custom Range");
+      }
+    }
+  }, [value]);
 
   useEffect(() => {
     const handleClickOutside = (event) => {

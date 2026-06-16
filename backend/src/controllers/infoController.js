@@ -1,158 +1,128 @@
 import { supabase } from "../config/supabaseClient.js";
 
-// ---------------- GET INFO ----------------
-export const getInfo = async (req, res) => {
+// ---------------- FETCH ALL DATA ----------------
+export const getAllInfo = async (req, res) => {
   try {
-    const { data: information, error } = await supabase
-      .from("schoolInfo")
-      .select("*");
-
-    if (error) throw error;
-
-    // Map V2 columns (key/value) back to frontend names (title/content)
-    const mapped = (information || []).map(i => ({ ...i, title: i.key, content: i.value }));
+    const [settings, champions, gallery, newsletters] = await Promise.all([
+      supabase.from("school_settings").select("*").limit(1).single(),
+      supabase.from("school_champions").select("*").order("created_at", { ascending: false }),
+      supabase.from("school_gallery").select("*").order("created_at", { ascending: false }),
+      supabase.from("school_newsletters").select("*").order("created_at", { ascending: false })
+    ]);
 
     return res.status(200).json({
       success: true,
-      info: mapped,
+      data: {
+        settings: settings.data || null,
+        champions: champions.data || [],
+        gallery: gallery.data || [],
+        newsletters: newsletters.data || []
+      }
     });
-  } catch (e) {
-    return res.status(500).json({
-      success: false,
-      message: `Error occurred: ${e.message}`,
-    });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
   }
 };
 
-// ---------------- CREATE INFO ----------------
-export const createInfo = async (req, res) => {
-  const { data } = req.body;
-
+// ---------------- SETTINGS (Social Links) ----------------
+export const updateSettings = async (req, res) => {
+  const { instagram_url, whatsapp_url, linkedin_url, twitter_url } = req.body;
   try {
-    if (!data) {
-      return res.status(400).json({
-        success: false,
-        message: "Data is required",
-      });
+    // Check if settings exist
+    const { data: existing } = await supabase.from("school_settings").select("id").limit(1).single();
+    
+    let result;
+    if (existing?.id) {
+      result = await supabase.from("school_settings").update({ instagram_url, whatsapp_url, linkedin_url, twitter_url, updated_at: new Date() }).eq("id", existing.id).select();
+    } else {
+      result = await supabase.from("school_settings").insert([{ instagram_url, whatsapp_url, linkedin_url, twitter_url }]).select();
     }
 
-    // Map frontend field names to V2 DB column names
-    const insertData = {
-      key: data.title || data.key,
-      value: data.content || data.value,
-    };
+    if (result.error) throw result.error;
+    
+    return res.status(200).json({ success: true, data: result.data[0], message: "Settings updated successfully" });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
 
-    const { data: information, error } = await supabase
-      .from("schoolInfo")
-      .insert([insertData])
-      .select();
-
+// ---------------- CHAMPIONS ----------------
+export const addChampion = async (req, res) => {
+  const { student_id, game_name, achievement_level, marks_score } = req.body;
+  try {
+    const { data, error } = await supabase.from("school_champions").insert([{ student_id, game_name, achievement_level, marks_score }]).select();
     if (error) throw error;
-
-    // Map back to frontend field names
-    const mapped = information.map(i => ({ ...i, title: i.key, content: i.value }));
-
-    return res.status(201).json({
-      success: true,
-      info: mapped,
-      message: "Successfully created",
-    });
-  } catch (e) {
-    return res.status(500).json({
-      success: false,
-      message: `Error occurred: ${e.message}`,
-    });
+    return res.status(201).json({ success: true, data: data[0], message: "Champion added successfully" });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
   }
 };
 
-// ---------------- UPDATE INFO ----------------
-export const updateInfo = async (req, res) => {
-  const { data } = req.body;
-
-  if (!data || !data.id) {
-    return res.status(400).json({
-      success: false,
-      message: "ID and data are required",
-    });
-  }
-
-  const { id, createdAt, created_at, ...rawData } = data;
-
-  // Map frontend names to V2 DB column names
-  const updateData = {};
-  if (rawData.title || rawData.key) updateData.key = rawData.title || rawData.key;
-  if (rawData.content || rawData.value) updateData.value = rawData.content || rawData.value;
-
-  try {
-    const { data: information, error: existingError } = await supabase
-      .from("schoolInfo")
-      .select("*")
-      .eq("id", id);
-
-    if (existingError || !information || information.length === 0) {
-      return res.status(404).json({
-        success: false,
-        message: "Info not found",
-      });
-    }
-
-    const { data: updatedInfo, error: updateError } = await supabase
-      .from("schoolInfo")
-      .update(updateData)
-      .eq("id", id)
-      .select();
-
-    if (updateError) throw updateError;
-
-    const mapped = updatedInfo.map(i => ({ ...i, title: i.key, content: i.value }));
-
-    return res.status(200).json({
-      success: true,
-      message: "Info updated successfully",
-      data: mapped,
-    });
-  } catch (e) {
-    return res.status(500).json({
-      success: false,
-      message: `Error occurred: ${e.message}`,
-    });
-  }
-};
-
-// ---------------- DELETE INFO ----------------
-export const deleteInfo = async (req, res) => {
+export const updateChampion = async (req, res) => {
   const { id } = req.params;
-
-  if (!id) {
-    return res.status(400).json({
-      success: false,
-      message: "ID is required",
-    });
-  }
-
+  const { student_id, game_name, achievement_level, marks_score } = req.body;
   try {
-    const { data: deletedInfo, error } = await supabase
-      .from("schoolInfo")
-      .delete()
-      .eq("id", id)
-      .select();
+    const { data, error } = await supabase.from("school_champions").update({ student_id, game_name, achievement_level, marks_score }).eq("id", id).select();
+    if (error) throw error;
+    return res.status(200).json({ success: true, data: data[0], message: "Champion updated successfully" });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
 
-    if (error || !deletedInfo || deletedInfo.length === 0) {
-      return res.status(404).json({
-        success: false,
-        message: "Info not found",
-      });
-    }
+export const deleteChampion = async (req, res) => {
+  const { id } = req.params;
+  try {
+    const { error } = await supabase.from("school_champions").delete().eq("id", id);
+    if (error) throw error;
+    return res.status(200).json({ success: true, message: "Champion deleted successfully" });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
 
-    return res.status(200).json({
-      success: true,
-      message: "Info deleted successfully",
-      data: deletedInfo,
-    });
-  } catch (e) {
-    return res.status(500).json({
-      success: false,
-      message: `Error occurred: ${e.message}`,
-    });
+// ---------------- GALLERY ----------------
+export const addGalleryImage = async (req, res) => {
+  const { image_url } = req.body;
+  try {
+    const { data, error } = await supabase.from("school_gallery").insert([{ image_url }]).select();
+    if (error) throw error;
+    return res.status(201).json({ success: true, data: data[0], message: "Image added to gallery" });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+export const deleteGalleryImage = async (req, res) => {
+  const { id } = req.params;
+  try {
+    const { error } = await supabase.from("school_gallery").delete().eq("id", id);
+    if (error) throw error;
+    return res.status(200).json({ success: true, message: "Image deleted successfully" });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// ---------------- NEWSLETTERS ----------------
+export const addNewsletter = async (req, res) => {
+  const { document_url } = req.body;
+  try {
+    const { data, error } = await supabase.from("school_newsletters").insert([{ document_url }]).select();
+    if (error) throw error;
+    return res.status(201).json({ success: true, data: data[0], message: "Newsletter uploaded successfully" });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+export const deleteNewsletter = async (req, res) => {
+  const { id } = req.params;
+  try {
+    const { error } = await supabase.from("school_newsletters").delete().eq("id", id);
+    if (error) throw error;
+    return res.status(200).json({ success: true, message: "Newsletter deleted successfully" });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
   }
 };

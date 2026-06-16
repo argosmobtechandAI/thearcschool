@@ -11,16 +11,16 @@ export const createTimeTable = async (req, res) => {
   }
 
   try {
-    // 1️⃣ Delete existing entries for this class and date
-    await supabase
-      .from("timeTable")
-      .delete()
-      .match({ class_id: data.classId, date: data.date });
+    // 1️⃣ Removed the deletion step so adding new periods appends instead of overwriting
+
+    // Calculate day_of_week from date to satisfy legacy DB constraint
+    const dayOfWeek = new Date(data.date).toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase();
 
     // 2️⃣ Insert new entries
     const timeTableInserts = data.timeTables.map(timeT => ({
       class_id: data.classId,
       date: data.date,
+      day_of_week: dayOfWeek,
       teacher_id: timeT.teacher || null,
       time_slot: timeT.time,
       subject: timeT.subject || null,
@@ -159,9 +159,12 @@ export const addPeriod = async (req, res) => {
   }
 
   try {
+    const dayOfWeek = new Date(data.date).toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase();
+
     const payload = {
       class_id: data.classId,
       date: data.date,
+      day_of_week: dayOfWeek,
       time_slot: data.time,
       subject: data.subject || null,
       teacher_id: data.teacher || null,

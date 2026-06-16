@@ -1,15 +1,32 @@
 import { Router } from "express";
+import { 
+  getAllInfo, 
+  updateSettings, 
+  addChampion, updateChampion, deleteChampion, 
+  addGalleryImage, deleteGalleryImage, 
+  addNewsletter, deleteNewsletter 
+} from "../controllers/infoController.js";
 import { auth } from "../middlewares/authMiddleware.js";
-import { createInfo, deleteInfo, getInfo, updateInfo } from "../controllers/infoController.js";
 
-const infoRouter = Router()
+const router = Router();
 
-infoRouter.get("/getInfo",auth, getInfo )
+// Retrieve all info for the admin dashboard (public or protected based on your needs)
+router.get("/getAll", auth, getAllInfo);
 
-infoRouter.post("/createInfo", auth, createInfo)
+// Settings (Social)
+router.put("/settings", auth, updateSettings);
 
-infoRouter.put("/updateInfo", auth, updateInfo)
+// Champions
+router.post("/champion", auth, addChampion);
+router.put("/champion/:id", auth, updateChampion);
+router.delete("/champion/:id", auth, deleteChampion);
 
-infoRouter.delete("/deleteInfo/:id", auth, deleteInfo)
+// Gallery
+router.post("/gallery", auth, addGalleryImage);
+router.delete("/gallery/:id", auth, deleteGalleryImage);
 
-export default infoRouter
+// Newsletters
+router.post("/newsletter", auth, addNewsletter);
+router.delete("/newsletter/:id", auth, deleteNewsletter);
+
+export default router;

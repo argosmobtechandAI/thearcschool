@@ -19,7 +19,7 @@ const AdmissionManagement = () => {
   const [editingId, setEditingId] = useState(null);
   const [loading, setLoading] = useState(false);
   const [selectedColumns, setSelectedColumns] = useState([
-    "name", "email", "parent", "status"
+    "name", "email", "parent", "status", "documents"
   ]);
 
   const [formData, setFormData] = useState({
@@ -31,6 +31,7 @@ const AdmissionManagement = () => {
     status: "Pending",
     dob: "",
     gender: "",
+    documents: [],
   });
 
   const [selectedFiles, setSelectedFiles] = useState({
@@ -132,7 +133,7 @@ const AdmissionManagement = () => {
 
   const closeModal = () => {
     setEditingId(null);
-    setFormData({ name: "", email: "", parent: "", parentEmail: "", phone: "", status: "Pending", dob: "", gender: "" });
+    setFormData({ name: "", email: "", parent: "", parentEmail: "", phone: "", status: "Pending", dob: "", gender: "", documents: [] });
     setSelectedFiles({ aadhar: null, pan: null, birthCertificate: null });
     setOpenModal(false);
   };
@@ -148,6 +149,7 @@ const AdmissionManagement = () => {
       status: user.status,
       dob: user.dob,
       gender: user.gender,
+      documents: user.documents || [],
     });
     setOpenModal(true);
   };
@@ -168,6 +170,7 @@ const AdmissionManagement = () => {
     { key: "parentEmail", label: "Parent Email" },
     { key: "phone", label: "Phone" },
     { key: "status", label: "Status" },
+    { key: "documents", label: "Documents" },
     { key: "dob", label: "Date of Birth" },
     { key: "gender", label: "Gender" },
     { key: "created_at", label: "Applied Date" }
@@ -189,6 +192,7 @@ const AdmissionManagement = () => {
       addIfSelected("parentEmail", u.parentEmail);
       addIfSelected("phone", u.phone);
       addIfSelected("status", u.status);
+      addIfSelected("documents", Array.isArray(u.documents) ? u.documents.map(d => d.type).join(", ") : "N/A");
       addIfSelected("dob", u.dob);
       addIfSelected("gender", u.gender);
       addIfSelected("created_at", u.created_at ? new Date(u.created_at).toLocaleDateString() : "N/A");
@@ -214,6 +218,7 @@ const AdmissionManagement = () => {
       addIfSelected("parentEmail", u.parentEmail);
       addIfSelected("phone", u.phone);
       addIfSelected("status", u.status);
+      addIfSelected("documents", Array.isArray(u.documents) ? u.documents.map(d => d.type).join(", ") : "N/A");
       addIfSelected("dob", u.dob);
       addIfSelected("gender", u.gender);
       addIfSelected("created_at", u.created_at ? new Date(u.created_at).toLocaleDateString() : "N/A");
@@ -233,16 +238,29 @@ const AdmissionManagement = () => {
       case "status": return (
         <span
           style={{
-            background: user.status === "Approved" ? "rgba(16, 185, 129, 0.2)" : user.status === "Rejected" ? "rgba(239, 68, 68, 0.2)" : "rgba(245, 158, 11, 0.2)",
-            color: user.status === "Approved" ? "#6ee7b7" : user.status === "Rejected" ? "#fca5a5" : "#fcd34d",
-            padding: "2px 6px",
-            borderRadius: "8px",
-            fontSize: "11px",
+            background: user.status === "Approved" ? "rgba(16, 185, 129, 0.15)" : user.status === "Rejected" ? "rgba(239, 68, 68, 0.15)" : "rgba(245, 158, 11, 0.15)",
+            color: user.status === "Approved" ? "#047857" : user.status === "Rejected" ? "#b91c1c" : "#b45309",
+            padding: "4px 8px",
+            borderRadius: "6px",
+            fontSize: "0.75rem",
+            fontWeight: "600",
+            border: `1px solid ${user.status === "Approved" ? "rgba(16, 185, 129, 0.3)" : user.status === "Rejected" ? "rgba(239, 68, 68, 0.3)" : "rgba(245, 158, 11, 0.3)"}`
           }}
         >
           {user.status}
         </span>
       );
+      case "documents": 
+        if (!user.documents || !Array.isArray(user.documents) || user.documents.length === 0) return <span style={{ color: "var(--text-secondary)" }}>None</span>;
+        return (
+          <div style={{ display: "flex", gap: "4px", flexWrap: "wrap" }}>
+            {user.documents.map((doc, idx) => (
+              <span key={idx} style={{ background: "rgba(59, 130, 246, 0.1)", color: "#1d4ed8", padding: "2px 6px", borderRadius: "4px", fontSize: "10px", textTransform: "uppercase", fontWeight: "600" }}>
+                {doc.type || doc.name || "Doc"}
+              </span>
+            ))}
+          </div>
+        );
       case "dob": return user.dob || "N/A";
       case "gender": return user.gender || "N/A";
       case "created_at": return user.created_at ? new Date(user.created_at).toLocaleDateString() : "N/A";
@@ -276,7 +294,7 @@ const AdmissionManagement = () => {
           onExportPDF={handleExportPDF}
           filters={[
             {
-              label: "All Statuses",
+              // label: "All Statuses",
               value: filter,
               onChange: setFilter,
               options: [
@@ -334,22 +352,24 @@ const AdmissionManagement = () => {
                       return <td key={col.key} style={{ padding: "0.5rem 1rem", fontSize: "0.875rem" }}>{renderCell(user, col.key)}</td>;
                     })}
                     <td style={{ padding: "0.5rem 1rem", textAlign: "right" }}>
-                      <button onClick={() => handleEdit(user)} className="btn-ghost" style={{ padding: "4px", border: "none", background: "none", cursor: "pointer", color: "#60a5fa" }}>
-                        <Edit size={16} />
-                      </button>
-                      <button onClick={() => handleDelete(user.id)} className="btn-ghost" style={{ padding: "4px", border: "none", background: "none", cursor: "pointer", color: "#ef4444", marginLeft: "4px" }}>
-                        <Trash2 size={16} />
-                      </button>
-                      {user.status === "Pending" && (
-                        <>
-                          <button onClick={() => handleStatusUpdate(user, "approved")} className="btn-ghost" style={{ padding: "4px", border: "none", background: "none", cursor: "pointer", color: "#10b981", marginLeft: "8px" }}>
-                            <CheckCircle size={16} />
-                          </button>
-                          <button onClick={() => handleStatusUpdate(user, "rejected")} className="btn-ghost" style={{ padding: "4px", border: "none", background: "none", cursor: "pointer", color: "#ef4444", marginLeft: "8px" }}>
-                            <XCircle size={16} />
-                          </button>
-                        </>
-                      )}
+                      <div style={{ display: "flex", gap: "0.5rem", justifyContent: "flex-end" }}>
+                        <button onClick={() => handleEdit(user)} className="btn-ghost" style={{ display: "flex", alignItems: "center", fontSize: "0.75rem", padding: "0.25rem 0.5rem", color: "#3b82f6", background: "rgba(59, 130, 246, 0.1)", borderRadius: "4px" }}>
+                          <Edit size={14} style={{ marginRight: "0.25rem" }}/> Edit
+                        </button>
+                        <button onClick={() => handleDelete(user.id)} className="btn-ghost" style={{ display: "flex", alignItems: "center", fontSize: "0.75rem", padding: "0.25rem 0.5rem", color: "#ef4444", background: "rgba(239, 68, 68, 0.1)", borderRadius: "4px" }}>
+                          <Trash2 size={14} style={{ marginRight: "0.25rem" }}/> Delete
+                        </button>
+                        {user.status === "Pending" && (
+                          <>
+                            <button onClick={() => handleStatusUpdate(user, "Approved")} className="btn-ghost" style={{ display: "flex", alignItems: "center", fontSize: "0.75rem", padding: "0.25rem 0.5rem", color: "#10b981", background: "rgba(16, 185, 129, 0.1)", borderRadius: "4px" }}>
+                              <CheckCircle size={14} style={{ marginRight: "0.25rem" }}/> Approve
+                            </button>
+                            <button onClick={() => handleStatusUpdate(user, "Rejected")} className="btn-ghost" style={{ display: "flex", alignItems: "center", fontSize: "0.75rem", padding: "0.25rem 0.5rem", color: "#ef4444", background: "rgba(239, 68, 68, 0.1)", borderRadius: "4px" }}>
+                              <XCircle size={14} style={{ marginRight: "0.25rem" }}/> Reject
+                            </button>
+                          </>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))
@@ -413,6 +433,20 @@ const AdmissionManagement = () => {
                       <label style={{ display: "block", marginBottom: "0.5rem", fontSize: "0.75rem" }}>Birth Certificate</label>
                       <input type="file" style={{ fontSize: "0.75rem" }} onChange={(e) => setSelectedFiles({ ...selectedFiles, birthCertificate: e.target.files[0] })} />
                     </div>
+                  </div>
+                </div>
+              )}
+
+              {editingId && formData.documents && formData.documents.length > 0 && (
+                <div style={{ marginTop: "1rem", borderTop: "1px solid var(--glass-border)", paddingTop: "1rem" }}>
+                  <h3 style={{ marginBottom: "1rem", fontSize: "1rem", fontWeight: "600" }}>Uploaded Documents</h3>
+                  <div style={{ display: "flex", gap: "1rem", flexWrap: "wrap" }}>
+                    {formData.documents.map((doc, idx) => (
+                      <a key={idx} href={doc.url} target="_blank" rel="noopener noreferrer" className="btn-ghost" style={{ display: "flex", alignItems: "center", gap: "0.5rem", fontSize: "0.875rem", padding: "0.5rem 1rem", border: "1px solid var(--glass-border)", borderRadius: "6px", textDecoration: "none" }}>
+                        <FileText size={16} color="var(--accent-primary)" />
+                        {doc.type ? doc.type.toUpperCase() : "Document"}
+                      </a>
+                    ))}
                   </div>
                 </div>
               )}
