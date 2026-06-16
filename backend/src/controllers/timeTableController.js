@@ -1,0 +1,215 @@
+import { supabase } from "../config/supabaseClient.js";
+
+export const createTimeTable = async (req, res) => {
+  const { data } = req.body;
+
+  if (!data?.classId || !data?.date || !data?.timeTables?.length) {
+    return res.status(400).json({
+      success: false,
+      message: "Class, Date and TimeTable are required",
+    });
+  }
+
+  try {
+    // 1️⃣ Delete existing entries for this class and date
+    await supabase
+      .from("timeTable")
+      .delete()
+      .match({ class_id: data.classId, date: data.date });
+
+    // 2️⃣ Insert new entries
+    const timeTableInserts = data.timeTables.map(timeT => ({
+      class_id: data.classId,
+      date: data.date,
+      teacher_id: timeT.teacher || null,
+      time_slot: timeT.time,
+      subject: timeT.subject || null,
+      is_break: timeT.isBreak || false,
+      room_number: timeT.roomNumber || null
+    }));
+
+    const { error: insertError } = await supabase
+      .from("timeTable")
+      .insert(timeTableInserts);
+
+    if (insertError) throw insertError;
+
+    return res.status(201).json({
+      success: true,
+      message: "TimeTable created successfully",
+    });
+  } catch (e) {
+    return res.status(500).json({
+      success: false,
+      message: `Error Occurred: ${e.message}`,
+    });
+  }
+};
+
+export const getTimeTable = async (req, res) => {
+  try {
+    // Fetch all normalized timetable rows
+    const { data: timetables, error } = await supabase
+      .from("timeTable")
+      .select("*, class(name)");
+
+    if (error) throw error;
+
+    if (timetables) {
+      // Group by classId and then by date
+      const groupedData = {};
+
+      timetables.forEach(row => {
+        const cId = row.class_id;
+        if (!groupedData[cId]) {
+          groupedData[cId] = {
+            id: row.id,
+            classId: cId,
+            dates: {} // Maps date string (YYYY-MM-DD) to array of periods
+          };
+        }
+        
+        const dateStr = row.date; // e.g. "2026-06-20"
+        if (!dateStr) return; // ignore legacy data without dates
+        
+        if (!groupedData[cId].dates[dateStr]) {
+            groupedData[cId].dates[dateStr] = [];
+        }
+
+        groupedData[cId].dates[dateStr].push({
+            id: row.id,
+            teacher: row.teacher_id,
+            time: row.time_slot,
+            subject: row.subject,
+            isBreak: row.is_break,
+            roomNumber: row.room_number
+        });
+      });
+
+      const formattedTimetables = Object.values(groupedData);
+
+      return res.status(200).json({
+        success: true,
+        message: "TimeTable get successfully",
+        timeTables: formattedTimetables,
+      });
+    } else {
+      return res.status(200).json({
+        success: true,
+        message: "No timetables found",
+        timeTables: [],
+      });
+    }
+  } catch (e) {
+    return res.status(500).json({
+      success: false,
+      message: `Error occured: ${e.message}`,
+    });
+  }
+};
+
+export const updatePeriod = async (req, res) => {
+  const { id } = req.params;
+  const { data } = req.body;
+
+  if (!data) {
+    return res.status(400).json({ success: false, message: "Data is required" });
+  }
+
+  try {
+    const payload = {
+      time_slot: data.time,
+      subject: data.subject || null,
+      teacher_id: data.teacher || null,
+      is_break: data.isBreak || false,
+      room_number: data.roomNumber || null
+    };
+
+    const { data: updated, error } = await supabase
+      .from("timeTable")
+      .update(payload)
+      .eq("id", id)
+      .select();
+
+    if (error || !updated || updated.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: error ? error.message : "Period not found",
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "Period updated successfully",
+      period: updated[0],
+    });
+  } catch (e) {
+    return res.status(500).json({
+      success: false,
+      message: `Error occurred: ${e.message}`,
+    });
+  }
+};
+
+export const addPeriod = async (req, res) => {
+  const { data } = req.body;
+
+  if (!data?.classId || !data?.date || !data?.time) {
+    return res.status(400).json({ success: false, message: "Class, Date and Time are required" });
+  }
+
+  try {
+    const payload = {
+      class_id: data.classId,
+      date: data.date,
+      time_slot: data.time,
+      subject: data.subject || null,
+      teacher_id: data.teacher || null,
+      is_break: data.isBreak || false,
+      room_number: data.roomNumber || null
+    };
+
+    const { data: inserted, error } = await supabase
+      .from("timeTable")
+      .insert(payload)
+      .select();
+
+    if (error) throw error;
+
+    return res.status(201).json({
+      success: true,
+      message: "Period added successfully",
+      period: inserted[0],
+    });
+  } catch (e) {
+    return res.status(500).json({ success: false, message: `Error occurred: ${e.message}` });
+  }
+};
+
+export const deletePeriod = async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const { error } = await supabase
+      .from("timeTable")
+      .delete()
+      .eq("id", id);
+
+    if (error) {
+      return res.status(404).json({
+        success: false,
+        message: error.message,
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "Period deleted successfully",
+    });
+  } catch (e) {
+    return res.status(500).json({
+      success: false,
+      message: `Error occurred: ${e.message}`,
+    });
+  }
+};
