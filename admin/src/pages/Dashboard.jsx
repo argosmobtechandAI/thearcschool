@@ -1,10 +1,11 @@
-import { useEffect } from "react";
+import { useState, useEffect } from "react";
 import { useSelector, useDispatch } from "react-redux";
-import { useNavigate } from "react-router-dom";
-import { Users, GraduationCap, Calendar, CreditCard, UserPlus, BookOpen, Clock, UserCheck } from "lucide-react";
+import { Users, GraduationCap, Calendar, CreditCard, BookOpen, Clock, UserCheck, Building } from "lucide-react";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Cell, RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis } from "recharts";
 import api from "../services/api";
 import { setDashboardLoading, setDashboardStats, setDashboardTopper } from "../features/dashboardSlice";
-import { formatDate } from "../components/DateRangePicker";
+import DateRangePicker, { formatDate } from "../components/DateRangePicker";
+import { useNavigate } from "react-router";
 
 const StatCard = ({ title, value, icon: Icon, color, onClick }) => (
   <div 
@@ -28,6 +29,10 @@ const Dashboard = () => {
   const navigate = useNavigate();
   const dispatch = useDispatch();
   
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
+  const [admissionData, setAdmissionData] = useState([]);
+  
   const { user } = useSelector((state) => state.auth);
   // Pulling state directly from the simple Redux slice
   const { stats, topper, loading } = useSelector((state) => state.dashboard);
@@ -45,38 +50,47 @@ const Dashboard = () => {
           { data: newUserData },
           { data: feeData },
           { data: eventData },
-          { data: attendanceData }
+          { data: attendanceData },
+          { data: roomData }
         ] = await Promise.all([
-          api.get("/user/getUser").catch(() => ({ data: { users: [] } })),
-          api.get("/class/getClass").catch(() => ({ data: { classes: [] } })),
-          api.get("/newUser/getAllNewUser").catch(() => ({ data: { users: [] } })),
-          api.get("/fees/getFees").catch(() => ({ data: { fees: [] } })),
-          api.get("/events/getAllEvents").catch(() => ({ data: { events: [] } })),
-          api.get("/user/attendance", { params: { startDate: today, endDate: today } }).catch(() => ({ data: { records: [] } }))
+          api.get("/admin_panel/users").catch(() => ({ data: { users: [] } })),
+          api.get("/admin_panel/class/getClass").catch(() => ({ data: { classes: [] } })),
+          api.get("/admission_panel/getAllNewUser").catch(() => ({ data: { data: [] } })),
+          api.get("/finance_panel/getFees").catch(() => ({ data: { fees: [] } })),
+          api.get("/admin_panel/events/getAllEvents").catch(() => ({ data: { events: [] } })),
+          api.get("/user/attendance", { params: { startDate: today, endDate: today } }).catch(() => ({ data: { records: [] } })),
+          api.get("/rooms/getRooms").catch(() => ({ data: { rooms: [] } }))
         ]);
 
         const users = userData?.users || [];
         const classes = classData?.classes || [];
-        const newUsers = newUserData?.users || newUserData?.data || [];
         const fees = feeData?.fees || [];
         const events = eventData?.events || eventData?.data || [];
         const attendanceRecords = attendanceData?.records || [];
+        const rooms = roomData?.rooms || [];
+        const allAdmissions = newUserData?.data || [];
+        setAdmissionData(allAdmissions);
 
         // Calculate "Present Today" by counting students whose status is present
         // First get student IDs to ensure we only count students
         const studentIds = new Set(users.filter(u => u.type === 'student').map(u => u.id));
         const presentToday = attendanceRecords.filter(a => a.status === 'present' && studentIds.has(a.student_id)).length;
 
+        const totalCounselors = users.filter(u => u.type === 'admission').length;
+        const totalProspects = allAdmissions.filter(u => u.status === 'Pending').length;
+
         dispatch(setDashboardStats({
           totalStudents: users.filter(u => u.type === 'student').length,
           totalTeachers: users.filter(u => u.type === 'teacher').length,
           totalParents: users.filter(u => u.type === 'parent').length,
-          pendingAdmissions: newUsers.filter(u => u.status === 'Pending').length,
+          totalCounselors,
+          totalProspects,
           pendingFees: fees.filter(f => f.status === 'Pending').reduce((acc, f) => acc + (Number(f.amount) || 0), 0),
           collectedFees: fees.filter(f => f.status === 'Paid').reduce((acc, f) => acc + (Number(f.amount) || 0), 0),
           activeClasses: classes.length,
           eventsToday: events.filter(e => e.date === today).length,
-          presentToday: presentToday
+          presentToday: presentToday,
+          totalRooms: rooms.length
         }));
         
         try {
@@ -97,80 +111,175 @@ const Dashboard = () => {
     fetchDashboardData();
   }, [dispatch]);
 
+  const filteredAdmissions = admissionData.filter(u => {
+    if (!startDate || !endDate) return true;
+    const date = new Date(u.created_at);
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    end.setHours(23, 59, 59, 999);
+    return date >= start && date <= end;
+  });
+
+  const admissionStats = [
+    { name: 'Total Applicants', count: filteredAdmissions.length, fill: '#6366f1' },
+    { name: 'Prospects (Pending)', count: filteredAdmissions.filter(u => u.status === 'Pending').length, fill: '#f59e0b' },
+    { name: 'Admitted', count: filteredAdmissions.filter(u => u.status === 'Approved').length, fill: '#10b981' },
+    { name: 'Rejected', count: filteredAdmissions.filter(u => u.status === 'Rejected').length, fill: '#ef4444' }
+  ];
+
+  const userDistributionStats = [
+    { subject: 'Students', A: stats.totalStudents || 0, fullMark: Math.max(stats.totalStudents || 10, 50) },
+    { subject: 'Teachers', A: stats.totalTeachers || 0, fullMark: Math.max(stats.totalTeachers || 10, 50) },
+    { subject: 'Parents', A: stats.totalParents || 0, fullMark: Math.max(stats.totalParents || 10, 50) },
+    { subject: 'Counselors', A: stats.totalCounselors || 0, fullMark: Math.max(stats.totalCounselors || 10, 50) },
+  ];
+
   return (
     <div>
-      <div style={{ marginBottom: "2rem" }}>
-        <h1 style={{ fontSize: "2rem", fontWeight: "800", marginBottom: "0.5rem" }}>Dashboard Overview</h1>
-        <p style={{ color: "var(--text-secondary)", fontSize: "1rem" }}>Welcome back, {user?.name || "Admin"}! Here is what's happening today.</p>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "2rem" }}>
+        <div>
+          <h1 style={{ fontSize: "2rem", fontWeight: "800", marginBottom: "0.5rem" }}>Dashboard Overview</h1>
+          <p style={{ color: "var(--text-secondary)", fontSize: "1rem" }}>Welcome back, {user?.name || "Admin"}! Here is what's happening today.</p>
+        </div>
+        <DateRangePicker 
+          startDate={startDate}
+          endDate={endDate}
+          setStartDate={setStartDate}
+          setEndDate={setEndDate}
+          defaultRange="mtd"
+        />
       </div>
 
-      <h3 style={{ fontSize: "1.1rem", fontWeight: "700", marginBottom: "1rem", color: "var(--text-primary)", display: "flex", alignItems: "center", gap: "0.5rem" }}>
-        <Users size={18} color="var(--accent-primary)"/> People & Attendance
-      </h3>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: "1rem", marginBottom: "2rem" }}>
-        <StatCard title="Total Students" value={loading ? "..." : stats.totalStudents} icon={Users} color="59, 130, 246" onClick={() => navigate("/users/student")} />
-        <StatCard title="Present Today" value={loading ? "..." : `${stats.presentToday} / ${stats.totalStudents}`} icon={UserCheck} color="16, 185, 129" onClick={() => navigate("/attendance")} />
-        <StatCard title="Total Teachers" value={loading ? "..." : stats.totalTeachers} icon={BookOpen} color="168, 85, 247" onClick={() => navigate("/users/teacher")} />
-        <StatCard title="Total Parents" value={loading ? "..." : stats.totalParents} icon={Users} color="245, 158, 11" onClick={() => navigate("/users/parent")} />
-        <StatCard title="Pending Admissions" value={loading ? "..." : stats.pendingAdmissions} icon={UserPlus} color="239, 68, 68" onClick={() => navigate("/admissions")} />
-      </div>
+      {user?.type === "admin" && (
+        <>
+          <h3 style={{ fontSize: "1.1rem", fontWeight: "700", marginBottom: "1rem", color: "var(--text-primary)", display: "flex", alignItems: "center", gap: "0.5rem" }}>
+            <Users size={18} color="var(--accent-primary)"/> People Overview
+          </h3>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: "1rem", marginBottom: "2rem" }}>
+            <StatCard title="Total Students" value={loading ? "..." : stats.totalStudents} icon={Users} color="99, 102, 241" onClick={() => navigate("/users/student")} />
+            <StatCard title="Present Today" value={loading ? "..." : `${stats.presentToday || 0} / ${stats.totalStudents || 0}`} icon={UserCheck} color="16, 185, 129" onClick={() => navigate("/attendance")} />
+            <StatCard title="Total Teachers" value={loading ? "..." : stats.totalTeachers} icon={BookOpen} color="168, 85, 247" onClick={() => navigate("/users/teacher")} />
+            <StatCard title="Total Parents" value={loading ? "..." : stats.totalParents} icon={Users} color="245, 158, 11" onClick={() => navigate("/users/parent")} />
+            <StatCard title="Active Counselors" value={loading ? "..." : stats.totalCounselors} icon={UserCheck} color="14, 165, 233" onClick={() => navigate("/users/admission")} />
+            <StatCard title="Active Prospects" value={loading ? "..." : stats.totalProspects} icon={UserCheck} color="236, 72, 153" onClick={() => navigate("/admissions")} />
+          </div>
+        </>
+      )}
 
-      <h3 style={{ fontSize: "1.1rem", fontWeight: "700", marginBottom: "1rem", color: "var(--text-primary)", display: "flex", alignItems: "center", gap: "0.5rem" }}>
-        <CreditCard size={18} color="var(--accent-primary)"/> Operations & Financials
-      </h3>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: "1rem", marginBottom: "2rem" }}>
-        <StatCard title="Collected Fees" value={loading ? "..." : `₹${stats.collectedFees}`} icon={CreditCard} color="16, 185, 129" onClick={() => navigate("/fees")} />
-        <StatCard title="Pending Fees" value={loading ? "..." : `₹${stats.pendingFees}`} icon={Clock} color="245, 158, 11" onClick={() => navigate("/fees")} />
-        <StatCard title="Active Classes" value={loading ? "..." : stats.activeClasses} icon={GraduationCap} color="14, 165, 233" onClick={() => navigate("/classes")} />
-        <StatCard title="Events Today" value={loading ? "..." : stats.eventsToday} icon={Calendar} color="236, 72, 153" onClick={() => navigate("/events")} />
-      </div>
+      {(user?.type === "admin" || user?.type === "finance") && (
+        <>
+          <h3 style={{ fontSize: "1.1rem", fontWeight: "700", marginBottom: "1rem", color: "var(--text-primary)", display: "flex", alignItems: "center", gap: "0.5rem" }}>
+            <CreditCard size={18} color="var(--accent-primary)"/> Operations & Financials
+          </h3>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: "1rem", marginBottom: "2rem" }}>
+            <StatCard title="Collected Fees" value={loading ? "..." : `₹${stats.collectedFees}`} icon={CreditCard} color="16, 185, 129" onClick={() => navigate("/fees")} />
+            <StatCard title="Pending Fees" value={loading ? "..." : `₹${stats.pendingFees}`} icon={Clock} color="245, 158, 11" onClick={() => navigate("/fees")} />
+            {user?.type === "admin" && (
+              <>
+                <StatCard title="Active Classes" value={loading ? "..." : stats.activeClasses} icon={GraduationCap} color="14, 165, 233" onClick={() => navigate("/classes")} />
+                <StatCard title="Total Rooms" value={loading ? "..." : stats.totalRooms} icon={Building} color="99, 102, 241" onClick={() => navigate("/rooms")} />
+                <StatCard title="Events Today" value={loading ? "..." : stats.eventsToday} icon={Calendar} color="236, 72, 153" onClick={() => navigate("/events")} />
+              </>
+            )}
+          </div>
+        </>
+      )}
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
-        <div className="glass-panel" style={{ padding: "1.5rem" }}>
-          <h3 style={{ fontSize: "1.25rem", fontWeight: "700", marginBottom: "1rem", paddingBottom: "1rem", borderBottom: "1px solid var(--glass-border)" }}>
-            Needs Attention
-          </h3>
-          <div style={{ padding: "2rem", textAlign: "center", color: "var(--text-secondary)" }}>
-            {stats.pendingAdmissions > 0 ? (
-              <div style={{ display: "flex", flexDirection: "column", gap: "1rem", alignItems: "center" }}>
-                <div 
-                  onClick={() => navigate("/admissions")}
-                  onMouseEnter={(e) => (e.currentTarget.style.transform = "scale(1.02)")}
-                  onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
-                  style={{ background: "rgba(239, 68, 68, 0.1)", color: "#ef4444", padding: "1rem", borderRadius: "12px", display: "flex", alignItems: "center", gap: "1rem", width: "100%", justifyContent: "center", cursor: "pointer", transition: "transform 0.2s" }}
-                >
-                  <UserPlus size={24} />
-                  <div>
-                    <h4 style={{ fontWeight: "700", fontSize: "1.1rem" }}>{stats.pendingAdmissions} Pending Admissions</h4>
-                    <p style={{ fontSize: "0.875rem", opacity: 0.8 }}>Require review</p>
-                  </div>
+        {user?.type === "admin" && (
+          <div className="glass-panel" style={{ padding: "1.5rem" }}>
+            <h3 style={{ fontSize: "1.25rem", fontWeight: "700", marginBottom: "1rem", paddingBottom: "1rem", borderBottom: "1px solid var(--glass-border)" }}>
+              Needs Attention
+            </h3>
+            <div style={{ padding: "2rem", textAlign: "center", color: "var(--text-secondary)" }}>
+              "You're all caught up! No urgent tasks pending."
+            </div>
+          </div>
+        )}
+
+        {user?.type === "admin" && (
+          <div className="glass-panel" style={{ padding: "1.5rem" }}>
+            <h3 style={{ fontSize: "1.25rem", fontWeight: "700", marginBottom: "1rem", paddingBottom: "1rem", borderBottom: "1px solid var(--glass-border)" }}>
+              Topper of the Month
+            </h3>
+            {topper ? (
+              <div style={{ padding: "1rem", textAlign: "center", display: "flex", flexDirection: "column", alignItems: "center", gap: "1rem" }}>
+                <div style={{ width: "80px", height: "80px", borderRadius: "50%", background: "var(--accent-light)", color: "var(--accent-primary)", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: "800", fontSize: "2rem", boxShadow: "0 4px 20px rgba(99, 102, 241, 0.2)" }}>
+                  {topper.name?.charAt(0)}
+                </div>
+                <div>
+                  <h4 style={{ fontSize: "1.5rem", fontWeight: "800", color: "var(--text-primary)" }}>{topper.name}</h4>
+                  <p style={{ color: "var(--accent-primary)", fontWeight: "600", marginTop: "0.25rem", fontSize: "1.1rem" }}>Score: {topper.score}</p>
                 </div>
               </div>
             ) : (
-              "You're all caught up! No urgent tasks pending."
+              <div style={{ padding: "2rem", textAlign: "center", color: "var(--text-secondary)" }}>
+                No top performer data available
+              </div>
             )}
+          </div>
+        )}
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(450px, 1fr))", gap: "1rem" }}>
+        {/* Admissions Waterfall Chart */}
+        <div className="glass-panel" style={{ marginTop: "1rem", padding: "1.5rem" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem", paddingBottom: "1rem", borderBottom: "1px solid var(--glass-border)" }}>
+            <h3 style={{ fontSize: "1.25rem", fontWeight: "700", display: "flex", alignItems: "center", gap: "0.5rem" }}>
+              <UserCheck size={20} color="var(--accent-primary)" /> Admissions Pipeline
+            </h3>
+            <button 
+              onClick={() => navigate("/admissions")}
+              className="btn btn-secondary"
+              style={{ fontSize: "0.875rem", padding: "0.5rem 1rem" }}
+            >
+              Manage Admissions
+            </button>
+          </div>
+          <div style={{ height: "300px", width: "100%" }}>
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart
+                data={admissionStats}
+                margin={{ top: 20, right: 30, left: 20, bottom: 25 }}
+              >
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(255,255,255,0.1)" />
+                <XAxis dataKey="name" stroke="var(--text-primary)" fontWeight={600} tickMargin={10} />
+                <YAxis stroke="var(--text-secondary)" />
+                <RechartsTooltip 
+                  cursor={{ fill: 'rgba(255,255,255,0.05)' }}
+                  contentStyle={{ background: 'var(--glass-bg)', border: '1px solid var(--glass-border)', borderRadius: '8px', color: 'var(--text-primary)' }}
+                  itemStyle={{ color: 'var(--text-primary)', fontWeight: 'bold' }}
+                />
+                <Bar dataKey="count" radius={[4, 4, 0, 0]} barSize={60}>
+                  {admissionStats.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={entry.fill} />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
           </div>
         </div>
 
-        <div className="glass-panel" style={{ padding: "1.5rem" }}>
-          <h3 style={{ fontSize: "1.25rem", fontWeight: "700", marginBottom: "1rem", paddingBottom: "1rem", borderBottom: "1px solid var(--glass-border)" }}>
-            Topper of the Month
-          </h3>
-          {topper ? (
-            <div style={{ padding: "1rem", textAlign: "center", display: "flex", flexDirection: "column", alignItems: "center", gap: "1rem" }}>
-              <div style={{ width: "80px", height: "80px", borderRadius: "50%", background: "var(--accent-light)", color: "var(--accent-primary)", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: "800", fontSize: "2rem", boxShadow: "0 4px 20px rgba(99, 102, 241, 0.2)" }}>
-                {topper.name?.charAt(0)}
-              </div>
-              <div>
-                <h4 style={{ fontSize: "1.5rem", fontWeight: "800", color: "var(--text-primary)" }}>{topper.name}</h4>
-                <p style={{ color: "var(--accent-primary)", fontWeight: "600", marginTop: "0.25rem", fontSize: "1.1rem" }}>Score: {topper.score}</p>
-              </div>
-            </div>
-          ) : (
-            <div style={{ padding: "2rem", textAlign: "center", color: "var(--text-secondary)" }}>
-              No top performer data available
-            </div>
-          )}
+        {/* User Distribution Radar Chart */}
+        <div className="glass-panel" style={{ marginTop: "1rem", padding: "1.5rem" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem", paddingBottom: "1rem", borderBottom: "1px solid var(--glass-border)" }}>
+            <h3 style={{ fontSize: "1.25rem", fontWeight: "700", display: "flex", alignItems: "center", gap: "0.5rem" }}>
+              <Users size={20} color="var(--accent-primary)" /> User Distribution
+            </h3>
+          </div>
+          <div style={{ height: "300px", width: "100%" }}>
+            <ResponsiveContainer width="100%" height="100%">
+              <RadarChart cx="50%" cy="50%" outerRadius="80%" data={userDistributionStats}>
+                <PolarGrid stroke="rgba(255,255,255,0.1)" />
+                <PolarAngleAxis dataKey="subject" stroke="var(--text-primary)" fontWeight={600} />
+                <PolarRadiusAxis angle={30} domain={[0, 'dataMax']} stroke="var(--text-secondary)" />
+                <Radar name="Users" dataKey="A" stroke="#8b5cf6" fill="#8b5cf6" fillOpacity={0.4} />
+                <RechartsTooltip 
+                  contentStyle={{ background: 'var(--glass-bg)', border: '1px solid var(--glass-border)', borderRadius: '8px', color: 'var(--text-primary)' }}
+                />
+              </RadarChart>
+            </ResponsiveContainer>
+          </div>
         </div>
       </div>
     </div>

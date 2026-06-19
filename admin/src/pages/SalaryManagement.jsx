@@ -275,15 +275,15 @@ const SalaryManagement = () => {
                                         <div className="flex justify-center gap-2">
                                             <button
                                                 onClick={() => handleEditSalary(salary)}
-                                                className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 hover:shadow-sm rounded-lg transition-all"
+                                                className="px-3 py-1.5 text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition-all text-xs font-medium flex items-center gap-1"
                                                 title="Edit Salary"
                                             >
-                                                <Edit size={16} />
+                                                <Edit size={14} /> Edit
                                             </button>
                                             {salary.status !== 'Paid' && (
                                                 <button
                                                     onClick={() => handleProcessPayment(salary)}
-                                                    className="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium rounded-lg transition-all shadow-sm hover:shadow-md active:scale-95 flex items-center gap-1"
+                                                    className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium rounded-lg transition-all shadow-sm hover:shadow-md active:scale-95 flex items-center gap-1"
                                                 >
                                                     Pay
                                                 </button>

@@ -5,7 +5,7 @@ import { supabase } from "../config/supabaseClient.js";
 dotenv.config();
 
 export const generateToken = async (data, type) => {
-  let token = jwt.sign(data, process.env.JWT_SECRET);
+  let token = jwt.sign({ ...data, type }, process.env.JWT_SECRET);
   return token;
 };
 

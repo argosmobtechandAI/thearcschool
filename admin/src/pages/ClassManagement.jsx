@@ -165,10 +165,10 @@ const ClassManagement = () => {
       const payload = { ...formData };
       if (editingClass) {
         payload.id = editingClass;
-        await api.put("/class/updateClass", { data: payload });
+        await api.put("/admin_panel/class/updateClass", { data: payload });
         toast.success("Class updated successfully");
       } else {
-        await api.post("/class/createClass", { data: payload });
+        await api.post("/admin_panel/class/createClass", { data: payload });
         toast.success("Class created successfully");
       }
       setIsModalOpen(false);
@@ -181,7 +181,7 @@ const ClassManagement = () => {
   const handleDelete = async (id) => {
     if (window.confirm("Are you sure you want to delete this class?")) {
       try {
-        await api.delete(`/class/deleteClass/${id}`);
+        await api.delete(`/admin_panel/class/deleteClass/${id}`);
         toast.success("Class deleted successfully");
         dispatch(fetchClasses());
       } catch (error) {
@@ -278,12 +278,14 @@ const ClassManagement = () => {
                       return <td key={col.key}>{renderCell(cls, col.key)}</td>;
                     })}
                     <td style={{ textAlign: "right", whiteSpace: "nowrap" }}>
-                      <button onClick={() => handleOpenModal(cls)} className="btn-ghost" style={{ border: "none", cursor: "pointer", padding: "4px", marginRight: "4px" }}>
-                        <Edit size={16} />
-                      </button>
-                      <button onClick={() => handleDelete(cls.id)} className="btn-ghost" style={{ border: "none", cursor: "pointer", padding: "4px", color: "#ef4444" }}>
-                        <Trash2 size={16} />
-                      </button>
+                      <div style={{ display: "flex", gap: "0.5rem", justifyContent: "flex-end" }}>
+                        <button onClick={() => handleOpenModal(cls)} className="btn-ghost" style={{ display: "flex", alignItems: "center", fontSize: "0.75rem", padding: "0.25rem 0.5rem", color: "#3b82f6", background: "rgba(59, 130, 246, 0.1)", borderRadius: "4px", border: "none", cursor: "pointer" }}>
+                          <Edit size={14} style={{ marginRight: "0.25rem" }} /> Edit
+                        </button>
+                        <button onClick={() => handleDelete(cls.id)} className="btn-ghost" style={{ display: "flex", alignItems: "center", fontSize: "0.75rem", padding: "0.25rem 0.5rem", color: "#ef4444", background: "rgba(239, 68, 68, 0.1)", borderRadius: "4px", border: "none", cursor: "pointer" }}>
+                          <Trash2 size={14} style={{ marginRight: "0.25rem" }} /> Delete
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))

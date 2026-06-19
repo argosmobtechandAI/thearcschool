@@ -43,10 +43,10 @@ const SubjectManagement = () => {
     setLoading(true);
     try {
       if (editingId) {
-        await api.put(`/subjects/updateSubject/${editingId}`, { data: formData });
+        await api.put(`/admin_panel/subjects/updateSubject/${editingId}`, { data: formData });
         toast.success("Subject updated successfully");
       } else {
-        await api.post("/subjects/createSubject", { data: formData });
+        await api.post("/admin_panel/subjects/createSubject", { data: formData });
         toast.success("Subject created successfully");
       }
       setIsModalOpen(false);
@@ -61,7 +61,7 @@ const SubjectManagement = () => {
   const handleDelete = async (id) => {
     if (!window.confirm("Are you sure you want to delete this subject?")) return;
     try {
-      await api.delete(`/subjects/deleteSubject/${id}`);
+      await api.delete(`/admin_panel/subjects/deleteSubject/${id}`);
       toast.success("Subject deleted successfully");
       dispatch(fetchSubjects());
     } catch (error) {
@@ -121,11 +121,11 @@ const SubjectManagement = () => {
                     <td style={{ padding: "1rem", fontWeight: "500" }}>{subject.name}</td>
                     <td style={{ padding: "1rem", textAlign: "right" }}>
                       <div style={{ display: "flex", gap: "0.5rem", justifyContent: "flex-end" }}>
-                        <button onClick={() => handleOpenModal(subject)} className="btn-ghost" style={{ padding: "0.5rem", border: "none", cursor: "pointer", background: "rgba(96,165,250,0.1)", color: "#60a5fa", borderRadius: "8px" }} title="Edit">
-                          <Edit2 size={16} />
+                        <button onClick={() => handleOpenModal(subject)} className="btn-ghost" style={{ display: "flex", alignItems: "center", fontSize: "0.75rem", padding: "0.25rem 0.5rem", color: "#3b82f6", background: "rgba(59, 130, 246, 0.1)", borderRadius: "4px", border: "none", cursor: "pointer" }}>
+                          <Edit2 size={14} style={{ marginRight: "0.25rem" }} /> Edit
                         </button>
-                        <button onClick={() => handleDelete(subject.id)} className="btn-ghost" style={{ padding: "0.5rem", border: "none", cursor: "pointer", background: "rgba(239,68,68,0.1)", color: "#ef4444", borderRadius: "8px" }} title="Delete">
-                          <Trash2 size={16} />
+                        <button onClick={() => handleDelete(subject.id)} className="btn-ghost" style={{ display: "flex", alignItems: "center", fontSize: "0.75rem", padding: "0.25rem 0.5rem", color: "#ef4444", background: "rgba(239, 68, 68, 0.1)", borderRadius: "4px", border: "none", cursor: "pointer" }}>
+                          <Trash2 size={14} style={{ marginRight: "0.25rem" }} /> Delete
                         </button>
                       </div>
                     </td>

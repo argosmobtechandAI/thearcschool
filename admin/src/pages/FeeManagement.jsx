@@ -113,10 +113,10 @@ const FeeManagement = () => {
     e.preventDefault();
     try {
       if (editingFeeId) {
-        await api.put(`/fees/updateFee/${editingFeeId}`, { data: feeForm });
+        await api.put(`/finance_panel/updateFee/${editingFeeId}`, { data: feeForm });
         toast.success("Fee updated");
       } else {
-        await api.post("/user/createFees", { data: feeForm });
+        await api.post("/finance_panel/createFee", { data: feeForm });
         toast.success("Fee created");
       }
       setIsFeeModalOpen(false);
@@ -129,7 +129,7 @@ const FeeManagement = () => {
   const handleDeleteFee = async (id) => {
     if (window.confirm("Delete this fee?")) {
       try {
-        await api.delete(`/fees/deleteFee/${id}`);
+        await api.delete(`/finance_panel/deleteFee/${id}`);
         toast.success("Deleted successfully");
         dispatch(fetchFees());
       } catch (err) {

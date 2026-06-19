@@ -25,7 +25,7 @@ const Complaints = () => {
   const fetchComplaints = async () => {
     try {
       setLoading(true);
-      const res = await api.get("/complaint/getComplaint");
+      const res = await api.get("/admin_panel/complaints");
       setComplaints(res.data.complaint || []);
     } catch (e) {
       toast.error("Failed to load complaints");
@@ -42,7 +42,7 @@ const Complaints = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      await api.post("/complaint/createComplaint", { data: formData });
+      await api.post("/admin_panel/complaints", { data: formData });
       toast.success("Complaint logged successfully");
       setOpenModal(false);
       fetchComplaints();

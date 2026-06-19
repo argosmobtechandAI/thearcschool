@@ -1,219 +1,171 @@
-import React, { useState, useEffect, useRef } from "react";
-import { Calendar as CalendarIcon, ChevronDown, X } from "lucide-react";
+import React, { useState, useEffect } from 'react';
+import { Calendar } from 'lucide-react';
 
-// Helper to format date as YYYY-MM-DD
-export const formatDate = (date) => {
-  if (!date) return "";
-  const d = new Date(date);
+export const formatDate = (d) => {
   const year = d.getFullYear();
-  const month = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
   return `${year}-${month}-${day}`;
 };
 
-const presets = [
-  { label: "Today", getValue: () => { const d = new Date(); return { start: formatDate(d), end: formatDate(d) } } },
-  { label: "Yesterday", getValue: () => { const d = new Date(); d.setDate(d.getDate() - 1); return { start: formatDate(d), end: formatDate(d) } } },
-  { label: "This Week", getValue: () => { 
-      const curr = new Date(); 
-      const first = curr.getDate() - curr.getDay() + 1; // Monday
-      const last = first + 6; // Sunday
-      return { start: formatDate(new Date(curr.setDate(first))), end: formatDate(new Date(curr.setDate(last))) };
-  }},
-  { label: "Last 7 Days", getValue: () => { const d = new Date(); const start = new Date(d); start.setDate(d.getDate() - 6); return { start: formatDate(start), end: formatDate(d) } } },
-  { label: "This Month", getValue: () => { const d = new Date(); return { start: formatDate(new Date(d.getFullYear(), d.getMonth(), 1)), end: formatDate(new Date(d.getFullYear(), d.getMonth() + 1, 0)) } } },
-  { label: "Last Month", getValue: () => { const d = new Date(); return { start: formatDate(new Date(d.getFullYear(), d.getMonth() - 1, 1)), end: formatDate(new Date(d.getFullYear(), d.getMonth(), 0)) } } },
-  { label: "All Time", getValue: () => ({ start: "", end: "" }) },
-];
+const DateRangePicker = ({ 
+  startDate, endDate, 
+  setStartDate, setEndDate, 
+  value, onRangeChange,
+  defaultRange = 'mtd',
+  initialPreset
+}) => {
+  const actualStartDate = value?.start || startDate;
+  const actualEndDate = value?.end || endDate;
+  const [selectedRange, setSelectedRange] = useState(initialPreset || defaultRange);
 
-const DateRangePicker = ({ value, onRangeChange, initialPreset = "All Time" }) => {
-  const [isOpen, setIsOpen] = useState(false);
-  const [activePreset, setActivePreset] = useState(initialPreset);
-  const [customRange, setCustomRange] = useState(value || { start: "", end: "" });
-  const wrapperRef = useRef(null);
+  const ranges = {
+    custom: "Custom",
+    today: "Today",
+    yesterday: "Yesterday",
+    this_week: "This Week",
+    mtd: "This Month (MTD)",
+    last_month: "Last Month",
+    ytd: "This Year (YTD)"
+  };
 
-  useEffect(() => {
-    if (initialPreset !== "All Time" && !value) {
-        const preset = presets.find(p => p.label === initialPreset);
-        if (preset) {
-            const range = preset.getValue();
-            setCustomRange(range);
+    const getRangeDates = (range) => {
+      const today = new Date();
+      today.setHours(0,0,0,0);
+
+      let start = "";
+      let end = formatDate(today);
+
+      switch(range) {
+        case 'today':
+          start = end;
+          break;
+        case 'yesterday': {
+          const y = new Date(today);
+          y.setDate(y.getDate() - 1);
+          start = formatDate(y);
+          end = formatDate(y);
+          break;
         }
-    }
-  }, []);
-
-  useEffect(() => {
-    if (value && (value.start !== customRange.start || value.end !== customRange.end)) {
-      setCustomRange(value);
-      // If the passed value doesn't exactly match the current preset, switch to Custom Range
-      const currentPresetVal = presets.find(p => p.label === activePreset)?.getValue();
-      if (!currentPresetVal || currentPresetVal.start !== value.start || currentPresetVal.end !== value.end) {
-        setActivePreset("Custom Range");
+        case 'this_week': {
+          const w = new Date(today);
+          w.setDate(w.getDate() - w.getDay());
+          start = formatDate(w);
+          break;
+        }
+        case 'mtd': {
+          const m = new Date(today);
+          m.setDate(1);
+          start = formatDate(m);
+          break;
+        }
+        case 'last_month': {
+          const lmStart = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+          const lmEnd = new Date(today.getFullYear(), today.getMonth(), 0);
+          start = formatDate(lmStart);
+          end = formatDate(lmEnd);
+          break;
+        }
+        case 'ytd': {
+          const yStart = new Date(today.getFullYear(), 0, 1);
+          start = formatDate(yStart);
+          break;
+        }
+        default:
+          return null;
       }
-    }
-  }, [value]);
+      return { start, end };
+    };
 
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (wrapperRef.current && !wrapperRef.current.contains(event.target)) {
-        setIsOpen(false);
+    const setRangeDates = (range) => {
+      if (range === 'custom') return;
+      const dates = getRangeDates(range);
+      if (dates) {
+        if (typeof onRangeChange === 'function') onRangeChange(dates);
+        if (typeof setStartDate === 'function') setStartDate(dates.start);
+        if (typeof setEndDate === 'function') setEndDate(dates.end);
       }
     };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
 
-  const handlePresetClick = (preset) => {
-    setActivePreset(preset.label);
-    const range = preset.getValue();
-    setCustomRange(range);
-    onRangeChange(range);
-    setIsOpen(false);
+  useEffect(() => {
+    if (!actualStartDate && !actualEndDate && selectedRange !== 'custom') {
+      const dates = getRangeDates(initialPreset || defaultRange);
+      if (dates) {
+        if (typeof onRangeChange === 'function') onRangeChange(dates);
+        if (typeof setStartDate === 'function') setStartDate(dates.start);
+        if (typeof setEndDate === 'function') setEndDate(dates.end);
+        setSelectedRange(initialPreset || defaultRange);
+      }
+    } else if (actualStartDate || actualEndDate) {
+      let matchedRange = 'custom';
+      for (const key of Object.keys(ranges)) {
+        if (key === 'custom') continue;
+        const testRange = getRangeDates(key);
+        if (testRange && testRange.start === actualStartDate && testRange.end === actualEndDate) {
+          matchedRange = key;
+          break;
+        }
+      }
+      if (selectedRange !== matchedRange) {
+        setSelectedRange(matchedRange);
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [actualStartDate, actualEndDate]);
+
+  const handleRangeChange = (e) => {
+    const val = e.target.value;
+    setSelectedRange(val);
+    setRangeDates(val);
   };
 
-  const applyCustomRange = () => {
-    setActivePreset("Custom Range");
-    onRangeChange(customRange);
-    setIsOpen(false);
-  };
-
-  const clearRange = (e) => {
-    e.stopPropagation();
-    setActivePreset("All Time");
-    setCustomRange({ start: "", end: "" });
-    onRangeChange({ start: "", end: "" });
-  };
-
-  const getDisplayText = () => {
-    if (activePreset !== "Custom Range") return activePreset;
-    if (customRange.start && customRange.end) return `${customRange.start} to ${customRange.end}`;
-    if (customRange.start) return `From ${customRange.start}`;
-    if (customRange.end) return `Until ${customRange.end}`;
-    return "Custom Range";
+  // If user manually edits dates, switch to custom
+  const handleDateChange = (type, val) => {
+    setSelectedRange('custom');
+    if (typeof onRangeChange === 'function') {
+      if (type === 'start') onRangeChange({ start: val, end: actualEndDate });
+      else onRangeChange({ start: actualStartDate, end: val });
+    }
+    if (type === 'start' && typeof setStartDate === 'function') setStartDate(val);
+    if (type === 'end' && typeof setEndDate === 'function') setEndDate(val);
   };
 
   return (
-    <div style={{ position: "relative" }} ref={wrapperRef}>
-      {/* Trigger Button */}
-      <button
-        onClick={() => setIsOpen(!isOpen)}
-        className="btn-ghost"
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: "0.5rem",
-          padding: "0.6rem 1rem",
-          background: "var(--glass-bg)",
-          border: "1px solid var(--glass-border)",
-          borderRadius: "8px",
-          color: "var(--text-primary)",
-          fontSize: "0.875rem",
-          minWidth: "180px",
-          justifyContent: "space-between"
-        }}
+    <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
+      <select 
+        className="input-glass"
+        style={{ padding: "0.4rem 0.5rem", cursor: "pointer", width: "160px", fontSize: "0.8rem", appearance: "auto" }}
+        value={selectedRange}
+        onChange={handleRangeChange}
       >
-        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-          <CalendarIcon size={16} color="var(--text-secondary)" />
-          <span>{getDisplayText()}</span>
-        </div>
-        <div style={{ display: "flex", alignItems: "center", gap: "0.25rem" }}>
-          {activePreset !== "All Time" && (
-            <div
-              onClick={clearRange}
-              style={{
-                display: "flex", alignItems: "center", justifyContent: "center",
-                width: "18px", height: "18px", borderRadius: "50%",
-                background: "rgba(255,255,255,0.1)", cursor: "pointer"
-              }}
-            >
-              <X size={12} />
-            </div>
-          )}
-          <ChevronDown size={16} color="var(--text-secondary)" />
-        </div>
-      </button>
+        {Object.entries(ranges).map(([k, v]) => (
+          <option key={k} value={k} style={{ color: "black" }}>{v}</option>
+        ))}
+      </select>
 
-      {/* Popover */}
-      {isOpen && (
-        <div
-          className="glass-panel animate-fade-in"
-          style={{
-            position: "absolute",
-            top: "calc(100% + 0.5rem)",
-            right: 0,
-            zIndex: 50,
-            minWidth: "340px",
-            padding: "1rem",
-            boxShadow: "0 10px 25px -5px rgba(0, 0, 0, 0.3)",
-          }}
-        >
-          <div style={{ display: "flex", gap: "1.5rem" }}>
-            {/* Presets Column */}
-            <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: "0.25rem", borderRight: "1px solid var(--glass-border)", paddingRight: "1rem" }}>
-              <div style={{ fontSize: "0.75rem", color: "var(--text-secondary)", fontWeight: "600", marginBottom: "0.5rem", textTransform: "uppercase", letterSpacing: "0.05em" }}>
-                Presets
-              </div>
-              {presets.map(p => (
-                <button
-                  key={p.label}
-                  onClick={() => handlePresetClick(p)}
-                  style={{
-                    textAlign: "left",
-                    padding: "0.5rem 0.75rem",
-                    borderRadius: "6px",
-                    background: activePreset === p.label ? "rgba(96,165,250,0.15)" : "transparent",
-                    color: activePreset === p.label ? "var(--accent-primary)" : "var(--text-primary)",
-                    border: "none",
-                    cursor: "pointer",
-                    fontSize: "0.875rem",
-                    transition: "all 0.2s"
-                  }}
-                  className={activePreset !== p.label ? "hover-bg" : ""}
-                >
-                  {p.label}
-                </button>
-              ))}
-            </div>
-
-            {/* Custom Range Column */}
-            <div style={{ flex: 1, display: "flex", flexDirection: "column" }}>
-              <div style={{ fontSize: "0.75rem", color: "var(--text-secondary)", fontWeight: "600", marginBottom: "0.5rem", textTransform: "uppercase", letterSpacing: "0.05em" }}>
-                Custom Range
-              </div>
-              
-              <div style={{ marginBottom: "1rem" }}>
-                <label style={{ display: "block", fontSize: "0.75rem", color: "var(--text-secondary)", marginBottom: "0.25rem" }}>Start Date</label>
-                <input
-                  type="date"
-                  className="input-glass"
-                  style={{ width: "100%", padding: "0.5rem", fontSize: "0.875rem" }}
-                  value={customRange.start}
-                  onChange={(e) => setCustomRange({ ...customRange, start: e.target.value })}
-                />
-              </div>
-              
-              <div style={{ marginBottom: "1.5rem" }}>
-                <label style={{ display: "block", fontSize: "0.75rem", color: "var(--text-secondary)", marginBottom: "0.25rem" }}>End Date</label>
-                <input
-                  type="date"
-                  className="input-glass"
-                  style={{ width: "100%", padding: "0.5rem", fontSize: "0.875rem" }}
-                  value={customRange.end}
-                  onChange={(e) => setCustomRange({ ...customRange, end: e.target.value })}
-                />
-              </div>
-
-              <button 
-                onClick={applyCustomRange}
-                className="btn btn-primary"
-                style={{ width: "100%", padding: "0.5rem", fontSize: "0.875rem" }}
-              >
-                Apply Range
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <div style={{ position: "relative" }}>
+        <Calendar size={16} style={{ position: "absolute", left: "0.75rem", top: "50%", transform: "translateY(-50%)", color: "var(--text-secondary)" }} />
+        <input
+          type="date"
+          className="input-glass"
+          style={{ paddingLeft: "2rem", margin: 0, paddingRight: "0.5rem", width: "145px", fontSize: "0.8rem", padding: "0.4rem 0.4rem 0.4rem 2.2rem" }}
+          value={actualStartDate || ""}
+          onChange={(e) => handleDateChange('start', e.target.value)}
+          title="Start Date"
+        />
+      </div>
+      <span style={{ color: "var(--text-secondary)", fontSize: "0.875rem" }}>to</span>
+      <div style={{ position: "relative" }}>
+        <Calendar size={16} style={{ position: "absolute", left: "0.75rem", top: "50%", transform: "translateY(-50%)", color: "var(--text-secondary)" }} />
+        <input
+          type="date"
+          className="input-glass"
+          style={{ paddingLeft: "2rem", margin: 0, paddingRight: "0.5rem", width: "145px", fontSize: "0.8rem", padding: "0.4rem 0.4rem 0.4rem 2.2rem" }}
+          value={actualEndDate || ""}
+          onChange={(e) => handleDateChange('end', e.target.value)}
+          title="End Date"
+        />
+      </div>
     </div>
   );
 };

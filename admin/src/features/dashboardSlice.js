@@ -11,6 +11,7 @@ const initialState = {
     activeClasses: 0,
     eventsToday: 0,
     presentToday: 0,
+    totalRooms: 0,
   },
   topper: null,
   loading: false,

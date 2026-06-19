@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { fetchNewUsers } from "../features/dataSlice";
+import { fetchNewUsers, fetchUsers } from "../features/dataSlice";
 import { toast } from "react-toastify";
 import api, { uploadFile } from "../services/api";
 import { FileText, CheckCircle, XCircle, Plus, Edit, Trash2, FileSpreadsheet, ChevronUp, ChevronDown, ChevronsUpDown } from "lucide-react";
@@ -10,7 +10,7 @@ import { useSortableData } from "../hooks/useSortableData";
 
 const AdmissionManagement = () => {
   const dispatch = useDispatch();
-  const { newUsers, loadingNewUsers } = useSelector((state) => state.data);
+  const { newUsers, loadingNewUsers, users } = useSelector((state) => state.data);
 
   const [filter, setFilter] = useState("All");
   const [genderFilter, setGenderFilter] = useState("");
@@ -19,7 +19,7 @@ const AdmissionManagement = () => {
   const [editingId, setEditingId] = useState(null);
   const [loading, setLoading] = useState(false);
   const [selectedColumns, setSelectedColumns] = useState([
-    "name", "email", "parent", "status", "documents"
+    "name", "email", "parent", "status", "assigned_to", "documents"
   ]);
 
   const [formData, setFormData] = useState({
@@ -32,6 +32,9 @@ const AdmissionManagement = () => {
     dob: "",
     gender: "",
     documents: [],
+    monthly_fee: "",
+    bus_fee: "",
+    assigned_to: "",
   });
 
   const [selectedFiles, setSelectedFiles] = useState({
@@ -42,6 +45,7 @@ const AdmissionManagement = () => {
 
   useEffect(() => {
     dispatch(fetchNewUsers());
+    dispatch(fetchUsers());
   }, [dispatch]);
 
   const handleFileUpload = async (fileUpload) => {
@@ -76,14 +80,14 @@ const AdmissionManagement = () => {
 
       const payload = {
         ...formData,
-        documents: documentsArray,
+        documents: [...(formData.documents || []), ...documentsArray],
       };
 
       if (editingId) {
-        await api.put(`/newUser/updateNewUser/${editingId}`, { data: payload });
+        await api.put(`/admission_panel/updateNewUser/${editingId}`, { data: payload });
         toast.success("Application updated successfully");
       } else {
-        await api.post("/newUser/createNewUser", { data: payload });
+        await api.post("/admission_panel/createNewUser", { data: payload });
         toast.success("Application submitted successfully");
       }
 
@@ -105,11 +109,13 @@ const AdmissionManagement = () => {
         type: "student",
         documents: { pan: "", aadhar: "" },
         phone: String(user.phone),
+        monthly_fee: user.monthly_fee || 0,
+        bus_fee: user.bus_fee || 0,
         address: "",
         links: { fb: "", insta: "", linkdIn: "", twitter: "" },
       };
 
-      await api.post("/newUser/approveNewUser", { data: { payload, id: user.id, status } });
+      await api.post("/admission_panel/approveNewUser", { data: { payload, id: user.id, status } });
       toast.success(`Application ${status} successfully`);
       dispatch(fetchNewUsers());
     } catch (error) {
@@ -122,7 +128,7 @@ const AdmissionManagement = () => {
   const handleDelete = async (id) => {
     if (window.confirm("Are you sure you want to delete this application?")) {
       try {
-        await api.delete(`/newUser/deleteNewUser/${id}`);
+        await api.delete(`/admission_panel/deleteNewUser/${id}`);
         toast.success("Application deleted successfully");
         dispatch(fetchNewUsers());
       } catch (error) {
@@ -133,9 +139,16 @@ const AdmissionManagement = () => {
 
   const closeModal = () => {
     setEditingId(null);
-    setFormData({ name: "", email: "", parent: "", parentEmail: "", phone: "", status: "Pending", dob: "", gender: "", documents: [] });
+    setFormData({ name: "", email: "", parent: "", parentEmail: "", phone: "", status: "Pending", dob: "", gender: "", documents: [], monthly_fee: "", bus_fee: "", assigned_to: "" });
     setSelectedFiles({ aadhar: null, pan: null, birthCertificate: null });
     setOpenModal(false);
+  };
+
+  const removeDocument = (indexToRemove) => {
+    setFormData(prev => ({
+      ...prev,
+      documents: prev.documents.filter((_, idx) => idx !== indexToRemove)
+    }));
   };
 
   const handleEdit = (user) => {
@@ -150,6 +163,10 @@ const AdmissionManagement = () => {
       dob: user.dob,
       gender: user.gender,
       documents: user.documents || [],
+      monthly_fee: user.monthly_fee || "",
+      transport_required: user.transport_required || false,
+      transport_distance_km: user.transport_distance_km || 0,
+      assigned_to: user.assigned_to || "",
     });
     setOpenModal(true);
   };
@@ -171,6 +188,7 @@ const AdmissionManagement = () => {
     { key: "phone", label: "Phone" },
     { key: "status", label: "Status" },
     { key: "documents", label: "Documents" },
+    { key: "assigned_to", label: "Assigned Counselor" },
     { key: "dob", label: "Date of Birth" },
     { key: "gender", label: "Gender" },
     { key: "created_at", label: "Applied Date" }
@@ -261,6 +279,10 @@ const AdmissionManagement = () => {
             ))}
           </div>
         );
+      case "assigned_to": {
+        const counselor = users?.find(u => String(u.id) === String(user.assigned_to));
+        return counselor ? <div style={{ color: "#3b82f6", fontWeight: "500" }}>{counselor.name}</div> : <div style={{ color: "var(--text-secondary)" }}>Unassigned</div>;
+      }
       case "dob": return user.dob || "N/A";
       case "gender": return user.gender || "N/A";
       case "created_at": return user.created_at ? new Date(user.created_at).toLocaleDateString() : "N/A";
@@ -415,43 +437,72 @@ const AdmissionManagement = () => {
                     <option value="Female">Female</option>
                   </select>
                 </div>
+                <div>
+                  <label style={{ display: "block", marginBottom: "0.5rem", fontSize: "0.875rem" }}>Monthly Fee</label>
+                  <input type="number" className="input-glass" value={formData.monthly_fee} onChange={(e) => setFormData({ ...formData, monthly_fee: e.target.value })} />
+                </div>
+                <div>
+                  <label style={{ display: "block", marginBottom: "0.5rem", fontSize: "0.875rem" }}>Transport Required</label>
+                  <select className="input-glass" value={formData.transport_required} onChange={(e) => setFormData({ ...formData, transport_required: e.target.value === "true" })}>
+                    <option value="false">No</option>
+                    <option value="true">Yes</option>
+                  </select>
+                </div>
+                {formData.transport_required && (
+                  <div>
+                    <label style={{ display: "block", marginBottom: "0.5rem", fontSize: "0.875rem" }}>Transport Distance (km)</label>
+                    <input type="number" step="0.1" className="input-glass" value={formData.transport_distance_km} onChange={(e) => setFormData({ ...formData, transport_distance_km: e.target.value })} />
+                  </div>
+                )}
+                <div>
+                  <label style={{ display: "block", marginBottom: "0.5rem", fontSize: "0.875rem" }}>Assign Counselor</label>
+                  <select className="input-glass" value={formData.assigned_to} onChange={(e) => setFormData({ ...formData, assigned_to: e.target.value })}>
+                    <option value="">Unassigned</option>
+                    {users?.filter(u => u.type === 'admission').map(c => (
+                      <option key={c.id} value={c.id}>{c.name}</option>
+                    ))}
+                  </select>
+                </div>
               </div>
 
-              {!editingId && (
-                <div style={{ marginTop: "1rem", borderTop: "1px solid var(--glass-border)", paddingTop: "1rem" }}>
-                  <h3 style={{ marginBottom: "1rem", fontSize: "1rem", fontWeight: "600" }}>Documents</h3>
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "1rem" }}>
-                    <div>
-                      <label style={{ display: "block", marginBottom: "0.5rem", fontSize: "0.75rem" }}>Aadhar Card</label>
-                      <input type="file" style={{ fontSize: "0.75rem" }} onChange={(e) => setSelectedFiles({ ...selectedFiles, aadhar: e.target.files[0] })} />
-                    </div>
-                    <div>
-                      <label style={{ display: "block", marginBottom: "0.5rem", fontSize: "0.75rem" }}>PAN Card</label>
-                      <input type="file" style={{ fontSize: "0.75rem" }} onChange={(e) => setSelectedFiles({ ...selectedFiles, pan: e.target.files[0] })} />
-                    </div>
-                    <div>
-                      <label style={{ display: "block", marginBottom: "0.5rem", fontSize: "0.75rem" }}>Birth Certificate</label>
-                      <input type="file" style={{ fontSize: "0.75rem" }} onChange={(e) => setSelectedFiles({ ...selectedFiles, birthCertificate: e.target.files[0] })} />
-                    </div>
+              <div style={{ marginTop: "1rem", borderTop: "1px solid var(--glass-border)", paddingTop: "1rem" }}>
+                <h3 style={{ marginBottom: "1rem", fontSize: "1rem", fontWeight: "600" }}>Upload Documents</h3>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "1rem" }}>
+                  <div>
+                    <label style={{ display: "block", marginBottom: "0.5rem", fontSize: "0.75rem" }}>Aadhar Card</label>
+                    <input type="file" style={{ fontSize: "0.75rem" }} onChange={(e) => setSelectedFiles({ ...selectedFiles, aadhar: e.target.files[0] })} />
+                  </div>
+                  <div>
+                    <label style={{ display: "block", marginBottom: "0.5rem", fontSize: "0.75rem" }}>PAN Card</label>
+                    <input type="file" style={{ fontSize: "0.75rem" }} onChange={(e) => setSelectedFiles({ ...selectedFiles, pan: e.target.files[0] })} />
+                  </div>
+                  <div>
+                    <label style={{ display: "block", marginBottom: "0.5rem", fontSize: "0.75rem" }}>Birth Certificate</label>
+                    <input type="file" style={{ fontSize: "0.75rem" }} onChange={(e) => setSelectedFiles({ ...selectedFiles, birthCertificate: e.target.files[0] })} />
                   </div>
                 </div>
-              )}
+              </div>
 
-              {editingId && formData.documents && formData.documents.length > 0 && (
+              {formData.documents && formData.documents.length > 0 && (
                 <div style={{ marginTop: "1rem", borderTop: "1px solid var(--glass-border)", paddingTop: "1rem" }}>
                   <h3 style={{ marginBottom: "1rem", fontSize: "1rem", fontWeight: "600" }}>Uploaded Documents</h3>
                   <div style={{ display: "flex", gap: "1rem", flexWrap: "wrap" }}>
                     {formData.documents.map((doc, idx) => (
-                      <a key={idx} href={doc.url} target="_blank" rel="noopener noreferrer" className="btn-ghost" style={{ display: "flex", alignItems: "center", gap: "0.5rem", fontSize: "0.875rem", padding: "0.5rem 1rem", border: "1px solid var(--glass-border)", borderRadius: "6px", textDecoration: "none" }}>
-                        <FileText size={16} color="var(--accent-primary)" />
-                        {doc.type ? doc.type.toUpperCase() : "Document"}
-                      </a>
+                      <div key={idx} style={{ display: "flex", alignItems: "center", gap: "0.5rem", fontSize: "0.875rem", padding: "0.5rem 1rem", border: "1px solid var(--glass-border)", borderRadius: "6px" }}>
+                        <a href={doc.url} target="_blank" rel="noopener noreferrer" className="btn-ghost" style={{ display: "flex", alignItems: "center", gap: "0.5rem", textDecoration: "none" }}>
+                          <FileText size={16} color="var(--accent-primary)" />
+                          {doc.type ? doc.type.toUpperCase() : "Document"}
+                        </a>
+                        <button type="button" onClick={() => removeDocument(idx)} style={{ background: "none", border: "none", cursor: "pointer", display: "flex", alignItems: "center", padding: "0.25rem", borderRadius: "50%", color: "#ef4444" }}>
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
                     ))}
                   </div>
                 </div>
               )}
 
-              <div style={{ display: "flex", justifyContent: "flex-end", gap: "1rem", marginTop: "1.5rem" }}>
+              <div style={{ display: "flex", justifyContent: "flex-end", gap: "1rem", marginTop: "2rem" }}>
                 <button type="button" onClick={closeModal} className="btn btn-ghost">Cancel</button>
                 <button type="submit" disabled={loading} className="btn btn-primary">{loading ? "Saving..." : "Save Application"}</button>
               </div>

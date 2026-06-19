@@ -36,10 +36,10 @@ const Events = () => {
     setLoading(true);
     try {
       if (editingId) {
-        await api.put(`/events/updateEvents/${editingId}`, { data: formData });
+        await api.put(`/admin_panel/events/updateEvents/${editingId}`, { data: formData });
         toast.success("Event updated successfully");
       } else {
-        await api.post("/events/createEvents", { data: formData });
+        await api.post("/admin_panel/events/createEvents", { data: formData });
         toast.success("Event created successfully");
       }
       dispatch(fetchEvents());
@@ -54,7 +54,7 @@ const Events = () => {
   const handleDelete = async (id) => {
     if (window.confirm("Are you sure you want to delete this event?")) {
       try {
-        await api.delete(`/events/deleteEvents/${id}`);
+        await api.delete(`/admin_panel/events/deleteEvents/${id}`);
         toast.success("Event deleted");
         dispatch(fetchEvents());
       } catch (error) {

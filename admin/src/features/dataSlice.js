@@ -5,7 +5,7 @@ export const fetchUsers = createAsyncThunk(
   "data/fetchUsers",
   async (_, { rejectWithValue }) => {
     try {
-      const response = await api.get("/user/getUser");
+      const response = await api.get("/admin_panel/users");
       return response.data.users;
     } catch (error) {
       return rejectWithValue(error.response.data);
@@ -17,7 +17,7 @@ export const fetchClasses = createAsyncThunk(
   "data/fetchClasses",
   async (_, { rejectWithValue }) => {
     try {
-      const response = await api.get("/class/getClass");
+      const response = await api.get("/admin_panel/class/getClass");
       return response.data.classes;
     } catch (error) {
       return rejectWithValue(error.response.data);
@@ -41,7 +41,7 @@ export const fetchExams = createAsyncThunk(
   "data/fetchExams",
   async (_, { rejectWithValue }) => {
     try {
-      const response = await api.get("/exams/getExams");
+      const response = await api.get("/admin_panel/exams");
       return response.data.exams || response.data;
     } catch (error) {
       return rejectWithValue(error.response?.data || "Network Error");
@@ -65,7 +65,7 @@ export const fetchSubjects = createAsyncThunk(
   "data/fetchSubjects",
   async (_, { rejectWithValue }) => {
     try {
-      const response = await api.get("/subjects/getSubjects");
+      const response = await api.get("/admin_panel/subjects/getSubjects");
       return response.data.subjects;
     } catch (error) {
       return rejectWithValue(error.response?.data || "Network Error");
@@ -86,17 +86,17 @@ export const fetchRooms = createAsyncThunk(
 );
 
 export const fetchNewUsers = createAsyncThunk("data/fetchNewUsers", async () => {
-  const response = await api.get("/newUser/getAllNewUser");
+  const response = await api.get("/admission_panel/getAllNewUser");
   return response.data.users || response.data.data;
 });
 
 export const fetchTimeTables = createAsyncThunk("data/fetchTimeTables", async () => {
-  const response = await api.get("/timeTable/getTimeTable");
+  const response = await api.get("/admin_panel/timeTable/getTimeTable");
   return response.data.timeTables || [];
 });
 
 export const fetchEvents = createAsyncThunk('data/fetchEvents', async () => {
-    const response = await api.get("/events/getAllEvents");
+    const response = await api.get("/admin_panel/events/getAllEvents");
     return response.data.data || response.data.events || [];
 });
 

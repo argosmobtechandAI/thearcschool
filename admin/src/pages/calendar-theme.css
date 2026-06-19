@@ -1,0 +1,103 @@
+/* react-big-calendar glassmorphism overrides */
+
+.rbc-calendar {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: 12px;
+  backdrop-filter: blur(12px);
+  padding: 10px;
+  color: var(--text-primary);
+  font-family: 'Inter', sans-serif;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+}
+
+.rbc-header {
+  padding: 12px;
+  font-weight: 600;
+  border-bottom: 1px solid var(--glass-border) !important;
+  color: var(--text-primary);
+  text-transform: uppercase;
+  font-size: 0.85rem;
+  letter-spacing: 0.5px;
+}
+
+.rbc-month-view, .rbc-time-view, .rbc-agenda-view {
+  border: 1px solid var(--glass-border);
+  border-radius: 8px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.rbc-month-row, .rbc-day-bg, .rbc-time-header, .rbc-time-content, .rbc-timeslot-group, .rbc-time-slot {
+  border-color: var(--glass-border) !important;
+}
+
+.rbc-off-range-bg {
+  background: rgba(0, 0, 0, 0.05);
+}
+
+.rbc-today {
+  background: rgba(59, 130, 246, 0.05) !important;
+}
+
+.rbc-toolbar {
+  margin-bottom: 1.5rem;
+}
+
+.rbc-toolbar button {
+  color: var(--text-primary);
+  border: 1px solid var(--glass-border);
+  background: var(--glass-bg);
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+.rbc-toolbar button:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.rbc-toolbar button.rbc-active {
+  background: var(--accent-primary);
+  color: white;
+  border-color: var(--accent-primary);
+  box-shadow: none;
+}
+
+.rbc-toolbar button:active, .rbc-toolbar button:focus {
+  outline: none;
+  box-shadow: none;
+}
+
+.rbc-event {
+  transition: transform 0.1s ease, box-shadow 0.1s ease;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.rbc-event:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+}
+
+.rbc-event.rbc-selected {
+  outline: 2px solid rgba(255, 255, 255, 0.5);
+  box-shadow: 0 0 0 2px var(--accent-primary);
+}
+
+/* Time indicator line */
+.rbc-current-time-indicator {
+  background-color: #ef4444;
+  height: 2px;
+}
+.rbc-current-time-indicator::before {
+  content: '';
+  position: absolute;
+  left: -4px;
+  top: -4px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background-color: #ef4444;
+}

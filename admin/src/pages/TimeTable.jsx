@@ -3,9 +3,34 @@ import { useDispatch, useSelector } from "react-redux";
 import { fetchTimeTables, fetchClasses, fetchUsers, fetchSubjects, fetchRooms } from "../features/dataSlice";
 import { toast } from "react-toastify";
 import api from "../services/api";
-import { Calendar, Plus, Clock, ChevronLeft, ChevronRight, Edit2, Trash2, Filter } from "lucide-react";
+import { Calendar, Plus, Clock, ChevronLeft, ChevronRight, Edit2, Trash2, Filter, Download, Copy } from "lucide-react";
 import TimePicker from "../components/TimePicker";
 import DateRangePicker, { formatDate } from "../components/DateRangePicker";
+import { exportToExcel, exportToPDF } from "../utils/exportUtils";
+import { Calendar as BigCalendar, dateFnsLocalizer, Views } from 'react-big-calendar';
+import format from 'date-fns/format';
+import parse from 'date-fns/parse';
+import startOfWeek from 'date-fns/startOfWeek';
+import getDay from 'date-fns/getDay';
+import enUS from 'date-fns/locale/en-US';
+import 'react-big-calendar/lib/css/react-big-calendar.css';
+import dragAndDropModule from 'react-big-calendar/lib/addons/dragAndDrop';
+import 'react-big-calendar/lib/addons/dragAndDrop/styles.css';
+import './calendar-theme.css';
+
+const withDragAndDrop = dragAndDropModule.default || dragAndDropModule;
+const DnDCalendar = withDragAndDrop(BigCalendar);
+
+const locales = {
+  'en-US': enUS,
+}
+const localizer = dateFnsLocalizer({
+  format,
+  parse,
+  startOfWeek,
+  getDay,
+  locales,
+})
 
 const getThisWeek = () => {
   const curr = new Date(); 
@@ -14,17 +39,101 @@ const getThisWeek = () => {
   return { start: formatDate(new Date(curr.setDate(first))), end: formatDate(new Date(curr.setDate(last))) };
 };
 
-const TimeTable = () => {
+const CustomToolbar = (toolbar) => {
+  const goToBack = () => {
+    toolbar.onNavigate('PREV');
+  };
+
+  const goToNext = () => {
+    toolbar.onNavigate('NEXT');
+  };
+
+  const goToCurrent = () => {
+    toolbar.onNavigate('TODAY');
+  };
+
+  return (
+    <div className="rbc-toolbar" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', padding: '0.5rem' }}>
+      <div className="rbc-btn-group">
+        <button type="button" onClick={goToCurrent}>Today</button>
+      </div>
+
+      <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', fontWeight: '600', fontSize: '1.1rem', color: "var(--text-primary)" }}>
+        <button type="button" onClick={goToBack} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '36px', height: '36px', borderRadius: '50%', background: '#3b82f6', border: 'none', color: '#ffffff', cursor: 'pointer', transition: 'all 0.2s', boxShadow: '0 2px 4px rgba(0,0,0,0.1)', fontSize: '1.2rem', lineHeight: '1' }} className="hover-bg">&#10094;</button>
+        <span style={{ minWidth: "160px", textAlign: "center" }}>{toolbar.label}</span>
+        <button type="button" onClick={goToNext} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '36px', height: '36px', borderRadius: '50%', background: '#3b82f6', border: 'none', color: '#ffffff', cursor: 'pointer', transition: 'all 0.2s', boxShadow: '0 2px 4px rgba(0,0,0,0.1)', fontSize: '1.2rem', lineHeight: '1' }} className="hover-bg">&#10095;</button>
+      </div>
+
+      <div className="rbc-btn-group">
+        {toolbar.views.map(viewName => (
+          <button
+            key={viewName}
+            type="button"
+            className={toolbar.view === viewName ? 'rbc-active' : ''}
+            onClick={() => toolbar.onView(viewName)}
+          >
+            {viewName.charAt(0).toUpperCase() + viewName.slice(1)}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+const CustomEvent = ({ event }) => {
+  if (event.resource?.isMark) {
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', fontWeight: 'bold' }}>
+        {event.title}
+      </div>
+    );
+  }
+  
+  if (event.resource?.isBreak) {
+    return (
+      <div style={{ padding: '2px 4px', display: 'flex', flexDirection: 'column', justifyContent: 'center', height: '100%' }}>
+        <div style={{ fontWeight: 'bold', fontSize: '0.85rem' }}>☕ Break / Lunch</div>
+      </div>
+    );
+  }
+
+  const { subject, roomNumber, teacherName, time } = event.resource;
+
+  return (
+    <div style={{ padding: '2px 4px', display: 'flex', flexDirection: 'column', gap: '2px', height: '100%', color: '#ffffff' }}>
+      <div style={{ fontWeight: 'bold', fontSize: '0.9rem', lineHeight: '1.2' }}>{subject}</div>
+      <div style={{ fontSize: '0.75rem', opacity: 0.95, display: 'flex', alignItems: 'center', gap: '4px', marginTop: '2px' }}>
+        <span role="img" aria-label="teacher" style={{ fontSize: '0.7rem' }}>👤</span> {teacherName || "Unassigned"}
+      </div>
+      {roomNumber && (
+        <div style={{ fontSize: '0.75rem', opacity: 0.95, display: 'flex', alignItems: 'center', gap: '4px' }}>
+          <span role="img" aria-label="room" style={{ fontSize: '0.7rem' }}>🚪</span> {roomNumber}
+        </div>
+      )}
+      <div style={{ fontSize: '0.7rem', opacity: 0.85, marginTop: 'auto', display: 'flex', alignItems: 'center', gap: '4px' }}>
+        <span role="img" aria-label="time" style={{ fontSize: '0.7rem' }}>⏱️</span> {time}
+      </div>
+    </div>
+  );
+};
+
+export default function TimeTable() {
+  const [activeTab, setActiveTab] = useState("view");
   const dispatch = useDispatch();
   const { classes, timeTables, users, subjects, rooms } = useSelector((state) => state.data);
 
   const [selectedClass, setSelectedClass] = useState("");
   const [dateRange, setDateRange] = useState(getThisWeek());
+  const [calendarDate, setCalendarDate] = useState(new Date());
+  const [calendarView, setCalendarView] = useState(Views.WEEK);
   const [openModal, setOpenModal] = useState(false);
   const [openEditModal, setOpenEditModal] = useState(false);
   const [openAddSingleModal, setOpenAddSingleModal] = useState(false);
+  const [openDuplicateModal, setOpenDuplicateModal] = useState(false);
+  const [duplicateConfig, setDuplicateConfig] = useState({ sourceDate: "", targetStartDate: "", targetEndDate: "", copyMode: "exact" });
   const [loading, setLoading] = useState(false);
   const [editingPeriodId, setEditingPeriodId] = useState(null);
+  const [publicHolidays, setPublicHolidays] = useState([]);
 
   const [newTimeTable, setNewTimeTable] = useState({ date: "", timeTables: [] });
   const [timeSubject, setTimeSubject] = useState({ date: "", subject: "", initialTime: "", finalTime: "", teacher: "", isBreak: false, roomNumber: "" });
@@ -35,6 +144,8 @@ const TimeTable = () => {
     dispatch(fetchUsers());
     dispatch(fetchSubjects());
     dispatch(fetchRooms());
+    
+    api.get('/holidays').then(res => setPublicHolidays(res.data.data || [])).catch(console.error);
   }, [dispatch]);
 
   useEffect(() => {
@@ -52,6 +163,35 @@ const TimeTable = () => {
     return timeTables.find(t => String(t.classId) === String(selectedClass));
   }, [selectedClass, timeTables]);
 
+  const sortedClasses = useMemo(() => {
+    if (!classes) return [];
+    
+    const classOrder = {
+      'PLAY': 1,
+      'NUR': 2,
+      'LKG': 3,
+      'UKG': 4
+    };
+
+    return [...classes].sort((a, b) => {
+      const getOrder = (name) => {
+        const strName = String(name).toUpperCase().trim();
+        if (classOrder[strName]) return classOrder[strName];
+        
+        const num = parseInt(strName, 10);
+        if (!isNaN(num)) return 10 + num;
+        
+        return 100; // fallback
+      };
+
+      const orderA = getOrder(a.className);
+      const orderB = getOrder(b.className);
+
+      if (orderA !== orderB) return orderA - orderB;
+      return String(a.section).localeCompare(String(b.section));
+    });
+  }, [classes]);
+
   const getUserName = (userId) => {
     const user = users?.find(u => u.id === userId);
     return user ? user.name : "Unknown";
@@ -64,7 +204,7 @@ const TimeTable = () => {
     const times = new Set();
     Object.values(activeTimeTable.dates).forEach(periodsForDate => {
       periodsForDate.forEach(p => {
-        if (p && p.time) times.add(p.time);
+        if (p && p.time && p.time !== "All Day") times.add(p.time);
       });
     });
     return Array.from(times).sort((a, b) => {
@@ -88,6 +228,128 @@ const TimeTable = () => {
     }
     return dates;
   }, [dateRange]);
+
+  const eventStyleGetter = (event, start, end, isSelected) => {
+    let backgroundColor = '#3b82f6'; // Solid blue
+    let color = '#ffffff';
+    let borderLeft = 'none';
+    let opacity = 0.95;
+
+    if (event.resource?.isBreak) {
+      backgroundColor = '#f59e0b'; // Solid orange
+      color = '#ffffff';
+      borderLeft = 'none';
+    }
+
+    return {
+      style: {
+        backgroundColor,
+        color,
+        borderLeft,
+        borderRadius: '6px',
+        opacity,
+        border: 'none',
+        display: 'block'
+      }
+    };
+  };
+
+  const dayPropGetter = (date) => {
+    const pad = (n) => n.toString().padStart(2, '0');
+    const dateStr = `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+    
+    const markType = getDayMarkType(dateStr);
+    if (markType === 'Holiday' || markType === 'Public Holiday') {
+      return { style: { backgroundColor: 'rgba(16, 185, 129, 0.1)' } }; // Light green tint
+    }
+    if (markType === 'Week Off') {
+      return { style: { backgroundColor: 'rgba(99, 102, 241, 0.1)' } }; // Light purple tint
+    }
+    return {};
+  };
+
+  const handleSelectEvent = (event) => {
+    if (event.resource?.isMark) return; 
+    handleEditClick(event.resource, event.resource.date);
+  };
+
+  const handleSelectSlot = ({ start, end, action }) => {
+    const pad = (n) => n.toString().padStart(2, '0');
+    const dateStr = `${start.getFullYear()}-${pad(start.getMonth() + 1)}-${pad(start.getDate())}`;
+    
+    const initialTime = `${pad(start.getHours())}:${pad(start.getMinutes())}`;
+    const finalTime = `${pad(end.getHours())}:${pad(end.getMinutes())}`;
+
+    setTimeSubject({
+      date: dateStr,
+      subject: "",
+      initialTime,
+      finalTime,
+      teacher: "",
+      isBreak: false,
+      roomNumber: ""
+    });
+    setOpenAddSingleModal(true);
+  };
+
+  const handleEventDrop = async ({ event, start, end }) => {
+    if (event.resource?.isMark) return; 
+
+    const pad = (n) => n.toString().padStart(2, '0');
+    const newDateStr = `${start.getFullYear()}-${pad(start.getMonth() + 1)}-${pad(start.getDate())}`;
+    
+    const markType = getDayMarkType(newDateStr);
+    if (markType === "Public Holiday" || markType === "Holiday" || markType === "Week Off") {
+      return toast.error(`Cannot move period to a ${markType}.`);
+    }
+
+    const initialTime = `${pad(start.getHours())}:${pad(start.getMinutes())}`;
+    const finalTime = `${pad(end.getHours())}:${pad(end.getMinutes())}`;
+    const formattedTime = `${initialTime} - ${finalTime}`;
+
+    const existingPeriods = activeTimeTable?.dates?.[newDateStr] || [];
+    const isOverlapping = existingPeriods.some(p => {
+      if (p.id === event.id) return false;
+      const [pStart, pEnd] = p.time.split(" - ");
+      return initialTime < pEnd && finalTime > pStart;
+    });
+
+    if (isOverlapping) {
+      return toast.error("This time slot overlaps with an existing period on this date.");
+    }
+
+    setLoading(true);
+    try {
+      await api.put(`/admin_panel/timeTable/updatePeriod/${event.id}`, {
+        data: {
+          date: newDateStr,
+          time: formattedTime,
+          subject: event.resource.subject,
+          teacher: event.resource.teacher,
+          isBreak: event.resource.isBreak,
+          roomNumber: event.resource.roomNumber
+        }
+      });
+      toast.success("Period moved successfully");
+      dispatch(fetchTimeTables());
+    } catch (error) {
+      toast.error("Failed to move period");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleEventResize = handleEventDrop;
+
+  const handleRangeChange = (range) => {
+    if (Array.isArray(range)) {
+      if (range.length > 0) {
+        setDateRange({ start: formatDate(range[0]), end: formatDate(range[range.length - 1]) });
+      }
+    } else {
+      setDateRange({ start: formatDate(range.start), end: formatDate(range.end) });
+    }
+  };
 
   const handlePrevInterval = () => {
     if (!dateRange.start || !dateRange.end) {
@@ -122,12 +384,32 @@ const TimeTable = () => {
       toast.error("Please fill required fields for the period");
       return;
     }
-    if (!timeSubject.isBreak && (!timeSubject.subject || !timeSubject.teacher)) {
-      toast.error("Please select a teacher and subject");
+    const markType = getDayMarkType(newTimeTable.date);
+    if (markType === "Public Holiday" || markType === "Holiday" || markType === "Week Off") {
+      toast.error(`Cannot add period on a ${markType}.`);
       return;
     }
     if (timeSubject.initialTime >= timeSubject.finalTime) {
       toast.error("End time must be after start time");
+      return;
+    }
+
+    const existingPeriods = activeTimeTable?.dates?.[newTimeTable.date] || [];
+    const isOverlappingExisting = existingPeriods.some(p => {
+      const [pStart, pEnd] = p.time.split(" - ");
+      return timeSubject.initialTime < pEnd && timeSubject.finalTime > pStart;
+    });
+    if (isOverlappingExisting) {
+      toast.error("Overlaps with an existing period on this date.");
+      return;
+    }
+
+    const isOverlappingNew = newTimeTable.timeTables.some(p => {
+      const [pStart, pEnd] = p.time.split(" - ");
+      return timeSubject.initialTime < pEnd && timeSubject.finalTime > pStart;
+    });
+    if (isOverlappingNew) {
+      toast.error("Overlaps with a period you just added to this list.");
       return;
     }
     const formattedTime = `${timeSubject.initialTime} - ${timeSubject.finalTime}`;
@@ -136,8 +418,8 @@ const TimeTable = () => {
       timeTables: [
         ...newTimeTable.timeTables,
         {
-          subject: timeSubject.isBreak ? "Break/Lunch" : timeSubject.subject,
-          teacher: timeSubject.isBreak ? null : timeSubject.teacher,
+          subject: timeSubject.isBreak ? "Break/Lunch" : (timeSubject.subject || "Unassigned"),
+          teacher: timeSubject.isBreak ? null : (timeSubject.teacher || null),
           time: formattedTime,
           isBreak: timeSubject.isBreak,
           roomNumber: timeSubject.roomNumber
@@ -147,6 +429,97 @@ const TimeTable = () => {
     setTimeSubject({ day: "", subject: "", initialTime: "", finalTime: "", teacher: "", isBreak: false, roomNumber: "" });
   };
 
+  const handleMarkDay = async (date, type) => {
+    if (!window.confirm(`Are you sure you want to mark ${date} as a ${type}? This will clear all existing periods for this date.`)) return;
+    setLoading(true);
+    try {
+      const existingPeriods = activeTimeTable?.dates?.[date] || [];
+      for (const period of existingPeriods) {
+        await api.delete(`/admin_panel/timeTable/deletePeriod/${period.id}`);
+      }
+      await api.post("/admin_panel/timeTable/createTimeTable", {
+        data: {
+          classId: selectedClass,
+          date: date,
+          timeTables: [{ time: "All Day", subject: type, isBreak: true }]
+        }
+      });
+      toast.success(`Marked as ${type}`);
+      dispatch(fetchTimeTables());
+    } catch (err) {
+      toast.error(`Failed to mark ${type.toLowerCase()}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleRemoveDayMark = async (date) => {
+    if (!window.confirm(`Are you sure you want to remove the mark on ${date}?`)) return;
+    setLoading(true);
+    try {
+      const markPeriod = activeTimeTable?.dates?.[date]?.find(p => p.subject === "Holiday" || p.subject === "Week Off");
+      if (markPeriod) {
+        await api.delete(`/admin_panel/timeTable/deletePeriod/${markPeriod.id}`);
+        toast.success("Removed successfully");
+        dispatch(fetchTimeTables());
+      }
+    } catch (err) {
+      toast.error("Failed to remove");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const getDayMarkType = (date) => {
+    const d = new Date(date);
+    if (d.getDay() === 0) return "Week Off";
+    if (publicHolidays.some(h => h.date === date)) return "Public Holiday";
+    
+    const period = activeTimeTable?.dates?.[date]?.find(p => p.subject === "Holiday" || p.subject === "Week Off");
+    return period ? period.subject : null;
+  };
+
+  const calendarEvents = useMemo(() => {
+    const events = [];
+    if (!activeTimeTable) return events;
+
+    if (activeTimeTable.dates) {
+      Object.keys(activeTimeTable.dates).forEach(dateStr => {
+        const periods = activeTimeTable.dates[dateStr];
+        if (periods) {
+          periods.forEach(p => {
+            if (!p.time) return;
+            const [startT, endT] = p.time.split(" - ");
+            events.push({
+              id: p.id,
+              title: p.isBreak ? "☕ Break / Lunch" : `${p.subject}`,
+              start: new Date(`${dateStr}T${startT}:00`),
+              end: new Date(`${dateStr}T${endT}:00`),
+              resource: { ...p, date: dateStr, teacherName: getUserName(p.teacher) }
+            });
+          });
+        }
+      });
+    }
+    return events;
+  }, [activeTimeTable, publicHolidays, visibleDates]);
+
+  const { minTime, maxTime } = useMemo(() => {
+    let minH = 8;
+    let maxH = 18;
+    calendarEvents.forEach(e => {
+      if (!e.allDay && e.start && e.end) {
+        if (e.start.getHours() < minH) minH = e.start.getHours();
+        if (e.end.getHours() > maxH) maxH = e.end.getHours();
+        if (e.end.getMinutes() > 0 && e.end.getHours() === maxH) maxH++;
+      }
+    });
+    return {
+      minTime: new Date(1970, 0, 1, minH, 0, 0),
+      maxTime: new Date(1970, 0, 1, maxH, 0, 0)
+    };
+  }, [calendarEvents]);
+
   const handleSubmit = async () => {
     if (!newTimeTable.date || newTimeTable.timeTables.length === 0) {
       toast.error("Add at least one period before submitting");
@@ -154,7 +527,7 @@ const TimeTable = () => {
     }
     setLoading(true);
     try {
-      await api.post("/timeTable/createTimeTable", {
+      await api.post("/admin_panel/timeTable/createTimeTable", {
         data: {
           classId: selectedClass,
           date: newTimeTable.date,
@@ -172,20 +545,64 @@ const TimeTable = () => {
     }
   };
 
-  const handleDeletePeriod = async (id) => {
-    if (!window.confirm("Are you sure you want to delete this period?")) return;
+  const handleDeletePeriod = async (period) => {
+    if (period.subject !== "Unassigned" && period.subject !== "") {
+      if (!window.confirm(`This period is already assigned to a subject/teacher. Are you sure you want to delete it?`)) return;
+    } else {
+      if (!window.confirm("Are you sure you want to delete this period?")) return;
+    }
     try {
-      await api.delete(`/timeTable/deletePeriod/${id}`);
+      await api.delete(`/admin_panel/timeTable/deletePeriod/${period.id}`);
       toast.success("Period deleted successfully");
       dispatch(fetchTimeTables());
+      setOpenEditModal(false);
     } catch (error) {
       toast.error("Failed to delete period");
+    }
+  };
+
+  const handleDeleteSlot = async (time) => {
+    if (!window.confirm(`Are you sure you want to delete the entire ${time} slot?`)) return;
+
+    const periodsToDelete = [];
+    const conflictDates = [];
+
+    if (activeTimeTable && activeTimeTable.dates) {
+      Object.keys(activeTimeTable.dates).forEach(date => {
+        const period = activeTimeTable.dates[date].find(p => p.time === time);
+        if (period) {
+          if (period.subject !== "Unassigned" && period.subject !== "Holiday" && period.subject !== "Week Off") {
+            conflictDates.push(new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }));
+          }
+          periodsToDelete.push(period.id);
+        }
+      });
+    }
+
+    if (conflictDates.length > 0) {
+      const datesStr = conflictDates.join(", ");
+      toast.error(`Cannot delete slot. It contains booked classes on: ${datesStr}. Please clear them first.`, { autoClose: 6000 });
+      return;
+    }
+
+    setLoading(true);
+    try {
+      for (const id of periodsToDelete) {
+        await api.delete(`/admin_panel/timeTable/deletePeriod/${id}`);
+      }
+      toast.success("Time slot deleted successfully");
+      dispatch(fetchTimeTables());
+    } catch (error) {
+      toast.error("Failed to delete time slot");
+    } finally {
+      setLoading(false);
     }
   };
 
   const handleEditClick = (period, date) => {
     const [initialTime, finalTime] = period.time.split(" - ");
     setTimeSubject({
+      id: period._id || period.id,
       date: date || "",
       subject: period.subject || "",
       initialTime,
@@ -216,14 +633,25 @@ const TimeTable = () => {
     if (!timeSubject.initialTime || !timeSubject.finalTime) {
       return toast.error("Time is required");
     }
+
+    const existingPeriods = activeTimeTable?.dates?.[timeSubject.date] || [];
+    const isOverlapping = existingPeriods.some(p => {
+      if (p.id === editingPeriodId) return false;
+      const [pStart, pEnd] = p.time.split(" - ");
+      return timeSubject.initialTime < pEnd && timeSubject.finalTime > pStart;
+    });
+    if (isOverlapping) {
+      return toast.error("This time slot overlaps with an existing period on this date.");
+    }
+
     setLoading(true);
     try {
       const formattedTime = `${timeSubject.initialTime} - ${timeSubject.finalTime}`;
-      await api.put(`/timeTable/updatePeriod/${editingPeriodId}`, {
+      await api.put(`/admin_panel/timeTable/updatePeriod/${editingPeriodId}`, {
         data: {
           time: formattedTime,
-          subject: timeSubject.isBreak ? "Break/Lunch" : timeSubject.subject,
-          teacher: timeSubject.isBreak ? null : timeSubject.teacher,
+          subject: timeSubject.isBreak ? "Break/Lunch" : (timeSubject.subject || "Unassigned"),
+          teacher: timeSubject.isBreak ? null : (timeSubject.teacher || null),
           isBreak: timeSubject.isBreak,
           roomNumber: timeSubject.roomNumber
         }
@@ -243,19 +671,32 @@ const TimeTable = () => {
     if (!timeSubject.initialTime || !timeSubject.finalTime) {
       return toast.error("Time is required");
     }
-    if (!timeSubject.isBreak && (!timeSubject.subject || !timeSubject.teacher)) {
-      return toast.error("Please select a teacher and subject");
+
+    const markType = getDayMarkType(timeSubject.date);
+    if (markType === "Public Holiday" || markType === "Holiday" || markType === "Week Off") {
+      toast.error(`Cannot add period on a ${markType}.`);
+      return;
     }
+
+    const existingPeriods = activeTimeTable?.dates?.[timeSubject.date] || [];
+    const isOverlapping = existingPeriods.some(p => {
+      const [pStart, pEnd] = p.time.split(" - ");
+      return timeSubject.initialTime < pEnd && timeSubject.finalTime > pStart;
+    });
+    if (isOverlapping) {
+      return toast.error("This time slot overlaps with an existing period on this date.");
+    }
+
     setLoading(true);
     try {
       const formattedTime = `${timeSubject.initialTime} - ${timeSubject.finalTime}`;
-      await api.post(`/timeTable/addPeriod`, {
+      await api.post(`/admin_panel/timeTable/addPeriod`, {
         data: {
           classId: selectedClass,
           date: timeSubject.date,
           time: formattedTime,
-          subject: timeSubject.isBreak ? "Break/Lunch" : timeSubject.subject,
-          teacher: timeSubject.isBreak ? null : timeSubject.teacher,
+          subject: timeSubject.isBreak ? "Break/Lunch" : (timeSubject.subject || "Unassigned"),
+          teacher: timeSubject.isBreak ? null : (timeSubject.teacher || null),
           isBreak: timeSubject.isBreak,
           roomNumber: timeSubject.roomNumber
         }
@@ -271,6 +712,81 @@ const TimeTable = () => {
     }
   };
 
+  const handleDuplicateDay = async () => {
+    if (!duplicateConfig.sourceDate || !duplicateConfig.targetStartDate || !duplicateConfig.targetEndDate) {
+      return toast.error("Please fill all required fields");
+    }
+    if (duplicateConfig.targetStartDate > duplicateConfig.targetEndDate) {
+      return toast.error("Target end date must be after target start date");
+    }
+    setLoading(true);
+    try {
+      await api.post("/admin_panel/timeTable/duplicateDay", {
+        classId: selectedClass,
+        sourceDate: duplicateConfig.sourceDate,
+        targetStartDate: duplicateConfig.targetStartDate,
+        targetEndDate: duplicateConfig.targetEndDate,
+        copyMode: duplicateConfig.copyMode
+      });
+      toast.success("Schedule duplicated successfully!");
+      dispatch(fetchTimeTables());
+      setOpenDuplicateModal(false);
+    } catch (error) {
+      toast.error(error.response?.data?.message || "Failed to duplicate schedule");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleExportExcel = () => {
+    if (!activeTimeTable || allTimeSlots.length === 0) return toast.warn("No timetable to export");
+    const dataToExport = allTimeSlots.map(time => {
+      const row = { Time: time };
+      visibleDates.forEach(date => {
+        const markType = getDayMarkType(date);
+        const period = activeTimeTable?.dates?.[date]?.find(p => p.time === time);
+        
+        if (markType) {
+          row[date] = markType.toUpperCase();
+        } else if (period) {
+          if (period.isBreak) row[date] = "Break / Lunch";
+          else {
+            row[date] = `${period.subject} (${getUserName(period.teacher)})${period.roomNumber ? ` - Room: ${period.roomNumber}` : ""}`;
+          }
+        } else {
+          row[date] = "-";
+        }
+      });
+      return row;
+    });
+    exportToExcel(dataToExport, `Timetable_${activeClassData?.className}_${activeClassData?.section}`, `Timetable - ${activeClassData?.className} ${activeClassData?.section}`);
+  };
+
+  const handleExportPDF = async () => {
+    if (!activeTimeTable || allTimeSlots.length === 0) return toast.warn("No timetable to export");
+    const columns = ["Time", ...visibleDates];
+    const dataToExport = allTimeSlots.map(time => {
+      const row = [time];
+      visibleDates.forEach(date => {
+        const markType = getDayMarkType(date);
+        const period = activeTimeTable?.dates?.[date]?.find(p => p.time === time);
+        
+        if (markType) {
+          row.push(markType.toUpperCase());
+        } else if (period) {
+          if (period.isBreak) row.push("Break / Lunch");
+          else {
+            row.push(`${period.subject} (${getUserName(period.teacher)})${period.roomNumber ? ` - Room: ${period.roomNumber}` : ""}`);
+          }
+        } else {
+          row.push("-");
+        }
+      });
+      return row;
+    });
+    await exportToPDF(columns, dataToExport, `Timetable_${activeClassData?.className}_${activeClassData?.section}`, `Timetable - ${activeClassData?.className} ${activeClassData?.section}`);
+  };
+
   return (
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "2rem" }}>
@@ -279,6 +795,29 @@ const TimeTable = () => {
           <p style={{ color: "var(--text-secondary)" }}>Manage daily class routines</p>
         </div>
         <div style={{ display: "flex", gap: "1rem", alignItems: "center" }}>
+          {selectedClass && allTimeSlots.length > 0 && (
+            <div style={{ display: "flex", gap: "0.5rem" }}>
+              <button onClick={handleExportExcel} className="btn btn-ghost" title="Export to Excel">
+                <Download size={18} /> Excel
+              </button>
+              <button onClick={handleExportPDF} className="btn btn-ghost" title="Export to PDF">
+                <Download size={18} /> PDF
+              </button>
+            </div>
+          )}
+          <button 
+            onClick={() => {
+              if (!selectedClass) {
+                toast.warn("Please select a class first.");
+                return;
+              }
+              setDuplicateConfig({ sourceDate: formatDate(new Date()), targetStartDate: "", targetEndDate: "", copyMode: "exact" });
+              setOpenDuplicateModal(true);
+            }} 
+            className="btn btn-ghost" style={{ border: "1px solid var(--glass-border)", background: "rgba(255,255,255,0.05)" }}
+          >
+            <Copy size={18} /> Duplicate Schedule
+          </button>
           <button 
             onClick={() => {
               if (!selectedClass) {
@@ -301,123 +840,49 @@ const TimeTable = () => {
             <label style={{ display: "block", marginBottom: "0.5rem", fontSize: "0.875rem", color: "var(--text-secondary)" }}>Select Class</label>
             <select className="input-glass" value={selectedClass} onChange={(e) => setSelectedClass(e.target.value)}>
               <option value="">-- Choose Class --</option>
-              {classes?.map(c => (
+              {sortedClasses?.map(c => (
                 <option key={c.id} value={c.id}>{c.className} - {c.section}</option>
               ))}
             </select>
           </div>
           
-          <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
-            <button 
-              onClick={handlePrevInterval}
-              style={{ display: "flex", alignItems: "center", justifyContent: "center", width: "36px", height: "36px", borderRadius: "8px", background: "var(--glass-bg)", border: "1px solid var(--glass-border)", color: "var(--text-secondary)", cursor: "pointer", transition: "all 0.2s" }}
-              className="hover-bg"
-              title="Previous"
-            >
-              <ChevronLeft size={18} />
-            </button>
-            
-            <DateRangePicker value={dateRange} onRangeChange={setDateRange} initialPreset="This Week" />
-            
-            <button 
-              onClick={handleNextInterval}
-              style={{ display: "flex", alignItems: "center", justifyContent: "center", width: "36px", height: "36px", borderRadius: "8px", background: "var(--glass-bg)", border: "1px solid var(--glass-border)", color: "var(--text-secondary)", cursor: "pointer", transition: "all 0.2s" }}
-              className="hover-bg"
-              title="Next"
-            >
-              <ChevronRight size={18} />
-            </button>
-          </div>
         </div>
       </div>
 
       {selectedClass ? (
-        <div className="glass-panel" style={{ padding: "1.5rem", overflowX: "auto" }}>
-          {allTimeSlots.length > 0 ? (
-            <>
-            <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "center", minWidth: "800px" }}>
-              <thead>
-                <tr>
-                  <th style={{ padding: "1rem", borderBottom: "2px solid var(--glass-border)", background: "rgba(0,0,0,0.02)", width: "120px" }}>Time</th>
-                  {visibleDates.map(date => {
-                    const d = new Date(date);
-                    return (
-                      <th key={date} style={{ padding: "1rem", borderBottom: "2px solid var(--glass-border)", background: "rgba(0,0,0,0.02)", minWidth: "150px" }}>
-                        <div style={{ fontWeight: "600" }}>{d.toLocaleDateString('en-US', { weekday: 'short' })}</div>
-                        <div style={{ fontSize: "0.75rem", color: "var(--text-secondary)", fontWeight: "normal" }}>{d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</div>
-                      </th>
-                    );
-                  })}
-                </tr>
-              </thead>
-              <tbody>
-                {allTimeSlots.map(time => (
-                  <tr key={time}>
-                    <td style={{ padding: "1rem", borderBottom: "1px solid var(--glass-border)", fontWeight: "600", whiteSpace: "nowrap", borderRight: "1px solid var(--glass-border)" }}>{time}</td>
-                    {visibleDates.map(date => {
-                      const period = activeTimeTable?.dates?.[date]?.find(p => p.time === time);
-                      return (
-                        <td key={date} style={{ padding: "1rem", borderBottom: "1px solid var(--glass-border)", borderRight: "1px solid var(--glass-border)", background: period?.isBreak ? "rgba(245, 158, 11, 0.05)" : "transparent" }}>
-                          {period ? (
-                            <div style={{ display: "flex", flexDirection: "column", gap: "0.25rem", alignItems: "center" }}>
-                              <span style={{ fontWeight: "600", color: period.isBreak ? "#f59e0b" : "var(--accent-primary)", fontSize: "0.875rem" }}>
-                                {period.isBreak ? "☕ Break / Lunch" : period.subject}
-                              </span>
-                              {!period.isBreak && <span style={{ fontSize: "0.75rem", color: "var(--text-secondary)" }}>{getUserName(period.teacher)}</span>}
-                              {period.roomNumber && <span style={{ fontSize: "0.7rem", background: "rgba(0,0,0,0.05)", padding: "2px 6px", borderRadius: "4px", marginTop: "2px" }}>Room: {period.roomNumber}</span>}
-                              <div style={{ display: "flex", gap: "0.5rem", marginTop: "0.5rem" }}>
-                                <button onClick={() => handleEditClick(period, date)} className="btn-ghost" style={{ padding: "0.25rem", color: "#60a5fa", cursor: "pointer", border: "none", background: "transparent" }} title="Edit"><Edit2 size={14}/></button>
-                                <button onClick={() => handleDeletePeriod(period.id)} className="btn-ghost" style={{ padding: "0.25rem", color: "#ef4444", cursor: "pointer", border: "none", background: "transparent" }} title="Delete"><Trash2 size={14}/></button>
-                              </div>
-                            </div>
-                          ) : (
-                            <div className="group relative flex justify-center items-center h-full w-full min-h-[40px]">
-                              <span style={{ color: "var(--text-secondary)", opacity: 0.3 }} className="group-hover:hidden">-</span>
-                              <button 
-                                onClick={() => handleAddSpecificClick(date, time)} 
-                                className="hidden group-hover:flex items-center justify-center text-blue-500 hover:text-blue-600 bg-blue-50 rounded-full p-1 transition-all shadow-sm"
-                                title="Add Period"
-                              >
-                                <Plus size={16} />
-                              </button>
-                            </div>
-                          )}
-                        </td>
-                      );
-                    })}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-            
-            <button 
-              onClick={() => {
-                setNewTimeTable({ date: formatDate(new Date()), timeTables: [] });
-                setOpenModal(true);
+        <div className="glass-panel" style={{ padding: "1.5rem" }}>
+          <div style={{ height: "calc(100vh - 280px)", minHeight: "600px", marginTop: "1rem" }}>
+            <DnDCalendar
+              localizer={localizer}
+              events={calendarEvents}
+              startAccessor="start"
+              endAccessor="end"
+              date={calendarDate}
+              view={calendarView}
+              onNavigate={(newDate) => setCalendarDate(newDate)}
+              onView={(newView) => setCalendarView(newView)}
+              min={minTime}
+              max={maxTime}
+              views={[Views.MONTH, Views.WEEK, Views.DAY, Views.AGENDA]}
+              step={30}
+              timeslots={2}
+              selectable={true}
+              onSelectEvent={handleSelectEvent}
+              onSelectSlot={handleSelectSlot}
+              onRangeChange={handleRangeChange}
+              eventPropGetter={eventStyleGetter}
+              dayPropGetter={dayPropGetter}
+              onEventDrop={handleEventDrop}
+              onEventResize={handleEventResize}
+              draggableAccessor={() => true}
+              resizable
+              components={{
+                toolbar: CustomToolbar,
+                event: CustomEvent
               }}
-              className="btn btn-ghost hover-bg"
-              style={{ 
-                width: "100%", 
-                marginTop: "1rem", 
-                padding: "1rem", 
-                border: "2px dashed var(--glass-border)", 
-                borderRadius: "8px",
-                display: "flex",
-                justifyContent: "center",
-                alignItems: "center",
-                gap: "0.5rem",
-                color: "var(--accent-primary)"
-              }}
-            >
-              <Plus size={18} /> Add New Time Slots
-            </button>
-            </>
-          ) : (
-            <div style={{ padding: "3rem", textAlign: "center", color: "var(--text-secondary)" }}>
-              <Calendar size={48} style={{ margin: "0 auto 1rem", opacity: 0.5 }} />
-              <p>No timetable scheduled for this class yet.</p>
-            </div>
-          )}
+              style={{ fontFamily: "'Inter', sans-serif", color: "var(--text-primary)" }}
+            />
+          </div>
         </div>
       ) : (
         <div className="glass-panel" style={{ padding: "3rem", textAlign: "center", color: "var(--text-secondary)" }}>
@@ -607,9 +1072,19 @@ const TimeTable = () => {
               </>
             )}
 
-            <div style={{ display: "flex", justifyContent: "flex-end", gap: "1rem", marginTop: "1.5rem" }}>
-              <button type="button" onClick={() => setOpenEditModal(false)} className="btn btn-ghost">Cancel</button>
-              <button type="button" onClick={handleUpdatePeriod} disabled={loading} className="btn btn-primary">{loading ? "Saving..." : "Update Period"}</button>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "1.5rem" }}>
+              <button 
+                type="button" 
+                onClick={() => handleDeletePeriod(timeSubject)} 
+                className="btn btn-ghost hover-bg" 
+                style={{ color: "#ef4444", border: "1px solid rgba(239, 68, 68, 0.2)", background: "rgba(239, 68, 68, 0.05)" }}
+              >
+                Delete
+              </button>
+              <div style={{ display: "flex", gap: "1rem" }}>
+                <button type="button" onClick={() => setOpenEditModal(false)} className="btn btn-ghost">Cancel</button>
+                <button type="button" onClick={handleUpdatePeriod} disabled={loading} className="btn btn-primary">{loading ? "Saving..." : "Update Period"}</button>
+              </div>
             </div>
           </div>
         </div>
@@ -693,8 +1168,39 @@ const TimeTable = () => {
           </div>
         </div>
       )}
+
+      {openDuplicateModal && (
+        <div className="animate-fade-in" style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 50 }} onClick={() => setOpenDuplicateModal(false)}>
+          <div className="glass-panel modal-content" style={{ width: "100%", maxWidth: "500px", padding: "2rem", maxHeight: "90vh", overflowY: "auto" }} onClick={(e) => e.stopPropagation()}>
+            <h2 style={{ fontSize: "1.25rem", fontWeight: "700", marginBottom: "1.5rem" }}>Duplicate Schedule</h2>
+            <div style={{ display: "grid", gap: "1rem" }}>
+              <div>
+                <label style={{ display: "block", marginBottom: "0.5rem", fontSize: "0.875rem", fontWeight: "500" }}>Source Date (Copy From)</label>
+                <input type="date" className="input-glass" value={duplicateConfig.sourceDate} onChange={(e) => setDuplicateConfig({ ...duplicateConfig, sourceDate: e.target.value })} />
+              </div>
+              <div>
+                <label style={{ display: "block", marginBottom: "0.5rem", fontSize: "0.875rem", fontWeight: "500" }}>Target Start Date (Copy To)</label>
+                <input type="date" className="input-glass" value={duplicateConfig.targetStartDate} onChange={(e) => setDuplicateConfig({ ...duplicateConfig, targetStartDate: e.target.value })} />
+              </div>
+              <div>
+                <label style={{ display: "block", marginBottom: "0.5rem", fontSize: "0.875rem", fontWeight: "500" }}>Target End Date (Copy Until)</label>
+                <input type="date" className="input-glass" value={duplicateConfig.targetEndDate} onChange={(e) => setDuplicateConfig({ ...duplicateConfig, targetEndDate: e.target.value })} />
+              </div>
+              <div>
+                <label style={{ display: "block", marginBottom: "0.5rem", fontSize: "0.875rem", fontWeight: "500" }}>Copy Mode</label>
+                <select className="input-glass" value={duplicateConfig.copyMode} onChange={(e) => setDuplicateConfig({ ...duplicateConfig, copyMode: e.target.value })}>
+                  <option value="exact">Exact Copy (Keep Subjects & Teachers)</option>
+                  <option value="structure">Structure Only (Set all to Unassigned)</option>
+                </select>
+              </div>
+            </div>
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: "1rem", marginTop: "1.5rem" }}>
+              <button type="button" onClick={() => setOpenDuplicateModal(false)} className="btn btn-ghost">Cancel</button>
+              <button type="button" onClick={handleDuplicateDay} disabled={loading} className="btn btn-primary">{loading ? "Duplicating..." : "Duplicate"}</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
-};
-
-export default TimeTable;
+}
