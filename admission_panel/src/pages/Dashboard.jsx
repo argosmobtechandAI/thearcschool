@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useSelector, useDispatch } from "react-redux";
 import { useNavigate } from "react-router-dom";
-import { Users, UserPlus } from "lucide-react";
+import { Users, UserPlus, UserMinus, Percent, CalendarDays, Clock } from "lucide-react";
 import api from "../services/api";
 import { setDashboardLoading, setDashboardStats } from "../features/dashboardSlice";
 import DateRangePicker from "../components/DateRangePicker";
@@ -41,21 +41,37 @@ const Dashboard = () => {
         const { data: newUserData } = await api.get("/admission_panel/getAllNewUser");
         let newUsers = newUserData?.users || newUserData?.data || [];
 
+        // Data privacy: Counselors only see metrics for their assigned leads
+        if (user?.type === "admission") {
+          newUsers = newUsers.filter(u => String(u.assigned_to) === String(user.id));
+        }
+
         if (startDate || endDate) {
           newUsers = newUsers.filter(u => {
             if (!u.created_at) return true;
             const dDate = new Date(u.created_at);
-            if (startDate && dDate < new Date(startDate)) return false;
-            if (endDate && dDate > new Date(endDate)) return false;
+            if (startDate) {
+              const start = new Date(startDate);
+              start.setHours(0, 0, 0, 0);
+              if (dDate < start) return false;
+            }
+            if (endDate) {
+              const end = new Date(endDate);
+              end.setHours(23, 59, 59, 999);
+              if (dDate > end) return false;
+            }
             return true;
           });
         }
 
+        const today = new Date().toDateString();
         dispatch(setDashboardStats({
           pendingAdmissions: newUsers.filter(u => u.status === 'Pending').length,
           totalApplications: newUsers.length,
           approvedApplications: newUsers.filter(u => u.status === 'Approved').length,
           rejectedApplications: newUsers.filter(u => u.status === 'Rejected').length,
+          todayInquiries: newUsers.filter(u => u.created_at && new Date(u.created_at).toDateString() === today).length,
+          recentApplications: newUsers.sort((a, b) => new Date(b.created_at) - new Date(a.created_at)).slice(0, 5)
         }));
       } catch (error) {
         console.error("Failed to load dashboard data", error);
@@ -68,6 +84,10 @@ const Dashboard = () => {
   }, [dispatch, startDate, endDate]);
 
   const dateParams = `${startDate ? `startDate=${startDate}&` : ""}${endDate ? `endDate=${endDate}` : ""}`;
+  
+  const conversionRate = stats.totalApplications > 0 
+    ? Math.round((stats.approvedApplications / stats.totalApplications) * 100) 
+    : 0;
 
   return (
     <div>
@@ -90,11 +110,14 @@ const Dashboard = () => {
       </h3>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: "1rem", marginBottom: "2rem" }}>
         <StatCard title="Total Applications" value={loading ? "..." : stats.totalApplications || 0} icon={Users} color="59, 130, 246" onClick={() => navigate(`/admissions?${dateParams}`)} />
-        <StatCard title="Pending Review" value={loading ? "..." : stats.pendingAdmissions || 0} icon={UserPlus} color="245, 158, 11" onClick={() => navigate(`/admissions?${dateParams}`)} />
-        <StatCard title="Approved" value={loading ? "..." : stats.approvedApplications || 0} icon={UserPlus} color="16, 185, 129" onClick={() => navigate(`/admissions?${dateParams}`)} />
+        <StatCard title="Pending Review" value={loading ? "..." : stats.pendingAdmissions || 0} icon={Clock} color="245, 158, 11" onClick={() => navigate(`/admissions?status=Pending&${dateParams}`)} />
+        <StatCard title="Approved" value={loading ? "..." : stats.approvedApplications || 0} icon={UserPlus} color="16, 185, 129" onClick={() => navigate(`/admissions?status=Approved&${dateParams}`)} />
+        <StatCard title="Rejected" value={loading ? "..." : stats.rejectedApplications || 0} icon={UserMinus} color="239, 68, 68" onClick={() => navigate(`/admissions?status=Rejected&${dateParams}`)} />
+        <StatCard title="Today's Inquiries" value={loading ? "..." : stats.todayInquiries || 0} icon={CalendarDays} color="139, 92, 246" onClick={() => navigate(`/admissions?${dateParams}`)} />
+        <StatCard title="Conversion Rate" value={loading ? "..." : `${conversionRate}%`} icon={Percent} color="14, 165, 233" />
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: "1rem" }}>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 2fr", gap: "1rem" }}>
         <div className="glass-panel" style={{ padding: "1.5rem" }}>
           <h3 style={{ fontSize: "1.25rem", fontWeight: "700", marginBottom: "1rem", paddingBottom: "1rem", borderBottom: "1px solid var(--glass-border)" }}>
             Needs Attention
@@ -119,6 +142,49 @@ const Dashboard = () => {
               "You're all caught up! No applications pending review."
             )}
           </div>
+        </div>
+
+        <div className="glass-panel" style={{ padding: "1.5rem" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem", paddingBottom: "1rem", borderBottom: "1px solid var(--glass-border)" }}>
+            <h3 style={{ fontSize: "1.25rem", fontWeight: "700" }}>Recent Applications</h3>
+            <button onClick={() => navigate(`/admissions`)} className="btn-ghost" style={{ fontSize: "0.875rem", color: "var(--accent-primary)" }}>View All</button>
+          </div>
+          {loading ? (
+            <div style={{ padding: "2rem", textAlign: "center", color: "var(--text-secondary)" }}>Loading...</div>
+          ) : stats.recentApplications?.length > 0 ? (
+            <div style={{ overflowX: "auto" }}>
+              <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left" }}>
+                <thead>
+                  <tr style={{ color: "var(--text-secondary)", fontSize: "0.75rem", textTransform: "uppercase" }}>
+                    <th style={{ padding: "0.5rem" }}>Name</th>
+                    <th style={{ padding: "0.5rem" }}>Date</th>
+                    <th style={{ padding: "0.5rem" }}>Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {stats.recentApplications.map(app => (
+                    <tr key={app.id} style={{ borderBottom: "1px solid rgba(0,0,0,0.05)" }}>
+                      <td style={{ padding: "0.75rem 0.5rem", fontWeight: "500", fontSize: "0.875rem" }}>{app.name}</td>
+                      <td style={{ padding: "0.75rem 0.5rem", fontSize: "0.875rem", color: "var(--text-secondary)" }}>
+                        {new Date(app.created_at).toLocaleDateString()}
+                      </td>
+                      <td style={{ padding: "0.75rem 0.5rem" }}>
+                        <span style={{
+                          background: app.status === "Approved" ? "rgba(16, 185, 129, 0.15)" : app.status === "Rejected" ? "rgba(239, 68, 68, 0.15)" : "rgba(245, 158, 11, 0.15)",
+                          color: app.status === "Approved" ? "#047857" : app.status === "Rejected" ? "#b91c1c" : "#b45309",
+                          padding: "2px 6px", borderRadius: "4px", fontSize: "0.7rem", fontWeight: "600"
+                        }}>
+                          {app.status}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div style={{ padding: "2rem", textAlign: "center", color: "var(--text-secondary)" }}>No recent applications found.</div>
+          )}
         </div>
       </div>
     </div>

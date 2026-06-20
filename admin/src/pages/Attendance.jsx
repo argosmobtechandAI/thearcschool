@@ -51,7 +51,7 @@ const Attendance = () => {
 
   useEffect(() => {
     fetchAttendance();
-    api.get('/settings/holidays').then(res => setPublicHolidays(res.data)).catch(console.error);
+    api.get('/holidays').then(res => setPublicHolidays(res.data.data || [])).catch(console.error);
   }, []);
 
   useEffect(() => {
@@ -102,7 +102,7 @@ const Attendance = () => {
 
   const matrixClassStudents = useMemo(() => {
     if (!matrixClassId) return [];
-    const students = users.filter(u => u.type === 'student' && u.classes && u.classes.includes(Number(matrixClassId)));
+    const students = users.filter(u => u.type === 'student' && u.classes && u.classes.includes(matrixClassId));
     return students.map(student => ({
       ...student,
       records: matrixAttendance.filter(r => r.student_id === student.id)

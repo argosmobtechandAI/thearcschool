@@ -16,7 +16,7 @@ const AdmissionManagement = () => {
   const { user: currentUser } = useSelector((state) => state.auth);
 
   const [searchParams, setSearchParams] = useSearchParams();
-  const [filter, setFilter] = useState("All");
+  const [filter, setFilter] = useState(searchParams.get("status") || "All");
   const [genderFilter, setGenderFilter] = useState("");
   const [search, setSearch] = useState("");
   const [startDate, setStartDate] = useState(searchParams.get("startDate") || "");
@@ -37,10 +37,24 @@ const AdmissionManagement = () => {
     if (endDate && newParams.get("endDate") !== endDate) { newParams.set("endDate", endDate); changed = true; }
     else if (!endDate && newParams.has("endDate")) { newParams.delete("endDate"); changed = true; }
     
+    // Sync filter to URL status
+    if (filter && filter !== "All" && newParams.get("status") !== filter) { newParams.set("status", filter); changed = true; }
+    else if ((!filter || filter === "All") && newParams.has("status")) { newParams.delete("status"); changed = true; }
+
     if (changed) {
       setSearchParams(newParams, { replace: true });
     }
-  }, [startDate, endDate, searchParams, setSearchParams]);
+  }, [startDate, endDate, filter, searchParams, setSearchParams]);
+
+  // Sync from URL changes (like sidebar clicks)
+  useEffect(() => {
+    const urlStatus = searchParams.get("status");
+    if (urlStatus && urlStatus !== filter) {
+      setFilter(urlStatus);
+    } else if (!urlStatus && filter !== "All") {
+      setFilter("All");
+    }
+  }, [searchParams]);
 
   const [selectedColumns, setSelectedColumns] = useState([
     "sno", "name", "email", "parent", "status", "assigned_to", "documents"
@@ -197,14 +211,27 @@ const AdmissionManagement = () => {
 
   const filteredUsers = newUsers?.filter(
     (user) => {
+      // Data privacy: Counselors only see their own assigned leads
+      if (currentUser?.type === "admission") {
+        if (String(user.assigned_to) !== String(currentUser.id)) return false;
+      }
+
       const matchFilter = (filter === "All" || user.status?.toLowerCase() === filter.toLowerCase());
       const matchGender = (genderFilter === "" || user.gender === genderFilter);
       const matchSearch = user.name?.toLowerCase().includes(search.toLowerCase());
       let matchDate = true;
       if ((startDate || endDate) && user.created_at) {
         const dDate = new Date(user.created_at);
-        if (startDate && dDate < new Date(startDate)) matchDate = false;
-        if (endDate && dDate > new Date(endDate)) matchDate = false;
+        if (startDate) {
+          const start = new Date(startDate);
+          start.setHours(0, 0, 0, 0);
+          if (dDate < start) matchDate = false;
+        }
+        if (endDate) {
+          const end = new Date(endDate);
+          end.setHours(23, 59, 59, 999);
+          if (dDate > end) matchDate = false;
+        }
       }
       return matchFilter && matchGender && matchSearch && matchDate;
     }
@@ -424,7 +451,7 @@ const AdmissionManagement = () => {
                         <button onClick={() => handleDelete(user.id)} className="btn-ghost" style={{ display: "flex", alignItems: "center", fontSize: "0.75rem", padding: "0.25rem 0.5rem", color: "#ef4444", background: "rgba(239, 68, 68, 0.1)", borderRadius: "4px" }}>
                           <Trash2 size={14} style={{ marginRight: "0.25rem" }}/> Delete
                         </button>
-                        {user.status === "Pending" && (
+                        {(user.status === "Pending" && currentUser?.type === "admission") && (
                           <>
                             <button onClick={() => handleStatusUpdate(user, "Approved")} className="btn-ghost" style={{ display: "flex", alignItems: "center", fontSize: "0.75rem", padding: "0.25rem 0.5rem", color: "#10b981", background: "rgba(16, 185, 129, 0.1)", borderRadius: "4px" }}>
                               <CheckCircle size={14} style={{ marginRight: "0.25rem" }}/> Approve

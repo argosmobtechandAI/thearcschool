@@ -26,10 +26,15 @@ export const createSubject = async (req, res) => {
       throw error;
     }
 
+    if (data.classIds && data.classIds.length > 0) {
+      const inserts = data.classIds.map(cId => ({ class_id: cId, subject_id: subject[0].id }));
+      await supabase.from("class_subjects").insert(inserts);
+    }
+
     return res.status(201).json({
       success: true,
       message: "Subject created successfully",
-      subject: subject[0],
+      subject: { ...subject[0], classIds: data.classIds || [] },
     });
   } catch (e) {
     return res.status(500).json({
@@ -41,17 +46,23 @@ export const createSubject = async (req, res) => {
 
 export const getSubjects = async (req, res) => {
   try {
-    const { data: subjects, error } = await supabase
-      .from("subject")
-      .select("*")
-      .order("name", { ascending: true });
+    const [{ data: subjects, error: subError }, { data: mappings, error: mapError }] = await Promise.all([
+      supabase.from("subject").select("*").order("name", { ascending: true }),
+      supabase.from("class_subjects").select("*")
+    ]);
 
-    if (error) throw error;
+    if (subError) throw subError;
+    // MapError is ignored if the table doesn't exist yet, it'll just fail gracefully in map
+    
+    const formattedSubjects = (subjects || []).map(sub => {
+      const classIds = (mappings || []).filter(m => m.subject_id === sub.id).map(m => m.class_id);
+      return { ...sub, classIds };
+    });
 
     return res.status(200).json({
       success: true,
-      count: subjects.length,
-      subjects: subjects || [],
+      count: formattedSubjects.length,
+      subjects: formattedSubjects,
     });
   } catch (e) {
     return res.status(500).json({
@@ -86,10 +97,18 @@ export const updateSubject = async (req, res) => {
       });
     }
 
+    if (data.classIds !== undefined) {
+      await supabase.from("class_subjects").delete().eq("subject_id", id);
+      if (data.classIds.length > 0) {
+        const inserts = data.classIds.map(cId => ({ class_id: cId, subject_id: id }));
+        await supabase.from("class_subjects").insert(inserts);
+      }
+    }
+
     return res.status(200).json({
       success: true,
       message: "Subject updated successfully",
-      subject: updatedSubject[0],
+      subject: { ...updatedSubject[0], classIds: data.classIds || [] },
     });
   } catch (e) {
     return res.status(500).json({

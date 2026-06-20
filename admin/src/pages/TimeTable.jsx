@@ -18,7 +18,6 @@ import dragAndDropModule from 'react-big-calendar/lib/addons/dragAndDrop';
 import 'react-big-calendar/lib/addons/dragAndDrop/styles.css';
 import './calendar-theme.css';
 import Select from 'react-select';
-import CreatableSelect from 'react-select/creatable';
 const selectStyles = {
   control: (base, state) => ({
     ...base,
@@ -252,6 +251,10 @@ export default function TimeTable() {
 
   const allTeachers = useMemo(() => users?.filter(u => u.type === "teacher") || [], [users]);
 
+  const subjectOptions = useMemo(() => {
+    return subjects?.filter(s => s.classIds?.includes(selectedClass)).map(s => ({ value: s.name, label: s.name })) || [];
+  }, [subjects, selectedClass]);
+
   const allTimeSlots = useMemo(() => {
     if (!activeTimeTable || !activeTimeTable.dates) return [];
     const times = new Set();
@@ -432,21 +435,7 @@ export default function TimeTable() {
     setDateRange({ start: formatDate(s), end: formatDate(e) });
   };
 
-  const handleCreateSubject = async (inputValue) => {
-    try {
-      setLoading(true);
-      await api.post("/admin_panel/subjects/createSubject", {
-        data: { name: inputValue.toUpperCase() }
-      });
-      toast.success(`Subject "${inputValue.toUpperCase()}" created successfully`);
-      dispatch(fetchSubjects());
-      setTimeSubject({ ...timeSubject, subject: inputValue.toUpperCase() });
-    } catch (error) {
-      toast.error(error.response?.data?.message || "Failed to create subject");
-    } finally {
-      setLoading(false);
-    }
-  };
+
 
   const handleAddPeriod = () => {
     if (!newTimeTable.date || !timeSubject.initialTime || !timeSubject.finalTime) {
@@ -919,8 +908,8 @@ export default function TimeTable() {
       </div>
 
       {selectedClass ? (
-        <div className="glass-panel" style={{ padding: "1.5rem" }}>
-          <div style={{ height: "calc(100vh - 280px)", minHeight: "600px", marginTop: "1rem" }}>
+        <div className="glass-panel" style={{ padding: "1rem", height: "calc(100vh - 220px)", display: "flex", flexDirection: "column" }}>
+          <div style={{ flex: 1, marginTop: "0.5rem" }}>
             <DnDCalendar
               localizer={localizer}
               culture="en-GB"
@@ -961,8 +950,8 @@ export default function TimeTable() {
       )}
 
       {openModal && (
-        <div className="animate-fade-in" style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 50 }} onClick={() => setOpenModal(false)}>
-          <div className="glass-panel modal-content" style={{ width: "100%", maxWidth: "600px", padding: "2rem", maxHeight: "90vh", overflowY: "auto" }} onClick={(e) => e.stopPropagation()}>
+        <div className="animate-fade-in" style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)", display: "flex", alignItems: "flex-start", justifyContent: "center", zIndex: 50, overflowY: "auto", padding: "4rem 1rem" }} onClick={() => setOpenModal(false)}>
+          <div className="glass-panel modal-content" style={{ width: "100%", maxWidth: "600px", padding: "2rem", margin: "auto", position: "relative" }} onClick={(e) => e.stopPropagation()}>
             <h2 style={{ fontSize: "1.5rem", fontWeight: "700", marginBottom: "1.5rem" }}>
               Create Timetable
             </h2>
@@ -1018,14 +1007,13 @@ export default function TimeTable() {
                       </div>
                       <div>
                         <label style={{ display: "block", marginBottom: "0.5rem", fontSize: "0.75rem" }}>Subject</label>
-                        <CreatableSelect 
+                        <Select 
                           styles={selectStyles}
-                          options={subjects?.map(s => ({ value: s.name, label: s.name })) || []}
+                          options={subjectOptions}
                           value={timeSubject.subject ? { value: timeSubject.subject, label: timeSubject.subject } : null}
                           onChange={(option) => setTimeSubject({ ...timeSubject, subject: option ? option.value : "" })}
-                          onCreateOption={handleCreateSubject}
-                          formatCreateLabel={(inputValue) => `Create new subject: "${inputValue.toUpperCase()}"`}
-                          placeholder="Search or Create..."
+                          placeholder="Select Subject..."
+                          noOptionsMessage={() => "No subjects assigned to this class"}
                           isClearable
                           menuPlacement="auto"
                         />
@@ -1079,8 +1067,8 @@ export default function TimeTable() {
       )}
 
       {openEditModal && (
-        <div className="animate-fade-in" style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 50 }} onClick={() => setOpenEditModal(false)}>
-          <div className="glass-panel modal-content" style={{ width: "100%", maxWidth: "600px", padding: "2rem", maxHeight: "90vh", overflowY: "auto" }} onClick={(e) => e.stopPropagation()}>
+        <div className="animate-fade-in" style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)", display: "flex", alignItems: "flex-start", justifyContent: "center", zIndex: 50, overflowY: "auto", padding: "4rem 1rem" }} onClick={() => setOpenEditModal(false)}>
+          <div className="glass-panel modal-content" style={{ width: "100%", maxWidth: "600px", padding: "2rem", margin: "auto", position: "relative" }} onClick={(e) => e.stopPropagation()}>
             <h2 style={{ fontSize: "1.5rem", fontWeight: "700", marginBottom: "1.5rem" }}>
               Edit Period
             </h2>
@@ -1123,14 +1111,13 @@ export default function TimeTable() {
                     </div>
                     <div>
                       <label style={{ display: "block", marginBottom: "0.5rem", fontSize: "0.75rem" }}>Subject</label>
-                      <CreatableSelect 
+                      <Select 
                         styles={selectStyles}
-                        options={subjects?.map(s => ({ value: s.name, label: s.name })) || []}
+                        options={subjectOptions}
                         value={timeSubject.subject ? { value: timeSubject.subject, label: timeSubject.subject } : null}
                         onChange={(option) => setTimeSubject({ ...timeSubject, subject: option ? option.value : "" })}
-                        onCreateOption={handleCreateSubject}
-                        formatCreateLabel={(inputValue) => `Create new subject: "${inputValue.toUpperCase()}"`}
-                        placeholder="Search or Create..."
+                        placeholder="Select Subject..."
+                        noOptionsMessage={() => "No subjects assigned to this class"}
                         isClearable
                         menuPlacement="auto"
                       />
@@ -1216,14 +1203,13 @@ export default function TimeTable() {
                     </div>
                     <div>
                       <label style={{ display: "block", marginBottom: "0.5rem", fontSize: "0.75rem" }}>Subject</label>
-                      <CreatableSelect 
+                      <Select 
                         styles={selectStyles}
-                        options={subjects?.map(s => ({ value: s.name, label: s.name })) || []}
+                        options={subjectOptions}
                         value={timeSubject.subject ? { value: timeSubject.subject, label: timeSubject.subject } : null}
                         onChange={(option) => setTimeSubject({ ...timeSubject, subject: option ? option.value : "" })}
-                        onCreateOption={handleCreateSubject}
-                        formatCreateLabel={(inputValue) => `Create new subject: "${inputValue.toUpperCase()}"`}
-                        placeholder="Search or Create..."
+                        placeholder="Select Subject..."
+                        noOptionsMessage={() => "No subjects assigned to this class"}
                         isClearable
                         menuPlacement="auto"
                       />

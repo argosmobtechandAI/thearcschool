@@ -4,10 +4,10 @@ export const createEvent = async (req, res) => {
   try {
     const { data } = req.body;
 
-    if (!data?.date || !data?.title || !data?.time) {
+    if (!data?.date || (!data?.title && !data?.topic)) {
       return res.status(400).json({
         success: false,
-        message: "Date, title and time are required",
+        message: "Date and topic are required",
       });
     }
 
@@ -19,10 +19,8 @@ export const createEvent = async (req, res) => {
           date: data.date,
           title: data.topic || data.title,
           description: data.description || null,
-          time: data.time,
-          attendees: data.attendees || 0,
-          status: data.status || "pending",
-          approval: data.approval || "not",
+          location: data.location || null,
+          target_audience: data.target_audience || null,
         },
       ])
       .select();
@@ -59,7 +57,7 @@ export const createEvent = async (req, res) => {
       const activityInserts = principals.map(prince => ({
         user_id: prince.id,
         title: "Event Created",
-        message: `New Event "${data.topic || data.title}" scheduled on ${data.date} at ${data.time}`,
+        message: `New Event "${data.topic || data.title}" scheduled on ${data.date}`,
         type: "event",
         is_read: false
       }));
@@ -105,7 +103,7 @@ export const getEventById = async (req, res) => {
     const { data: event, error } = await supabase
       .from("events")
       .select("*")
-      .eq("id", Number(id));
+      .eq("id", id);
 
     if (error) throw error;
 
@@ -137,16 +135,14 @@ export const updateEvent = async (req, res) => {
       ...(data.date && { date: data.date }),
       ...((data.topic || data.title) && { title: data.topic || data.title }),
       ...(data.description !== undefined && { description: data.description }),
-      ...(data.time && { time: data.time }),
-      ...(data.attendees !== undefined && { attendees: data.attendees }),
-      ...(data.status && { status: data.status }),
-      ...(data.approval && { approval: data.approval }),
+      ...(data.location !== undefined && { location: data.location }),
+      ...(data.target_audience !== undefined && { target_audience: data.target_audience }),
     };
 
     const { data: updated, error } = await supabase
       .from("events")
       .update(updateObj)
-      .eq("id", Number(id))
+      .eq("id", id)
       .select();
 
     if (error || !updated || !updated.length) {
@@ -176,7 +172,7 @@ export const deleteEvent = async (req, res) => {
     const { data: deleted, error } = await supabase
       .from("events")
       .delete()
-      .eq("id", Number(id))
+      .eq("id", id)
       .select();
 
     if (error || !deleted || !deleted.length) {

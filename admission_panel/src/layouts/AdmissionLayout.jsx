@@ -1,4 +1,4 @@
-import { Outlet, useNavigate, NavLink } from "react-router-dom";
+import { Outlet, useNavigate, NavLink, useLocation } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import { LogOut, LayoutDashboard, UserPlus, ExternalLink } from "lucide-react";
 import { logout } from "../features/authSlice";
@@ -13,13 +13,33 @@ const AdmissionLayout = () => {
     navigate("/login");
   };
 
-  const navLinkStyle = ({ isActive }) => ({
-    display: "flex", alignItems: "center", gap: "0.5rem", padding: "0.5rem 1rem", 
-    borderRadius: "6px", fontWeight: "500", transition: "all 0.3s", fontSize: "0.875rem",
-    textDecoration: "none",
-    background: isActive ? "var(--accent-light)" : "transparent",
-    color: isActive ? "var(--accent-primary)" : "var(--text-secondary)",
-  });
+  const location = useLocation();
+  const searchParams = new URLSearchParams(location.search);
+  const currentStatus = searchParams.get("status");
+
+  const getLinkStyle = (path, matchStatus = null) => {
+    // If we're matching the dashboard
+    let isActive = false;
+    if (path === "/dashboard") {
+      isActive = location.pathname === "/dashboard";
+    } else {
+      // If we're matching /admissions with a specific status
+      if (matchStatus) {
+        isActive = location.pathname === path && currentStatus === matchStatus;
+      } else {
+        // "All Applications" - matches when there is NO status
+        isActive = location.pathname === path && !currentStatus;
+      }
+    }
+
+    return {
+      display: "flex", alignItems: "center", gap: "0.5rem", padding: "0.5rem 1rem", 
+      borderRadius: "6px", fontWeight: "500", transition: "all 0.3s", fontSize: "0.875rem",
+      textDecoration: "none",
+      background: isActive ? "var(--accent-light)" : "transparent",
+      color: isActive ? "var(--accent-primary)" : "var(--text-secondary)",
+    };
+  };
 
   return (
     <div style={{ display: "flex", minHeight: "100vh" }}>
@@ -34,7 +54,7 @@ const AdmissionLayout = () => {
         </div>
 
         <nav style={{ flex: 1, display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-          <NavLink to="/dashboard" style={navLinkStyle}>
+          <NavLink to="/dashboard" style={() => getLinkStyle("/dashboard")}>
             <LayoutDashboard size={18} /> Dashboard
           </NavLink>
           
@@ -42,7 +62,21 @@ const AdmissionLayout = () => {
             <span style={{ fontSize: "0.65rem", textTransform: "uppercase", letterSpacing: "0.1em", color: "#9ca3af", fontWeight: "700" }}>Pipeline</span>
             <div style={{ flex: 1, height: "1px", background: "var(--glass-border)" }}></div>
           </div>
-          <NavLink to="/admissions" style={navLinkStyle}><UserPlus size={18} /> Applications</NavLink>
+          <NavLink to="/admissions" style={() => getLinkStyle("/admissions", null)}>
+            <UserPlus size={18} /> All Applications
+          </NavLink>
+          <NavLink to="/admissions?status=Pending" style={() => getLinkStyle("/admissions", "Pending")}>
+            <div style={{ width: "8px", height: "8px", borderRadius: "50%", background: "#f59e0b", marginLeft: "4px" }}></div>
+            Pending Review
+          </NavLink>
+          <NavLink to="/admissions?status=Approved" style={() => getLinkStyle("/admissions", "Approved")}>
+            <div style={{ width: "8px", height: "8px", borderRadius: "50%", background: "#10b981", marginLeft: "4px" }}></div>
+            Approved
+          </NavLink>
+          <NavLink to="/admissions?status=Rejected" style={() => getLinkStyle("/admissions", "Rejected")}>
+            <div style={{ width: "8px", height: "8px", borderRadius: "50%", background: "#ef4444", marginLeft: "4px" }}></div>
+            Rejected
+          </NavLink>
 
           {(user?.type === "admin" || user?.type === "principal") && (
             <>
@@ -50,10 +84,10 @@ const AdmissionLayout = () => {
                 <span style={{ fontSize: "0.65rem", textTransform: "uppercase", letterSpacing: "0.1em", color: "#9ca3af", fontWeight: "700" }}>Portals</span>
                 <div style={{ flex: 1, height: "1px", background: "var(--glass-border)" }}></div>
               </div>
-              <a href="http://localhost:5174/dashboard" style={{ ...navLinkStyle({ isActive: false }), color: "var(--text-secondary)" }}>
+              <a href="http://localhost:5174/dashboard" style={{ display: "flex", alignItems: "center", gap: "0.5rem", padding: "0.5rem 1rem", fontSize: "0.875rem", textDecoration: "none", color: "var(--text-secondary)" }}>
                 <ExternalLink size={18} /> Admin Portal
               </a>
-              <a href="http://localhost:5176/dashboard" style={{ ...navLinkStyle({ isActive: false }), color: "var(--text-secondary)" }}>
+              <a href="http://localhost:5176/dashboard" style={{ display: "flex", alignItems: "center", gap: "0.5rem", padding: "0.5rem 1rem", fontSize: "0.875rem", textDecoration: "none", color: "var(--text-secondary)" }}>
                 <ExternalLink size={18} /> Finance Portal
               </a>
             </>

@@ -127,7 +127,7 @@ export const createExams = async (req, res) => {
 
 export const getExam = async (req, res) => {
   try {
-    const { data: exams, error } = await supabase.from("exams").select("*, class(name, section), user(name)");
+    const { data: exams, error } = await supabase.from("exams").select("*, user(name)");
 
     if (error) throw error;
 
@@ -135,13 +135,19 @@ export const getExam = async (req, res) => {
       return res.status(200).json({ success: true, count: 0, exams: [] });
     }
 
+    const classIds = [...new Set(exams.map(e => e.class_id).filter(Boolean))];
+    const { data: classes } = await supabase.from("class").select("id, name, section").in("id", classIds);
+
     // Map back to what frontend expects
-    const mappedExams = exams.map(ex => ({
-        ...ex,
-        class: ex.class?.name,
-        section: ex.class?.section,
-        invigilator: ex.user?.name || null
-    }));
+    const mappedExams = exams.map(ex => {
+        const cls = classes?.find(c => c.id === ex.class_id);
+        return {
+          ...ex,
+          class: cls?.name,
+          section: cls?.section,
+          invigilator: ex.user?.name || null
+        };
+    });
 
     return res.status(200).json({
       success: true,
@@ -244,7 +250,7 @@ export const getStudentExams = async (req, res) => {
 
     const { data: exams, error } = await supabase
       .from("exams")
-      .select("*, class(name, section), user(name)")
+      .select("*, user(name)")
       .eq("class_id", studentClass.class_id);
 
     if (error) throw error;
@@ -253,10 +259,16 @@ export const getStudentExams = async (req, res) => {
       return res.status(200).json({ success: true, count: 0, exams: [] });
     }
 
+    const { data: classData } = await supabase
+      .from("class")
+      .select("name, section")
+      .eq("id", studentClass.class_id)
+      .single();
+
     const mappedExams = exams.map((ex) => ({
       ...ex,
-      class: ex.class?.name,
-      section: ex.class?.section,
+      class: classData?.name,
+      section: classData?.section,
       invigilator: ex.user?.name || null,
     }));
 

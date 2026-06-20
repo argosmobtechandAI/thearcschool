@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useMemo } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { fetchSubjects } from "../features/dataSlice";
+import { fetchSubjects, fetchClasses } from "../features/dataSlice";
 import api from "../services/api";
 import { toast } from "react-toastify";
 import { Plus, Trash2, Edit2, Search } from "lucide-react";
@@ -8,16 +8,17 @@ import TableFilterHeader from "../components/TableFilterHeader";
 
 const SubjectManagement = () => {
   const dispatch = useDispatch();
-  const { subjects, loadingSubjects } = useSelector((state) => state.data);
+  const { subjects, loadingSubjects, classes } = useSelector((state) => state.data);
   const [searchQuery, setSearchQuery] = useState("");
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingId, setEditingId] = useState(null);
-  const [formData, setFormData] = useState({ name: "" });
+  const [formData, setFormData] = useState({ name: "", classIds: [] });
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     dispatch(fetchSubjects());
-  }, [dispatch]);
+    if (!classes || classes.length === 0) dispatch(fetchClasses());
+  }, [dispatch, classes?.length]);
 
   const filteredSubjects = useMemo(() => {
     return subjects.filter((s) =>
@@ -28,10 +29,10 @@ const SubjectManagement = () => {
   const handleOpenModal = (subject = null) => {
     if (subject) {
       setEditingId(subject.id);
-      setFormData({ name: subject.name });
+      setFormData({ name: subject.name, classIds: subject.classIds || [] });
     } else {
       setEditingId(null);
-      setFormData({ name: "" });
+      setFormData({ name: "", classIds: [] });
     }
     setIsModalOpen(true);
   };
@@ -109,16 +110,32 @@ const SubjectManagement = () => {
             <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left" }}>
               <thead>
                 <tr>
-                  <th style={{ padding: "1rem", borderBottom: "2px solid var(--glass-border)", color: "var(--text-secondary)", fontWeight: "600", width: "80px" }}>ID</th>
                   <th style={{ padding: "1rem", borderBottom: "2px solid var(--glass-border)", color: "var(--text-secondary)", fontWeight: "600" }}>Subject Name</th>
+                  <th style={{ padding: "1rem", borderBottom: "2px solid var(--glass-border)", color: "var(--text-secondary)", fontWeight: "600" }}>Classes Taught In</th>
                   <th style={{ padding: "1rem", borderBottom: "2px solid var(--glass-border)", color: "var(--text-secondary)", fontWeight: "600", textAlign: "right" }}>Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {filteredSubjects.map((subject) => (
                   <tr key={subject.id} className="table-row-hover" style={{ borderBottom: "1px solid var(--glass-border)" }}>
-                    <td style={{ padding: "1rem", color: "var(--text-secondary)" }}>{subject.id}</td>
-                    <td style={{ padding: "1rem", fontWeight: "500" }}>{subject.name}</td>
+                    <td style={{ padding: "1rem", fontWeight: "600", color: "var(--text-primary)" }}>{subject.name}</td>
+                    <td style={{ padding: "1rem" }}>
+                      <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
+                        {subject.classIds?.length > 0 ? (
+                          subject.classIds.map((cId) => {
+                            const clsInfo = classes?.find(c => c.id === cId);
+                            const cName = clsInfo ? `${clsInfo.className || clsInfo.name} - ${clsInfo.section}` : "Unknown Class";
+                            return (
+                              <span key={cId} style={{ background: "var(--accent-light)", color: "var(--accent-primary)", padding: "0.2rem 0.6rem", borderRadius: "20px", fontSize: "0.75rem", fontWeight: "600" }}>
+                                {cName}
+                              </span>
+                            );
+                          })
+                        ) : (
+                          <span style={{ color: "var(--text-secondary)", fontSize: "0.85rem", fontStyle: "italic" }}>Not assigned to any classes</span>
+                        )}
+                      </div>
+                    </td>
                     <td style={{ padding: "1rem", textAlign: "right" }}>
                       <div style={{ display: "flex", gap: "0.5rem", justifyContent: "flex-end" }}>
                         <button onClick={() => handleOpenModal(subject)} className="btn-ghost" style={{ display: "flex", alignItems: "center", fontSize: "0.75rem", padding: "0.25rem 0.5rem", color: "#3b82f6", background: "rgba(59, 130, 246, 0.1)", borderRadius: "4px", border: "none", cursor: "pointer" }}>
@@ -154,6 +171,29 @@ const SubjectManagement = () => {
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                   required
                 />
+              </div>
+              <div style={{ marginBottom: "1.5rem" }}>
+                <label style={{ display: "block", marginBottom: "0.5rem", fontSize: "0.875rem", fontWeight: "600" }}>Assign to Classes</label>
+                <div style={{ maxHeight: "150px", overflowY: "auto", border: "1px solid var(--glass-border)", borderRadius: "8px", padding: "0.5rem", background: "rgba(255,255,255,0.5)" }}>
+                  {classes?.length > 0 ? classes.map(c => (
+                    <label key={c.id} style={{ display: "flex", alignItems: "center", gap: "0.5rem", padding: "0.4rem 0.5rem", cursor: "pointer", borderRadius: "4px" }} className="table-row-hover">
+                      <input
+                        type="checkbox"
+                        checked={formData.classIds.includes(c.id)}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setFormData({ ...formData, classIds: [...formData.classIds, c.id] });
+                          } else {
+                            setFormData({ ...formData, classIds: formData.classIds.filter(id => id !== c.id) });
+                          }
+                        }}
+                      />
+                      <span style={{ fontSize: "0.875rem" }}>{c.className || c.name} - {c.section}</span>
+                    </label>
+                  )) : (
+                    <div style={{ padding: "0.5rem", fontSize: "0.875rem", color: "var(--text-secondary)" }}>No classes available</div>
+                  )}
+                </div>
               </div>
               <div style={{ display: "flex", justifyContent: "flex-end", gap: "1rem" }}>
                 <button type="button" onClick={() => setIsModalOpen(false)} className="btn btn-ghost">Cancel</button>

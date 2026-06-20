@@ -22,9 +22,9 @@ const Events = () => {
   const [formData, setFormData] = useState({
     date: "",
     topic: "",
-    time: "",
-    attendees: 0,
-    status: "pending",
+    description: "",
+    location: "",
+    target_audience: "All",
   });
 
   useEffect(() => {
@@ -69,13 +69,13 @@ const Events = () => {
       setFormData({
         date: event.date || "",
         topic: event.topic || "",
-        time: event.time?.slice(0, 5) || "",
-        attendees: event.attendees || 0,
-        status: event.status || "pending",
+        description: event.description || "",
+        location: event.location || "",
+        target_audience: event.target_audience || "All",
       });
     } else {
       setEditingId(null);
-      setFormData({ date: "", topic: "", time: "", attendees: 0, status: "pending" });
+      setFormData({ date: "", topic: "", description: "", location: "", target_audience: "All" });
     }
     setOpenModal(true);
   };
@@ -86,7 +86,6 @@ const Events = () => {
   };
 
   const filteredEvents = events?.filter(event => {
-    const matchesStatus = !statusFilter || event.status === statusFilter;
     const matchesSearch = !searchQuery || event.topic?.toLowerCase().includes(searchQuery.toLowerCase());
     
     let matchesDate = true;
@@ -105,15 +104,14 @@ const Events = () => {
       }
     }
 
-    return matchesStatus && matchesSearch && matchesDate;
+    return matchesSearch && matchesDate;
   });
-
   const exportColumnsList = [
     { key: "topic", label: "Topic" },
+    { key: "description", label: "Description" },
     { key: "date", label: "Date" },
-    { key: "time", label: "Time" },
-    { key: "attendees", label: "Attendees" },
-    { key: "status", label: "Status" }
+    { key: "location", label: "Location" },
+    { key: "target_audience", label: "Target Audience" }
   ];
 
   const handleExportExcel = (selectedKeys) => {
@@ -126,10 +124,10 @@ const Events = () => {
          }
       };
       addIfSelected("topic", item.topic);
+      addIfSelected("description", item.description);
       addIfSelected("date", item.date);
-      addIfSelected("time", item.time);
-      addIfSelected("attendees", item.attendees);
-      addIfSelected("status", item.status);
+      addIfSelected("location", item.location);
+      addIfSelected("target_audience", item.target_audience);
       return row;
     }) || [];
     exportToExcel(dataToExport, "Events_Report");
@@ -146,10 +144,10 @@ const Events = () => {
          if (!selectedKeys || selectedKeys.includes(key)) row.push(val);
       };
       addIfSelected("topic", item.topic);
+      addIfSelected("description", item.description);
       addIfSelected("date", item.date);
-      addIfSelected("time", item.time);
-      addIfSelected("attendees", item.attendees);
-      addIfSelected("status", item.status);
+      addIfSelected("location", item.location);
+      addIfSelected("target_audience", item.target_audience);
       return row;
     }) || [];
     exportToPDF(columnLabels, dataToExport, "Events_Report", "Events Report");
@@ -176,19 +174,8 @@ const Events = () => {
           exportColumns={exportColumnsList}
           onExportExcel={handleExportExcel}
           onExportPDF={handleExportPDF}
-          filters={[
-            {
-              label: "All Statuses",
-              value: statusFilter,
-              onChange: setStatusFilter,
-              options: [
-                { value: "pending", label: "Pending" },
-                { value: "approved", label: "Approved" }
-              ]
-            }
-          ]}
         >
-          <DateRangePicker onRangeChange={setDateRange} />
+          <DateRangePicker value={dateRange} onRangeChange={setDateRange} initialPreset="this_month" />
         </TableFilterHeader>
         {filteredEvents?.length === 0 ? (
           <div style={{ padding: "3rem", textAlign: "center", color: "var(--text-secondary)" }}>
@@ -201,23 +188,27 @@ const Events = () => {
               <div key={event.id} className="glass-card" style={{ padding: "1.5rem", display: "flex", flexDirection: "column", gap: "1rem" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
                   <h3 style={{ fontSize: "1.25rem", fontWeight: "600", color: "var(--text-primary)" }}>{event.topic}</h3>
-                  <span style={{ 
-                    padding: "4px 8px", 
-                    borderRadius: "12px", 
-                    fontSize: "0.75rem", 
-                    fontWeight: "600",
-                    background: event.status === "approved" ? "rgba(16, 185, 129, 0.2)" : "rgba(245, 158, 11, 0.2)",
-                    color: event.status === "approved" ? "#6ee7b7" : "#fcd34d"
-                  }}>
-                    {event.status.toUpperCase()}
-                  </span>
                 </div>
                 
                 <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem", color: "var(--text-secondary)", fontSize: "0.875rem" }}>
                   <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
-                    <Calendar size={16} /> {event.date} • {event.time}
+                    <Calendar size={16} /> {event.date}
                   </div>
-                  <div>Attendees: <strong style={{ color: "var(--text-primary)" }}>{event.attendees}</strong></div>
+                  {event.location && (
+                    <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
+                      <strong>Location:</strong> <span style={{ color: "var(--text-primary)" }}>{event.location}</span>
+                    </div>
+                  )}
+                  {event.target_audience && (
+                    <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
+                      <strong>Audience:</strong> <span style={{ color: "var(--text-primary)" }}>{event.target_audience}</span>
+                    </div>
+                  )}
+                  {event.description && (
+                    <div style={{ marginTop: "0.5rem", padding: "0.75rem", background: "rgba(0,0,0,0.02)", borderRadius: "8px", border: "1px solid rgba(0,0,0,0.05)" }}>
+                      {event.description}
+                    </div>
+                  )}
                 </div>
 
                 <div style={{ display: "flex", gap: "0.5rem", marginTop: "auto", paddingTop: "1rem", borderTop: "1px solid var(--glass-border)" }}>
@@ -235,40 +226,36 @@ const Events = () => {
       </div>
 
       {openModal && (
-        <div className="animate-fade-in" style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 50 }} onClick={handleCloseModal}>
-          <div className="glass-panel modal-content" style={{ width: "100%", maxWidth: "500px", padding: "2rem", maxHeight: "90vh", overflowY: "auto" }} onClick={(e) => e.stopPropagation()}>
+        <div className="animate-fade-in" style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)", display: "flex", alignItems: "flex-start", justifyContent: "center", zIndex: 50, overflowY: "auto", padding: "2rem 1rem" }} onClick={handleCloseModal}>
+          <div className="glass-panel modal-content" style={{ width: "100%", maxWidth: "500px", padding: "2rem", overflow: "visible", margin: "auto" }} onClick={(e) => e.stopPropagation()}>
             <h2 style={{ fontSize: "1.5rem", fontWeight: "700", marginBottom: "1.5rem" }}>
               {editingId ? "Update Event" : "Create Event"}
             </h2>
             <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
               <div>
                 <label style={{ display: "block", marginBottom: "0.5rem", fontSize: "0.875rem" }}>Event Topic</label>
-                <input required className="input-glass" value={formData.topic} onChange={(e) => setFormData({ ...formData, topic: e.target.value })} />
+                <input required className="input-glass" value={formData.topic} onChange={(e) => setFormData({ ...formData, topic: e.target.value })} placeholder="e.g. Freshers Party" />
+              </div>
+
+              <div>
+                <label style={{ display: "block", marginBottom: "0.5rem", fontSize: "0.875rem" }}>Description</label>
+                <textarea rows="3" className="input-glass" value={formData.description} onChange={(e) => setFormData({ ...formData, description: e.target.value })} placeholder="e.g. Outbound training trip to the Red Fort for 10th grade..." />
               </div>
               
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
                 <div>
-                  <label style={{ display: "block", marginBottom: "0.5rem", fontSize: "0.875rem" }}>Date</label>
-                  <input required type="date" className="input-glass" value={formData.date} onChange={(e) => setFormData({ ...formData, date: e.target.value })} />
+                  <label style={{ display: "block", marginBottom: "0.5rem", fontSize: "0.875rem" }}>Location</label>
+                  <input className="input-glass" value={formData.location} onChange={(e) => setFormData({ ...formData, location: e.target.value })} placeholder="e.g. School Auditorium" />
                 </div>
                 <div>
-                  <label style={{ display: "block", marginBottom: "0.5rem", fontSize: "0.875rem" }}>Time</label>
-                  <input required type="time" className="input-glass" value={formData.time} onChange={(e) => setFormData({ ...formData, time: e.target.value })} />
+                  <label style={{ display: "block", marginBottom: "0.5rem", fontSize: "0.875rem" }}>Target Audience</label>
+                  <input className="input-glass" value={formData.target_audience} onChange={(e) => setFormData({ ...formData, target_audience: e.target.value })} placeholder="e.g. All Students, Class 10A..." />
                 </div>
               </div>
-
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
-                <div>
-                  <label style={{ display: "block", marginBottom: "0.5rem", fontSize: "0.875rem" }}>Expected Attendees</label>
-                  <input required type="number" className="input-glass" value={formData.attendees} onChange={(e) => setFormData({ ...formData, attendees: parseInt(e.target.value) || 0 })} />
-                </div>
-                <div>
-                  <label style={{ display: "block", marginBottom: "0.5rem", fontSize: "0.875rem" }}>Status</label>
-                  <select required className="input-glass" value={formData.status} onChange={(e) => setFormData({ ...formData, status: e.target.value })}>
-                    <option value="pending">Pending</option>
-                    <option value="approved">Approved</option>
-                  </select>
-                </div>
+              
+              <div>
+                <label style={{ display: "block", marginBottom: "0.5rem", fontSize: "0.875rem" }}>Date</label>
+                <input required type="date" className="input-glass" value={formData.date} onChange={(e) => setFormData({ ...formData, date: e.target.value })} />
               </div>
 
               <div style={{ display: "flex", justifyContent: "flex-end", gap: "1rem", marginTop: "1rem" }}>

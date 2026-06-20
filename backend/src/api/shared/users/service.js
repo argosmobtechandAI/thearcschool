@@ -35,6 +35,32 @@ export class UserService {
   static async createUser(data) {
     const { connections, classId, classes, ...userData } = data;
 
+    if (data.type === 'parent') {
+      let father_name = data.name || '';
+      let mother_name = '';
+      if (father_name.includes('&')) {
+        [father_name, mother_name] = father_name.split('&').map(s => s.trim());
+      }
+      
+      const { data: parentData, error } = await supabase.from('parents').insert({
+        father_name,
+        mother_name,
+        phone: data.phone || null,
+        alternate_number: data.alternate_number || null,
+      }).select().single();
+      
+      if (error) throw error;
+      
+      if (connections && connections.length > 0) {
+        const studentParents = connections.map(studentId => ({
+          parent_id: parentData.id,
+          student_id: studentId
+        }));
+        await supabase.from('student_parents').insert(studentParents);
+      }
+      return { user: { ...parentData, type: 'parent' } };
+    }
+
     if (!supabaseAdmin) {
       throw new Error("Supabase Admin client not initialized. Ensure SERVICE_ROLE_KEY is set in .env");
     }
@@ -186,6 +212,36 @@ export class UserService {
   }
 
   static async updateUser(data) {
+    if (data.type === 'parent') {
+      const parentId = data.id;
+      let father_name = data.name || '';
+      let mother_name = '';
+      if (father_name.includes('&')) {
+        [father_name, mother_name] = father_name.split('&').map(s => s.trim());
+      }
+      
+      const { error } = await supabase.from('parents').update({
+        father_name,
+        mother_name,
+        phone: data.phone || null,
+        alternate_number: data.alternate_number || null,
+      }).eq("id", parentId);
+      
+      if (error) throw error;
+      
+      if (data.connections !== undefined) {
+        await supabase.from("student_parents").delete().eq("parent_id", parentId);
+        if (data.connections.length > 0) {
+          const studentParents = data.connections.map(studentId => ({
+            parent_id: parentId,
+            student_id: studentId
+          }));
+          await supabase.from("student_parents").insert(studentParents);
+        }
+      }
+      return { success: true };
+    }
+
     const { data: existingUser, error: existingError } = await supabase
       .from("user")
       .select("*")
@@ -304,7 +360,9 @@ export class UserService {
       { data: classStudentsData },
       { data: classTeachersData },
       { data: teacherDetailsData },
-      { data: connectionsData }
+      { data: connectionsData },
+      { data: parentsData },
+      { data: studentParentsData }
     ] = await Promise.all([
       supabase.from("grades").select("*"),
       supabase.from("student_fees").select("*, fee(*)"),
@@ -313,17 +371,18 @@ export class UserService {
       supabase.from("class_students").select("*"),
       supabase.from("class_teachers").select("*"),
       supabase.from("teacher_details").select("*"),
-      supabase.from("user_connections").select("*")
+      supabase.from("user_connections").select("*"),
+      supabase.from("parents").select("*").then(res => res.error ? { data: [] } : res).catch(() => ({ data: [] })),
+      supabase.from("student_parents").select("*").then(res => res.error ? { data: [] } : res).catch(() => ({ data: [] }))
     ]);
     
     const mappedUsers = users.map(user => {
       let connections = [];
-      if (connectionsData) {
-        if (user.type === 'student') {
-          connections = connectionsData.filter(c => c.student_id === user.id).map(c => c.parent_id);
-        } else if (user.type === 'parent') {
-          connections = connectionsData.filter(c => c.parent_id === user.id).map(c => c.student_id);
-        }
+      if (user.type === 'student') {
+        if (connectionsData) connections = connections.concat(connectionsData.filter(c => c.student_id === user.id).map(c => c.parent_id));
+        if (studentParentsData) connections = connections.concat(studentParentsData.filter(c => c.student_id === user.id).map(c => c.parent_id));
+      } else if (user.type === 'parent') {
+        if (connectionsData) connections = connections.concat(connectionsData.filter(c => c.parent_id === user.id).map(c => c.student_id));
       }
       let classes = [];
       if (user.type === 'student') {
@@ -351,7 +410,37 @@ export class UserService {
       return u;
     });
 
-    return mappedUsers;
+    const mappedParents = (parentsData || []).map(p => {
+      let connections = [];
+      let pClasses = new Set();
+      if (studentParentsData) {
+        connections = studentParentsData.filter(c => c.parent_id === p.id).map(c => c.student_id);
+        connections.forEach(studentId => {
+          const sClasses = (classStudentsData || []).filter(c => c.student_id === studentId).map(c => c.class_id);
+          sClasses.forEach(c => pClasses.add(c));
+        });
+      }
+      return {
+        id: p.id,
+        name: (p.father_name && p.mother_name) ? `${p.father_name} & ${p.mother_name}` : (p.father_name || p.mother_name || 'Parent'),
+        type: 'parent',
+        email: '',
+        phone: p.phone || p.alternate_number || '',
+        created_at: p.created_at,
+        status: 'active',
+        father_name: p.father_name,
+        mother_name: p.mother_name,
+        alternate_number: p.alternate_number,
+        connections,
+        classes: Array.from(pClasses),
+        grade: [],
+        fees: [],
+        notification: [],
+        activity: []
+      };
+    });
+
+    return [...mappedUsers, ...mappedParents];
   }
 
   static async getUserById(id) {

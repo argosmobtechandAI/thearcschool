@@ -30,6 +30,7 @@ import FinanceProfile from './pages/FinanceProfile';
 import Holidays from './pages/Holidays';
 import StudentProfile from './pages/StudentProfile';
 import TeacherProfile from './pages/TeacherProfile';
+import ClassProfile from './pages/ClassProfile';
 
 const ProtectedRoute = ({ children, allowedRoles }) => {
   const { isAuthenticated, user } = useSelector((state) => state.auth);
@@ -70,6 +71,7 @@ function App() {
           <Route path="finance-profile/:id" element={<ProtectedRoute allowedRoles={["admin"]}><FinanceProfile /></ProtectedRoute>} />
           <Route path="admissions" element={<ProtectedRoute allowedRoles={["admin", "principal"]}><AdmissionManagement /></ProtectedRoute>} />
           <Route path="classes" element={<ProtectedRoute allowedRoles={["admin"]}><ClassManagement /></ProtectedRoute>} />
+          <Route path="classes/:id" element={<ProtectedRoute allowedRoles={["admin"]}><ClassProfile /></ProtectedRoute>} />
           <Route path="subjects" element={<ProtectedRoute allowedRoles={["admin"]}><SubjectManagement /></ProtectedRoute>} />
           <Route path="rooms" element={<ProtectedRoute allowedRoles={["admin"]}><RoomManagement /></ProtectedRoute>} />
           <Route path="exams" element={<ProtectedRoute allowedRoles={["admin"]}><Exams /></ProtectedRoute>} />

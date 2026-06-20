@@ -14,17 +14,42 @@ const AdminLayout = () => {
   };
 
   const navLinkStyle = ({ isActive }) => ({
-    display: "flex", alignItems: "center", gap: "0.5rem", padding: "0.5rem 1rem", 
-    borderRadius: "6px", fontWeight: "500", transition: "all 0.3s", fontSize: "0.875rem",
+    display: "flex", alignItems: "center", gap: "0.5rem", padding: "0.35rem 0.75rem", 
+    borderRadius: "6px", fontWeight: "500", transition: "all 0.3s", fontSize: "0.8rem",
     textDecoration: "none",
     background: isActive ? "var(--accent-light)" : "transparent",
     color: isActive ? "var(--accent-primary)" : "var(--text-secondary)",
   });
 
+  const NavGroup = ({ title }) => (
+    <div style={{ 
+      marginTop: "1.25rem", 
+      marginBottom: "0.5rem", 
+      padding: "0 0.5rem", 
+      borderBottom: "1px solid var(--glass-border)", 
+      paddingBottom: "0.3rem" 
+    }}>
+      <span style={{ 
+        fontSize: "0.75rem", 
+        textTransform: "uppercase", 
+        letterSpacing: "0.1em", 
+        color: "var(--accent-primary)", 
+        fontWeight: "800" 
+      }}>{title}</span>
+    </div>
+  );
+
   return (
-    <div style={{ display: "flex", minHeight: "100vh" }}>
+    <div style={{ display: "flex", height: "100vh", overflow: "hidden" }}>
+      <style>
+        {`
+          .sidebar-nav::-webkit-scrollbar {
+            display: none;
+          }
+        `}
+      </style>
       {/* Sidebar */}
-      <aside className="glass-panel" style={{ width: "240px", padding: "1rem", display: "flex", flexDirection: "column", borderTopLeftRadius: 0, borderBottomLeftRadius: 0, height: "100vh" }}>
+      <aside className="glass-panel" style={{ width: "230px", padding: "0.75rem", display: "flex", flexDirection: "column", borderTopLeftRadius: 0, borderBottomLeftRadius: 0, height: "100vh", overflow: "hidden" }}>
         <div style={{ marginBottom: "1.5rem", display: "flex", alignItems: "center", gap: "0.75rem" }}>
           <img src="/thearcschoollogo.jpeg" alt="The Arc School" style={{ height: "48px", width: "48px", borderRadius: "50%", objectFit: "cover" }} />
           <div>
@@ -33,79 +58,64 @@ const AdminLayout = () => {
           </div>
         </div>
 
-        <nav style={{ flex: 1, display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+        <nav className="sidebar-nav" style={{ flex: 1, display: "flex", flexDirection: "column", gap: "0.15rem", overflowY: "auto", overflowX: "hidden", scrollbarWidth: "none", msOverflowStyle: "none", paddingBottom: "1rem" }}>
           <NavLink to="/dashboard" style={navLinkStyle}>
-            <LayoutDashboard size={18} /> Dashboard
+            <LayoutDashboard size={16} /> Dashboard
           </NavLink>
           
           {user?.type === "admin" && (
             <>
-              <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginTop: "1.25rem", marginBottom: "0.5rem", paddingLeft: "1rem", paddingRight: "1rem" }}>
-                <span style={{ fontSize: "0.65rem", textTransform: "uppercase", letterSpacing: "0.1em", color: "#9ca3af", fontWeight: "700" }}>People</span>
-                <div style={{ flex: 1, height: "1px", background: "var(--glass-border)" }}></div>
-              </div>
-              <NavLink to="/users/student" style={navLinkStyle}><Users size={18} /> Students</NavLink>
-              <NavLink to="/users/teacher" style={navLinkStyle}><UserCircle size={18} /> Teachers</NavLink>
-              <NavLink to="/users/parent" style={navLinkStyle}><Users size={18} /> Parents</NavLink>
-              <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginTop: "1.25rem", marginBottom: "0.5rem", paddingLeft: "1rem", paddingRight: "1rem" }}>
-                <span style={{ fontSize: "0.65rem", textTransform: "uppercase", letterSpacing: "0.1em", color: "#9ca3af", fontWeight: "700" }}>Staff</span>
-                <div style={{ flex: 1, height: "1px", background: "var(--glass-border)" }}></div>
-              </div>
-              <NavLink to="/users/admission" style={navLinkStyle}><UserCheck size={18} /> Counselors</NavLink>
-              <NavLink to="/users/finance" style={navLinkStyle}><IndianRupee size={18} /> Accountants</NavLink>
+              <NavGroup title="People" />
+              <NavLink to="/users/student" style={navLinkStyle}><Users size={16} /> Students</NavLink>
+              <NavLink to="/users/teacher" style={navLinkStyle}><UserCircle size={16} /> Teachers</NavLink>
+              <NavLink to="/users/parent" style={navLinkStyle}><Users size={16} /> Parents</NavLink>
+              <NavGroup title="Staff" />
+              <NavLink to="/users/admission" style={navLinkStyle}><UserCheck size={16} /> Counselors</NavLink>
+              <NavLink to="/users/finance" style={navLinkStyle}><IndianRupee size={16} /> Accountants</NavLink>
             </>
           )}
           
           {user?.type === "admin" && (
             <>
-              <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginTop: "1.25rem", marginBottom: "0.5rem", paddingLeft: "1rem", paddingRight: "1rem" }}>
-                <span style={{ fontSize: "0.65rem", textTransform: "uppercase", letterSpacing: "0.1em", color: "#9ca3af", fontWeight: "700" }}>Academics</span>
-                <div style={{ flex: 1, height: "1px", background: "var(--glass-border)" }}></div>
-              </div>
-              <NavLink to="/admissions" style={navLinkStyle}><UserCheck size={18} /> Admissions Pipeline</NavLink>
-              <NavLink to="/classes" style={navLinkStyle}><BookOpen size={18} /> Classes</NavLink>
-              <NavLink to="/subjects" style={navLinkStyle}><BookOpen size={18} /> Subjects</NavLink>
-              <NavLink to="/timetable" style={navLinkStyle}><Clock size={18} /> Timetable</NavLink>
-              <NavLink to="/attendance" style={navLinkStyle}><UserCheck size={18} /> Attendance</NavLink>
-              <NavLink to="/exams" style={navLinkStyle}><ClipboardCheck size={18} /> Exams & Grading</NavLink>
-              <NavLink to="/salary" style={navLinkStyle}><DollarSign size={18} /> Salary Management</NavLink>
-              <NavLink to="/communication/inbox" style={navLinkStyle}><MessageSquare size={18} /> Communication</NavLink>
-              <NavLink to="/notification" style={navLinkStyle}><Bell size={18} /> Notifications</NavLink>
-              <NavLink to="/school-info" style={navLinkStyle}><Info size={18} /> School Info</NavLink>
+              <NavGroup title="Academics" />
+              <NavLink to="/admissions" style={navLinkStyle}><UserCheck size={16} /> Admissions Pipeline</NavLink>
+              <NavLink to="/classes" style={navLinkStyle}><BookOpen size={16} /> Classes</NavLink>
+              <NavLink to="/subjects" style={navLinkStyle}><BookOpen size={16} /> Subjects</NavLink>
+              <NavLink to="/timetable" style={navLinkStyle}><Clock size={16} /> Timetable</NavLink>
+              <NavLink to="/attendance" style={navLinkStyle}><UserCheck size={16} /> Attendance</NavLink>
+              <NavLink to="/exams" style={navLinkStyle}><ClipboardCheck size={16} /> Exams & Grading</NavLink>
+              <NavLink to="/salary" style={navLinkStyle}><DollarSign size={16} /> Salary</NavLink>
+              <NavLink to="/communication/inbox" style={navLinkStyle}><MessageSquare size={16} /> Communication</NavLink>
+              <NavLink to="/notification" style={navLinkStyle}><Bell size={16} /> Notifications</NavLink>
+              <NavLink to="/school-info" style={navLinkStyle}><Info size={16} /> School Info</NavLink>
             </>
           )}
 
           {(user?.type === "admin" || user?.type === "finance") && (
             <>
-              <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginTop: "1.25rem", marginBottom: "0.5rem", paddingLeft: "1rem", paddingRight: "1rem" }}>
-                <span style={{ fontSize: "0.65rem", textTransform: "uppercase", letterSpacing: "0.1em", color: "#9ca3af", fontWeight: "700" }}>Management</span>
-                <div style={{ flex: 1, height: "1px", background: "var(--glass-border)" }}></div>
-              </div>
+              <NavGroup title="Management" />
               {user?.type === "admin" && (
                 <>
-                  <NavLink to="/events" style={navLinkStyle}><Calendar size={18} /> Events & Calendar</NavLink>
-                  <NavLink to="/holidays" style={navLinkStyle}><Calendar size={18} /> Public Holidays</NavLink>
-                  <NavLink to="/rooms" style={navLinkStyle}><MapPin size={18} /> Rooms Management</NavLink>
+                  <NavLink to="/events" style={navLinkStyle}><Calendar size={16} /> Events & Calendar</NavLink>
+                  <NavLink to="/holidays" style={navLinkStyle}><Calendar size={16} /> Holidays</NavLink>
+                  <NavLink to="/rooms" style={navLinkStyle}><MapPin size={16} /> Rooms Management</NavLink>
                 </>
               )}
-              <NavLink to="/fees" style={navLinkStyle}><IndianRupee size={18} /> Fees</NavLink>
+              <NavLink to="/fees" style={navLinkStyle}><IndianRupee size={16} /> Fees</NavLink>
               {user?.type === "admin" && (
-                <NavLink to="/complaints" style={navLinkStyle}><ShieldAlert size={18} /> Complaints</NavLink>
+                <NavLink to="/complaints" style={navLinkStyle}><ShieldAlert size={16} /> Complaints</NavLink>
               )}
             </>
           )}
 
           {user?.type === "admin" && (
             <>
-              <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginTop: "1.25rem", marginBottom: "0.5rem", paddingLeft: "1rem", paddingRight: "1rem" }}>
-                <span style={{ fontSize: "0.65rem", textTransform: "uppercase", letterSpacing: "0.1em", color: "#9ca3af", fontWeight: "700" }}>Portals</span>
-                <div style={{ flex: 1, height: "1px", background: "var(--glass-border)" }}></div>
-              </div>
+              <NavGroup title="Portals" />
               <a href="http://localhost:5175/dashboard" style={{ ...navLinkStyle({ isActive: false }), color: "var(--text-secondary)" }}>
-                <ExternalLink size={18} /> Admission Portal
+                <ExternalLink size={16} /> Admission Portal
               </a>
               <a href="http://localhost:5176/dashboard" style={{ ...navLinkStyle({ isActive: false }), color: "var(--text-secondary)" }}>
-                <ExternalLink size={18} /> Finance Portal
+                <ExternalLink size={16} /> Finance Portal
               </a>
             </>
           )}

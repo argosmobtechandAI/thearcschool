@@ -24,7 +24,8 @@ const DateRangePicker = ({
     today: "Today",
     yesterday: "Yesterday",
     this_week: "This Week",
-    mtd: "This Month (MTD)",
+    mtd: "Month To Date",
+    this_month: "This Month (All)",
     last_month: "Last Month",
     ytd: "This Year (YTD)"
   };
@@ -57,6 +58,13 @@ const DateRangePicker = ({
           const m = new Date(today);
           m.setDate(1);
           start = formatDate(m);
+          break;
+        }
+        case 'this_month': {
+          const mStart = new Date(today.getFullYear(), today.getMonth(), 1);
+          const mEnd = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+          start = formatDate(mStart);
+          end = formatDate(mEnd);
           break;
         }
         case 'last_month': {

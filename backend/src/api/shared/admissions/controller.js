@@ -6,6 +6,15 @@ export const createNewUser = async (req, res) => {
   const { data } = req.body;
 
   try {
+    let assignedTo = data.assigned_to || null;
+    if (assignedTo) {
+      // Ensure the assigned_to user actually exists in the DB
+      const { data: userCheck } = await supabase.from('user').select('id').eq('id', assignedTo).single();
+      if (!userCheck) {
+        assignedTo = null; // User doesn't exist, fallback to null
+      }
+    }
+
     const { data: insertedUser, error } = await supabase
       .from("newUsers")
       .insert([
@@ -19,7 +28,7 @@ export const createNewUser = async (req, res) => {
           dob: data.dob,
           gender: data.gender,
           documents: data.documents || [],
-          assigned_to: data.assigned_to || null,
+          assigned_to: assignedTo,
         },
       ])
       .select();
@@ -57,7 +66,7 @@ export const getAllNewUsers = async (req, res) => {
 };
 
 export const getSingleNewUser = async (req, res) => {
-  const id = Number(req.params.id);
+  const id = req.params.id;
 
   try {
     const { data: user, error } = await supabase
@@ -87,7 +96,7 @@ export const getSingleNewUser = async (req, res) => {
 };
 
 export const updateNewUser = async (req, res) => {
-  const id = Number(req.params.id);
+  const id = req.params.id;
   const { data } = req.body;
 
   try {
@@ -130,7 +139,7 @@ export const updateNewUser = async (req, res) => {
 };
 
 export const deleteNewUser = async (req, res) => {
-  const id = Number(req.params.id);
+  const id = req.params.id;
 
   try {
     const { data: deletedUser, error } = await supabase
@@ -173,7 +182,7 @@ export const approveNewUser = async (req, res) => {
       const { data: userReq, error: userError } = await supabase
         .from("newUsers")
         .select("*")
-        .eq("id", Number(id));
+        .eq("id", id);
 
       if (userError) throw userError;
 
@@ -208,7 +217,7 @@ export const approveNewUser = async (req, res) => {
       const { data: updatedUser, error: updateError } = await supabase
         .from("newUsers")
         .update({ status: "approved" })
-        .eq("id", Number(id))
+        .eq("id", id)
         .select();
 
       if (updateError) throw updateError;
@@ -229,7 +238,7 @@ export const approveNewUser = async (req, res) => {
       const { data: updatedUser, error } = await supabase
         .from("newUsers")
         .update({ status: "rejected" })
-        .eq("id", Number(id))
+        .eq("id", id)
         .select();
 
       if (error) throw error;

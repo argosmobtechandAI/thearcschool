@@ -114,16 +114,16 @@ const RoomManagement = () => {
             <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left" }}>
               <thead>
                 <tr>
-                  <th style={{ padding: "1rem", borderBottom: "2px solid var(--glass-border)", color: "var(--text-secondary)", fontWeight: "600", width: "80px" }}>ID</th>
+                  <th style={{ padding: "1rem", borderBottom: "2px solid var(--glass-border)", color: "var(--text-secondary)", fontWeight: "600", width: "80px" }}>S.No.</th>
                   <th style={{ padding: "1rem", borderBottom: "2px solid var(--glass-border)", color: "var(--text-secondary)", fontWeight: "600" }}>Room Name</th>
                   <th style={{ padding: "1rem", borderBottom: "2px solid var(--glass-border)", color: "var(--text-secondary)", fontWeight: "600" }}>Capacity</th>
                   <th style={{ padding: "1rem", borderBottom: "2px solid var(--glass-border)", color: "var(--text-secondary)", fontWeight: "600", textAlign: "right" }}>Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {filteredRooms.map((room) => (
+                {filteredRooms.map((room, index) => (
                   <tr key={room.id} className="table-row-hover" style={{ borderBottom: "1px solid var(--glass-border)" }}>
-                    <td style={{ padding: "1rem", color: "var(--text-secondary)" }}>{room.id}</td>
+                    <td style={{ padding: "1rem", color: "var(--text-secondary)" }}>{index + 1}</td>
                     <td style={{ padding: "1rem", fontWeight: "500" }}>{room.name}</td>
                     <td style={{ padding: "1rem", color: "var(--text-secondary)" }}>{room.capacity || "-"}</td>
                     <td style={{ padding: "1rem", textAlign: "right" }}>

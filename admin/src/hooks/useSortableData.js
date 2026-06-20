@@ -1,14 +1,14 @@
 import { useState, useMemo } from 'react';
 
-export const useSortableData = (items, config = null) => {
+export const useSortableData = (items, config = null, customGetters = {}) => {
   const [sortConfig, setSortConfig] = useState(config);
 
   const sortedItems = useMemo(() => {
     let sortableItems = [...items];
     if (sortConfig !== null) {
       sortableItems.sort((a, b) => {
-        let aValue = a[sortConfig.key];
-        let bValue = b[sortConfig.key];
+        let aValue = customGetters[sortConfig.key] ? customGetters[sortConfig.key](a) : a[sortConfig.key];
+        let bValue = customGetters[sortConfig.key] ? customGetters[sortConfig.key](b) : b[sortConfig.key];
 
         // Handle string comparison nicely
         if (typeof aValue === 'string') aValue = aValue.toLowerCase();

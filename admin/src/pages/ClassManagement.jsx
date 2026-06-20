@@ -1,4 +1,5 @@
 import { useEffect, useState, useMemo } from "react";
+import { useNavigate } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import { fetchClasses, fetchUsers } from "../features/dataSlice";
 import { Plus, Edit, Trash2, Users, ChevronUp, ChevronDown, ChevronsUpDown } from "lucide-react";
@@ -9,6 +10,7 @@ import { useSortableData } from "../hooks/useSortableData";
 
 const ClassManagement = () => {
   const dispatch = useDispatch();
+  const navigate = useNavigate();
   const { classes, users, loadingClasses } = useSelector((state) => state.data);
 
   // Main Page States
@@ -57,7 +59,12 @@ const ClassManagement = () => {
     );
   }, [classes, searchQuery]);
 
-  const { items: sortedClasses, requestSort, sortConfig } = useSortableData(filteredClasses);
+  const customGetters = useMemo(() => ({
+    teachers: (c) => c.teacher?.length > 0 ? c.teacher.map(t => teachers.find(u => u.id === t)?.name || "Unassigned").join(", ") : "Unassigned",
+    students: (c) => c.student?.length || 0
+  }), [teachers]);
+
+  const { items: sortedClasses, requestSort, sortConfig } = useSortableData(filteredClasses, null, customGetters);
 
   // Teacher selection filtering
   const filteredTeachersForSelect = useMemo(() => {
@@ -78,7 +85,7 @@ const ClassManagement = () => {
       if (studentClassFilter === "unassigned") {
         result = result.filter(s => !s.classes || s.classes.length === 0);
       } else {
-        result = result.filter(s => s.classes && s.classes.includes(Number(studentClassFilter)));
+        result = result.filter(s => s.classes && s.classes.includes(studentClassFilter));
       }
     }
 
@@ -218,8 +225,9 @@ const ClassManagement = () => {
   };
 
   return (
-    <div>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "2rem" }}>
+    <div style={{ display: "flex", flexDirection: "column", height: "100%", overflow: "hidden" }}>
+      <div style={{ flexShrink: 0 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "2rem" }}>
         <div>
           <h1 style={{ fontSize: "2rem", fontWeight: "700" }}>Class Management</h1>
           <p style={{ color: "var(--text-secondary)" }}>Manage your academic classes</p>
@@ -229,8 +237,9 @@ const ClassManagement = () => {
         </button>
       </div>
 
-      <div className="glass-panel" style={{ padding: "1rem" }}>
-        <TableFilterHeader
+      <div className="glass-panel" style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden", padding: "1rem" }}>
+        <div style={{ flexShrink: 0 }}>
+          <TableFilterHeader
           searchQuery={searchQuery}
           setSearchQuery={setSearchQuery}
           searchPlaceholder="Search classes or sections..."
@@ -241,13 +250,14 @@ const ClassManagement = () => {
           onExportExcel={() => {}}
           onExportPDF={() => {}}
         />
+        </div>
 
-        <div style={{ overflowX: "auto" }}>
+        <div style={{ flex: 1, overflowY: "auto", overflowX: "auto" }}>
           <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left" }}>
             <thead>
               <tr>
                 {exportColumnsList.map(col => selectedColumns.includes(col.key) && (
-                  <th key={col.key} style={{ cursor: "pointer" }} onClick={() => requestSort(col.key)}>
+                  <th key={col.key} style={{ cursor: "pointer", position: "sticky", top: 0, background: "var(--background-primary)", zIndex: 10, padding: "1rem", borderBottom: "2px solid var(--glass-border)", color: "var(--text-secondary)", fontWeight: "600" }} onClick={() => requestSort(col.key)}>
                     <div style={{ display: "flex", alignItems: "center", gap: "4px", whiteSpace: "nowrap" }}>
                       {col.label}
                       {sortConfig?.key === col.key ? (
@@ -258,7 +268,7 @@ const ClassManagement = () => {
                     </div>
                   </th>
                 ))}
-                <th style={{ textAlign: "right" }}>Actions</th>
+                <th style={{ textAlign: "right", position: "sticky", top: 0, background: "var(--background-primary)", zIndex: 10, padding: "1rem", borderBottom: "2px solid var(--glass-border)", color: "var(--text-secondary)", fontWeight: "600" }}>Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -279,6 +289,9 @@ const ClassManagement = () => {
                     })}
                     <td style={{ textAlign: "right", whiteSpace: "nowrap" }}>
                       <div style={{ display: "flex", gap: "0.5rem", justifyContent: "flex-end" }}>
+                        <button onClick={() => navigate(`/classes/${cls.id}`)} className="btn-ghost" style={{ display: "flex", alignItems: "center", fontSize: "0.75rem", padding: "0.25rem 0.5rem", color: "#10b981", background: "rgba(16, 185, 129, 0.1)", borderRadius: "4px", border: "none", cursor: "pointer" }}>
+                          View
+                        </button>
                         <button onClick={() => handleOpenModal(cls)} className="btn-ghost" style={{ display: "flex", alignItems: "center", fontSize: "0.75rem", padding: "0.25rem 0.5rem", color: "#3b82f6", background: "rgba(59, 130, 246, 0.1)", borderRadius: "4px", border: "none", cursor: "pointer" }}>
                           <Edit size={14} style={{ marginRight: "0.25rem" }} /> Edit
                         </button>
@@ -293,6 +306,7 @@ const ClassManagement = () => {
             </tbody>
           </table>
         </div>
+      </div>
       </div>
 
       {isModalOpen && (

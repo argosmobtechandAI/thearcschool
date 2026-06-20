@@ -22,12 +22,15 @@ const UserManagement = () => {
   const [leftSchoolFilter, setLeftSchoolFilter] = useState("");
   const [tcStatusFilter, setTcStatusFilter] = useState("");
   const [genderFilter, setGenderFilter] = useState("");
+  const [siblingCountFilter, setSiblingCountFilter] = useState("");
   const [studentSearch, setStudentSearch] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(100);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isStudentSelectModalOpen, setIsStudentSelectModalOpen] = useState(false);
   const [isClassSelectModalOpen, setIsClassSelectModalOpen] = useState(false);
+  const [isViewParentModalOpen, setIsViewParentModalOpen] = useState(false);
+  const [viewParent, setViewParent] = useState(null);
   
   // Bulk Upload State
   const [isBulkUploadModalOpen, setIsBulkUploadModalOpen] = useState(false);
@@ -97,7 +100,7 @@ const UserManagement = () => {
   // Reset pagination when filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchQuery, classFilter, formSubmittedFilter, leftSchoolFilter, tcStatusFilter, genderFilter, type]);
+  }, [searchQuery, classFilter, formSubmittedFilter, leftSchoolFilter, tcStatusFilter, genderFilter, siblingCountFilter, type]);
 
   const filteredUsers = useMemo(() => {
     return users
@@ -122,11 +125,43 @@ const UserManagement = () => {
 
         if (genderFilter && u.gender !== genderFilter) return false;
 
+        if (type === 'parent') {
+          if (classFilter) {
+            if (!u.classes || !u.classes.includes(classFilter)) return false;
+          }
+          if (siblingCountFilter) {
+            const count = u.connections?.length || 0;
+            if (siblingCountFilter === "1" && count !== 1) return false;
+            if (siblingCountFilter === "2" && count !== 2) return false;
+            if (siblingCountFilter === "3+" && count < 3) return false;
+          }
+        }
+
         return true;
       });
-  }, [users, type, searchQuery, classFilter, formSubmittedFilter, leftSchoolFilter, tcStatusFilter, genderFilter]);
+  }, [users, type, searchQuery, classFilter, formSubmittedFilter, leftSchoolFilter, tcStatusFilter, genderFilter, siblingCountFilter]);
 
-  const { items: sortedUsers, requestSort, sortConfig } = useSortableData(filteredUsers);
+  const customGetters = useMemo(() => {
+    const getClassName = (classId) => {
+      const cls = classes.find((c) => c.id === classId);
+      return cls ? `${cls.className} - ${cls.section}` : "Unknown";
+    };
+    return {
+      associations: (u) => {
+        if (type === "student" && u.classes?.length > 0) return getClassName(u.classes[0]);
+        if (type === "teacher" && u.classes?.length > 0) return `${u.classes.length} Classes`;
+        if (type === "parent" && u.connections?.length > 0) return `${u.connections.length} Students`;
+        if (type === "admission") {
+          const pipelineCount = newUsers?.filter(nu => String(nu.assigned_to) === String(u.id)).length || 0;
+          return `${pipelineCount} Assigned`;
+        }
+        return "";
+      },
+      total_fee: (u) => Number(u.monthly_fee || 0) + Number(u.bus_fee || 0)
+    };
+  }, [classes, type, newUsers]);
+
+  const { items: sortedUsers, requestSort, sortConfig } = useSortableData(filteredUsers, null, customGetters);
 
   const paginatedUsers = useMemo(() => {
     const start = (currentPage - 1) * itemsPerPage;
@@ -173,10 +208,26 @@ const UserManagement = () => {
           options: [{ label: "Received", value: "true" }, { label: "Pending", value: "false" }]
         }
       ];
+    } else if (type === 'parent') {
+      return [
+        {
+          label: "All Classes",
+          value: classFilter,
+          onChange: setClassFilter,
+          options: classes.map(c => ({ label: `${c.name} ${c.section}`, value: c.id }))
+        },
+        ...commonFilters,
+        {
+          label: "Number of Children",
+          value: siblingCountFilter,
+          onChange: setSiblingCountFilter,
+          options: [{ label: "1 Child", value: "1" }, { label: "2 Children", value: "2" }, { label: "3+ Children", value: "3+" }]
+        }
+      ];
     } else {
       return commonFilters;
     }
-  }, [type, classFilter, classes, formSubmittedFilter, leftSchoolFilter, tcStatusFilter, genderFilter]);
+  }, [type, classFilter, classes, formSubmittedFilter, leftSchoolFilter, tcStatusFilter, genderFilter, siblingCountFilter]);
 
   const exportColumnsList = useMemo(() => {
     const base = [
@@ -674,8 +725,8 @@ const UserManagement = () => {
           onExportExcel={handleExportExcel}
           onExportPDF={handleExportPDF}
         />
-        <div style={{ overflowX: "auto" }}>
-          <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left" }}>
+        <div style={{ overflowX: "auto", overflowY: "auto", maxHeight: "calc(100vh - 280px)" }}>
+          <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left", position: "relative" }}>
             <thead>
               <tr>
                 <th>S.No.</th>
@@ -713,12 +764,16 @@ const UserManagement = () => {
                     })}
                     <td style={{ textAlign: "right", whiteSpace: "nowrap" }}>
                       <div style={{ display: "flex", gap: "0.5rem", justifyContent: "flex-end" }}>
-                        {(type === 'admission' || type === 'finance' || type === 'student' || type === 'teacher') && (
+                        {(type === 'admission' || type === 'finance' || type === 'student' || type === 'teacher' || type === 'parent') && (
                           <button onClick={() => {
                             if (type === 'admission') navigate(`/counselor/${user.id}`);
                             else if (type === 'finance') navigate(`/finance-profile/${user.id}`);
                             else if (type === 'student') navigate(`/student-profile/${user.id}`);
                             else if (type === 'teacher') navigate(`/teacher-profile/${user.id}`);
+                            else if (type === 'parent') {
+                              setViewParent(user);
+                              setIsViewParentModalOpen(true);
+                            }
                           }} className="btn-ghost" style={{ display: "flex", alignItems: "center", fontSize: "0.75rem", padding: "0.25rem 0.5rem", color: "#10b981", background: "rgba(16, 185, 129, 0.1)", borderRadius: "4px", border: "none", cursor: "pointer" }}>
                             <Eye size={14} style={{ marginRight: "0.25rem" }} /> View
                           </button>
@@ -785,6 +840,109 @@ const UserManagement = () => {
         )}
       </div>
 
+      {isStudentSelectModalOpen && (
+        <div className="animate-fade-in" style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 60, padding: "1rem" }} onClick={() => setIsStudentSelectModalOpen(false)}>
+          <div className="glass-panel modal-content" style={{ width: "100%", maxWidth: "600px", padding: "2rem", maxHeight: "90vh", display: "flex", flexDirection: "column" }} onClick={(e) => e.stopPropagation()}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.5rem" }}>
+              <h3 style={{ fontSize: "1.25rem", fontWeight: "600" }}>Select Connected Students</h3>
+              <button onClick={() => setIsStudentSelectModalOpen(false)} style={{ background: "none", border: "none", color: "var(--text-secondary)", cursor: "pointer" }}>✕</button>
+            </div>
+            
+            <div style={{ position: "relative", marginBottom: "1rem" }}>
+              <Search size={16} style={{ position: "absolute", left: "12px", top: "50%", transform: "translateY(-50%)", color: "var(--text-secondary)" }} />
+              <input
+                type="text"
+                placeholder="Search students..."
+                value={studentSearch}
+                onChange={(e) => setStudentSearch(e.target.value)}
+                className="input-glass"
+                style={{ width: "100%", paddingLeft: "36px" }}
+              />
+            </div>
+            
+            <div style={{ flex: 1, overflowY: "auto", border: "1px solid var(--glass-border)", borderRadius: "8px", background: "rgba(255, 255, 255, 0.02)" }}>
+              {students
+                .filter(s => s.name?.toLowerCase().includes(studentSearch.toLowerCase()) || s.admission_number?.toLowerCase().includes(studentSearch.toLowerCase()))
+                .map(student => (
+                  <div 
+                    key={student.id}
+                    onClick={() => {
+                      setFormData(prev => ({
+                        ...prev,
+                        connections: prev.connections.includes(student.id)
+                          ? prev.connections.filter(id => id !== student.id)
+                          : [...prev.connections, student.id]
+                      }));
+                    }}
+                    style={{ 
+                      padding: "12px 16px", 
+                      borderBottom: "1px solid var(--glass-border)",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "12px",
+                      cursor: "pointer",
+                      background: formData.connections.includes(student.id) ? "rgba(59, 130, 246, 0.1)" : "transparent"
+                    }}
+                  >
+                    <input 
+                      type="checkbox" 
+                      checked={formData.connections.includes(student.id)}
+                      onChange={() => {}}
+                      style={{ cursor: "pointer" }}
+                    />
+                    <div>
+                      <div style={{ fontWeight: "500" }}>{student.name}</div>
+                      <div style={{ fontSize: "0.75rem", color: "var(--text-secondary)" }}>
+                        Adm No: {student.admission_number || "N/A"} | Class: {getClassName(student.classes?.[0])}
+                      </div>
+                    </div>
+                  </div>
+                ))
+              }
+            </div>
+            
+            <div style={{ display: "flex", justifyContent: "flex-end", marginTop: "1.5rem" }}>
+              <button onClick={() => setIsStudentSelectModalOpen(false)} className="btn">Done ({formData.connections.length} selected)</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {isViewParentModalOpen && viewParent && (
+        <div className="animate-fade-in" style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 50, padding: "1rem" }} onClick={() => setIsViewParentModalOpen(false)}>
+          <div className="glass-panel modal-content" style={{ width: "100%", maxWidth: "500px", padding: "2rem", maxHeight: "90vh", overflowY: "auto" }} onClick={(e) => e.stopPropagation()}>
+            <h2 style={{ fontSize: "1.5rem", fontWeight: "700", marginBottom: "1.5rem" }}>
+              Parent: {viewParent.name}
+            </h2>
+            <div style={{ marginBottom: "1.5rem" }}>
+              <h3 style={{ fontSize: "1.125rem", fontWeight: "600", marginBottom: "0.5rem" }}>Connected Students</h3>
+              {viewParent.connections && viewParent.connections.length > 0 ? (
+                <ul style={{ listStyle: "none", padding: 0 }}>
+                  {viewParent.connections.map(studentId => {
+                    const student = students.find(s => s.id === studentId);
+                    return (
+                      <li key={studentId} style={{ padding: "0.5rem", borderBottom: "1px solid var(--glass-border)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                        <span>{student ? student.name : "Unknown Student"}</span>
+                        {student && (
+                          <button onClick={() => navigate(`/student-profile/${student.id}`)} className="btn-ghost" style={{ fontSize: "0.75rem", padding: "0.25rem 0.5rem" }}>
+                            View Profile
+                          </button>
+                        )}
+                      </li>
+                    );
+                  })}
+                </ul>
+              ) : (
+                <p style={{ color: "var(--text-secondary)" }}>No students connected.</p>
+              )}
+            </div>
+            <div style={{ display: "flex", justifyContent: "flex-end" }}>
+              <button onClick={() => setIsViewParentModalOpen(false)} className="btn">Close</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {isModalOpen && (
         <div className="animate-fade-in" style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 50, padding: "1rem" }} onClick={() => setIsModalOpen(false)}>
           <div className="glass-panel modal-content" style={{ width: "100%", maxWidth: "600px", padding: "2rem", maxHeight: "90vh", overflowY: "auto" }} onClick={(e) => e.stopPropagation()}>
@@ -795,17 +953,21 @@ const UserManagement = () => {
               {/* Basic Info */}
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
                 <div style={{ gridColumn: "span 2" }}>
-                  <label style={{ display: "block", marginBottom: "0.5rem", fontSize: "0.875rem" }}>Full Name</label>
+                  <label style={{ display: "block", marginBottom: "0.5rem", fontSize: "0.875rem" }}>{type === 'parent' ? "Father & Mother Names (e.g. John & Jane)" : "Full Name"}</label>
                   <input required className="input-glass" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} />
                 </div>
-                <div>
-                  <label style={{ display: "block", marginBottom: "0.5rem", fontSize: "0.875rem" }}>Email Address</label>
-                  <input required type="email" className="input-glass" value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} />
-                </div>
-                <div>
-                  <label style={{ display: "block", marginBottom: "0.5rem", fontSize: "0.875rem" }}>Password {editingUser && "(Leave blank to keep)"}</label>
-                  <input type="password" required={!editingUser} className="input-glass" value={formData.password} onChange={(e) => setFormData({ ...formData, password: e.target.value })} />
-                </div>
+                {type !== 'parent' && (
+                  <>
+                    <div>
+                      <label style={{ display: "block", marginBottom: "0.5rem", fontSize: "0.875rem" }}>Email Address</label>
+                      <input required type="email" className="input-glass" value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} />
+                    </div>
+                    <div>
+                      <label style={{ display: "block", marginBottom: "0.5rem", fontSize: "0.875rem" }}>Password {editingUser && "(Leave blank to keep)"}</label>
+                      <input type="password" required={!editingUser} className="input-glass" value={formData.password} onChange={(e) => setFormData({ ...formData, password: e.target.value })} />
+                    </div>
+                  </>
+                )}
                 <div>
                   <label style={{ display: "block", marginBottom: "0.5rem", fontSize: "0.875rem" }}>Phone Number</label>
                   <input className="input-glass" value={formData.phone} onChange={(e) => setFormData({ ...formData, phone: e.target.value })} />

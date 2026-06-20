@@ -90,11 +90,11 @@ const AttendanceClassView = () => {
     return days;
   }, [matrixDateRange, publicHolidays, viewMode]);
 
-  const activeClass = useMemo(() => classes.find(c => c.id === Number(classId)), [classes, classId]);
+  const activeClass = useMemo(() => classes.find(c => String(c.id) === String(classId)), [classes, classId]);
   
   const classStudents = useMemo(() => {
     return users
-      .filter(u => u.type === 'student' && u.classes && u.classes.includes(Number(classId)))
+      .filter(u => u.type === 'student' && u.classes && u.classes.includes(classId))
       .map(user => {
         if (viewMode === "matrix") {
           const records = attendanceRecords.filter(a => a.student_id === user.id);
