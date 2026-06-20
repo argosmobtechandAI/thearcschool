@@ -36,15 +36,37 @@ const DashboardMetrics = () => {
 
   const [paymentsData, setPaymentsData] = useState([]);
   const [loadingPayments, setLoadingPayments] = useState(false);
+  const [balancesMap, setBalancesMap] = useState({});
+  const [selectedClassFilter, setSelectedClassFilter] = useState("");
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
+  const [selectedPaymentMode, setSelectedPaymentMode] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const ITEMS_PER_PAGE = 100;
 
   useEffect(() => {
     dispatch(fetchUsers());
     dispatch(fetchClasses());
   }, [dispatch]);
 
+  const students = useMemo(() => users.filter(u => u.type === "student"), [users]);
+
+  useEffect(() => {
+    if (students.length > 0) {
+      api.post("/finance_panel/studentBalances", { students: students.map(s => ({ id: s.id, type: s.type, fee_exempted: s.fee_exempted, classes: s.classes, bus_fee: s.bus_fee })) })
+        .then(res => {
+          if (res.data.success) {
+            const bMap = {};
+            res.data.data.forEach(b => bMap[b.student_id] = b);
+            setBalancesMap(bMap);
+          }
+        })
+        .catch(console.error);
+    }
+  }, [students, refreshTrigger]);
+
   useEffect(() => {
     if (currentView === "collected") {
-      setSelectedColumns(["sno", "date", "studentName", "admissionNumber", "feeTitle", "amount", "mode", "actions"]);
+      setSelectedColumns(["sno", "date", "studentName", "admissionNumber", "class_name", "feeTitle", "amount", "mode", "actions"]);
     } else {
       setSelectedColumns(["sno", "name", "admission_number", "class_name", "total_due", "total_paid", "balance", "actions"]);
     }
@@ -70,7 +92,7 @@ const DashboardMetrics = () => {
       };
       fetchPayments();
     }
-  }, [currentView, startDate, endDate]);
+  }, [currentView, startDate, endDate, refreshTrigger]);
 
 
 
@@ -90,44 +112,32 @@ const DashboardMetrics = () => {
       data = data.filter(s => {
         if (!s.created_at) return true;
         const d = new Date(s.created_at);
-        if (startDate && d < new Date(startDate)) return false;
-        if (endDate && d > new Date(endDate)) return false;
+        if (startDate && d < new Date(`${startDate}T00:00:00.000Z`)) return false;
+        if (endDate && d > new Date(`${endDate}T23:59:59.999Z`)) return false;
         return true;
       });
     }
 
     const enriched = data.map(s => {
       let className = "N/A";
+      let baseClassName = "N/A";
       if (s.classes && s.classes.length > 0) {
         const cls = classes.find(c => c.id === s.classes[0]);
-        if (cls) className = `${cls.name} ${cls.section || ''}`.trim();
-      }
-
-      let totalDue = 0;
-      let totalPaid = 0;
-      
-      if (!s.fee_exempted) {
-        if (s.fees && Array.isArray(s.fees)) {
-          s.fees.forEach(f => {
-            let isPending = true;
-            if (endDate && f.fee?.dueDate) {
-              const dDate = new Date(f.fee.dueDate);
-              if (dDate > new Date(endDate)) isPending = false; // Exclude future fees
-            }
-            if (isPending) {
-              totalDue += Number(f.fee?.amount || 0);
-              totalPaid += Number(f.total_paid_amount || 0);
-            }
-          });
+        if (cls) {
+          className = `${cls.name} ${cls.section || ''}`.trim();
+          baseClassName = cls.name;
         }
       }
+
+      const b = balancesMap[s.id] || { totalDue: 0, totalPaid: 0, balance: 0 };
 
       return {
         ...s,
         className,
-        totalDue,
-        totalPaid,
-        balance: s.fee_exempted ? 0 : Math.max(0, totalDue - totalPaid)
+        baseClassName,
+        totalDue: b.totalDue,
+        totalPaid: b.totalPaid,
+        balance: s.fee_exempted ? 0 : b.balance
       };
     });
 
@@ -142,27 +152,54 @@ const DashboardMetrics = () => {
       default:
         return enriched; // All students
     }
-  }, [users, classes, currentView, startDate, endDate]);
+  }, [users, classes, currentView, startDate, endDate, balancesMap]);
 
   const filteredData = useMemo(() => {
     return processedData.filter(item => 
-      (item.name?.toLowerCase() || "").includes(searchTerm.toLowerCase()) || 
-      (item.admission_number?.toLowerCase() || "").includes(searchTerm.toLowerCase())
+      ((item.name?.toLowerCase() || "").includes(searchTerm.toLowerCase()) || 
+      (item.admission_number?.toLowerCase() || "").includes(searchTerm.toLowerCase())) &&
+      (!selectedClassFilter || item.baseClassName === selectedClassFilter)
     );
-  }, [processedData, searchTerm]);
+  }, [processedData, searchTerm, selectedClassFilter]);
 
   const filteredPayments = useMemo(() => {
-    return paymentsData.filter(item => {
+    return paymentsData.map(item => {
+      const u = users.find(u => u.id === item.student_id);
+      let className = "N/A";
+      let baseClassName = "N/A";
+      if (u && u.classes && u.classes.length > 0) {
+        const cls = classes.find(c => c.id === u.classes[0]);
+        if (cls) {
+          className = `${cls.name} ${cls.section || ''}`.trim();
+          baseClassName = cls.name;
+        }
+      }
+      return { ...item, className, baseClassName };
+    }).filter(item => {
       const s = item.student;
-      return (s?.name?.toLowerCase() || "").includes(searchTerm.toLowerCase()) || 
+      const matchesSearch = (s?.name?.toLowerCase() || "").includes(searchTerm.toLowerCase()) || 
              (s?.admission_number?.toLowerCase() || "").includes(searchTerm.toLowerCase()) ||
-             (item.fee?.title?.toLowerCase() || "").includes(searchTerm.toLowerCase());
+             (item.fee?.title?.toLowerCase() || "").includes(searchTerm.toLowerCase()) ||
+             (item.remarks?.toLowerCase() || "").includes(searchTerm.toLowerCase());
+      const matchesMode = !selectedPaymentMode || item.payment_mode === selectedPaymentMode;
+      const matchesClass = !selectedClassFilter || item.baseClassName === selectedClassFilter;
+      return matchesSearch && matchesMode && matchesClass;
     });
-  }, [paymentsData, searchTerm]);
+  }, [paymentsData, searchTerm, selectedPaymentMode, users, classes, selectedClassFilter]);
 
   const { items: sortedData, requestSort, sortConfig } = useSortableData(
     currentView === "collected" ? filteredPayments : filteredData
   );
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [currentView, searchTerm, selectedClassFilter, selectedPaymentMode, sortedData.length]);
+
+  const totalPages = Math.ceil(sortedData.length / ITEMS_PER_PAGE);
+  const paginatedData = useMemo(() => {
+    const start = (currentPage - 1) * ITEMS_PER_PAGE;
+    return sortedData.slice(start, start + ITEMS_PER_PAGE);
+  }, [sortedData, currentPage]);
 
   const renderSortIndicator = (key) => {
     if (!sortConfig || sortConfig.key !== key) return null;
@@ -174,6 +211,7 @@ const DashboardMetrics = () => {
     { key: "date", label: "Date" },
     { key: "studentName", label: "Student Name" },
     { key: "admissionNumber", label: "Admission No" },
+    { key: "class_name", label: "Class" },
     { key: "feeTitle", label: "Fee Title" },
     { key: "amount", label: "Amount Paid" },
     { key: "mode", label: "Mode" }
@@ -196,7 +234,8 @@ const DashboardMetrics = () => {
           new Date(item.created_at).toLocaleDateString(),
           item.student?.name || "N/A",
           item.student?.admission_number || "-",
-          item.fee?.title || "N/A",
+          item.className,
+          item.fee?.title || item.remarks || "N/A",
           `Rs. ${item.amount_paid}`,
           item.payment_mode
         ];
@@ -222,7 +261,8 @@ const DashboardMetrics = () => {
           "Date": new Date(item.created_at).toLocaleDateString(),
           "Student Name": item.student?.name || "N/A",
           "Admission No": item.student?.admission_number || "-",
-          "Fee Title": item.fee?.title || "N/A",
+          "Class": item.className,
+          "Fee Title": item.fee?.title || item.remarks || "N/A",
           "Amount Paid": `Rs. ${item.amount_paid}`,
           "Mode": item.payment_mode
         };
@@ -262,6 +302,9 @@ const DashboardMetrics = () => {
       return toast.error("Please fill all required fields");
     }
 
+    const selectedFee = studentLedger.fees.find(f => f.id === paymentForm.feeId);
+    const feeTitle = selectedFee ? selectedFee.fee?.title : undefined;
+
     setIsPaying(true);
     try {
       const res = await api.post("/finance_panel/logPayment", {
@@ -270,11 +313,13 @@ const DashboardMetrics = () => {
           feeId: paymentForm.feeId,
           amount: Number(paymentForm.amount),
           paymentMode: paymentForm.paymentMode,
-          remarks: paymentForm.remarks
+          remarks: paymentForm.remarks,
+          title: feeTitle
         }
       });
       if (res.data.success) {
         toast.success("Payment recorded successfully");
+        setRefreshTrigger(prev => prev + 1);
         
         const feeDetails = studentLedger.fees.find(f => f.fee_id === paymentForm.feeId)?.fee;
         const completePayment = { ...res.data.payment, fee: feeDetails };
@@ -297,17 +342,17 @@ const DashboardMetrics = () => {
 
   return (
     <div className="animate-fade-in">
-      <div style={{ display: "flex", alignItems: "center", gap: "1rem", marginBottom: "2rem" }}>
-        <button onClick={() => navigate("/dashboard")} className="btn btn-ghost" style={{ padding: "0.5rem" }}>
-          <ArrowLeft size={20} />
+      <div style={{ display: "flex", alignItems: "center", gap: "1rem", marginBottom: "0.5rem" }}>
+        <button onClick={() => navigate("/dashboard")} className="btn btn-ghost" style={{ padding: "0.25rem 0.5rem" }}>
+          <ArrowLeft size={18} />
         </button>
         <div>
-          <h1 style={{ fontSize: "1.875rem", fontWeight: "700", color: "var(--text-primary)", marginBottom: "0.25rem" }}>Dashboard Metrics</h1>
-          <p style={{ color: "var(--text-secondary)", fontSize: "0.875rem" }}>Detailed breakdown of financial metrics.</p>
+          <h1 style={{ fontSize: "1.25rem", fontWeight: "700", color: "var(--text-primary)", marginBottom: "0" }}>Dashboard Metrics</h1>
+          <p style={{ color: "var(--text-secondary)", fontSize: "0.75rem", margin: "0" }}>Detailed breakdown of financial metrics.</p>
         </div>
       </div>
 
-      <div style={{ display: "flex", gap: "0.5rem", marginBottom: "1.5rem", overflowX: "auto", paddingBottom: "0.5rem" }}>
+      <div style={{ display: "flex", gap: "0.5rem", marginBottom: "0.75rem", overflowX: "auto", paddingBottom: "0.25rem" }}>
         {viewOptions.map(opt => (
           <button
             key={opt.id}
@@ -335,6 +380,26 @@ const DashboardMetrics = () => {
           searchQuery={searchTerm}
           setSearchQuery={setSearchTerm}
           searchPlaceholder="Search by student name or admission no..."
+          filters={currentView === "collected" ? [
+            {
+              label: "All Payment Modes",
+              value: selectedPaymentMode,
+              onChange: setSelectedPaymentMode,
+              options: [
+                { label: "Cash", value: "Cash" },
+                { label: "Online", value: "Online" },
+                { label: "Bank Transfer", value: "Bank Transfer" },
+                { label: "Cheque", value: "Cheque" }
+              ]
+            }
+          ] : [
+            {
+              label: "All Classes",
+              value: selectedClassFilter,
+              onChange: setSelectedClassFilter,
+              options: Array.from(new Set(classes.map(c => c.name))).filter(Boolean).map(name => ({ label: name, value: name }))
+            }
+          ]}
           exportColumns={exportColumnsList}
           onExportPDF={handleExportPDF}
           onExportExcel={handleExportExcel}
@@ -342,30 +407,54 @@ const DashboardMetrics = () => {
           setSelectedColumns={setSelectedColumns}
         />
 
+        {(currentView === "collected" || currentView === "dues") && (
+          <div style={{ display: "flex", justifyContent: "flex-end", marginTop: "0.5rem", gap: "0.5rem", flexWrap: "wrap", fontSize: "0.875rem" }}>
+            {currentView === "collected" && (
+              <div style={{ background: "rgba(16, 185, 129, 0.1)", color: "#10b981", padding: "0.35rem 0.75rem", borderRadius: "6px", fontWeight: "600", display: "flex", alignItems: "center", gap: "0.25rem" }}>
+                Total Displayed Amount: ₹{sortedData.reduce((acc, curr) => acc + Number(curr.amount_paid || 0), 0).toLocaleString()}
+              </div>
+            )}
+            {currentView === "dues" && (
+              <>
+                <div style={{ background: "rgba(59, 130, 246, 0.1)", color: "#3b82f6", padding: "0.35rem 0.75rem", borderRadius: "6px", fontWeight: "600", display: "flex", alignItems: "center", gap: "0.25rem" }}>
+                  Total Displayed Due: ₹{sortedData.reduce((acc, curr) => acc + Number(curr.totalDue || 0), 0).toLocaleString()}
+                </div>
+                <div style={{ background: "rgba(16, 185, 129, 0.1)", color: "#10b981", padding: "0.35rem 0.75rem", borderRadius: "6px", fontWeight: "600", display: "flex", alignItems: "center", gap: "0.25rem" }}>
+                  Total Displayed Paid: ₹{sortedData.reduce((acc, curr) => acc + Number(curr.totalPaid || 0), 0).toLocaleString()}
+                </div>
+                <div style={{ background: "rgba(239, 68, 68, 0.1)", color: "#ef4444", padding: "0.35rem 0.75rem", borderRadius: "6px", fontWeight: "600", display: "flex", alignItems: "center", gap: "0.25rem" }}>
+                  Total Displayed Balance: ₹{sortedData.reduce((acc, curr) => acc + Number(curr.balance || 0), 0).toLocaleString()}
+                </div>
+              </>
+            )}
+          </div>
+        )}
+
         <div style={{ overflowX: "auto", marginTop: "1rem" }}>
           <table style={{ width: "100%", borderCollapse: "collapse", whiteSpace: "nowrap" }}>
             <thead>
               {currentView === "collected" ? (
                 <tr style={{ borderBottom: "2px solid var(--glass-border)", background: "rgba(0,0,0,0.02)" }}>
-                  {selectedColumns.includes("sno") && <th style={{ padding: "1rem", textAlign: "left", fontSize: "0.75rem", fontWeight: "600", color: "var(--text-secondary)" }}>S.NO</th>}
-                  {selectedColumns.includes("date") && <th style={{ padding: "1rem", textAlign: "left", fontSize: "0.75rem", fontWeight: "600", color: "var(--text-secondary)", cursor: "pointer", userSelect: "none" }} onClick={() => requestSort("created_at")}>DATE{renderSortIndicator("created_at")}</th>}
-                  {selectedColumns.includes("studentName") && <th style={{ padding: "1rem", textAlign: "left", fontSize: "0.75rem", fontWeight: "600", color: "var(--text-secondary)", cursor: "pointer", userSelect: "none" }} onClick={() => requestSort("student.name")}>STUDENT</th>}
-                  {selectedColumns.includes("admissionNumber") && <th style={{ padding: "1rem", textAlign: "left", fontSize: "0.75rem", fontWeight: "600", color: "var(--text-secondary)", cursor: "pointer", userSelect: "none" }} onClick={() => requestSort("student.admission_number")}>ADM NO</th>}
-                  {selectedColumns.includes("feeTitle") && <th style={{ padding: "1rem", textAlign: "left", fontSize: "0.75rem", fontWeight: "600", color: "var(--text-secondary)", cursor: "pointer", userSelect: "none" }} onClick={() => requestSort("fee.title")}>FEE TITLE</th>}
-                  {selectedColumns.includes("amount") && <th style={{ padding: "1rem", textAlign: "left", fontSize: "0.75rem", fontWeight: "600", color: "var(--text-secondary)", cursor: "pointer", userSelect: "none" }} onClick={() => requestSort("amount_paid")}>AMOUNT PAID{renderSortIndicator("amount_paid")}</th>}
-                  {selectedColumns.includes("mode") && <th style={{ padding: "1rem", textAlign: "left", fontSize: "0.75rem", fontWeight: "600", color: "var(--text-secondary)", cursor: "pointer", userSelect: "none" }} onClick={() => requestSort("payment_mode")}>MODE{renderSortIndicator("payment_mode")}</th>}
-                  {selectedColumns.includes("actions") && <th style={{ padding: "1rem", textAlign: "right", fontSize: "0.75rem", fontWeight: "600", color: "var(--text-secondary)" }}>RECEIPT</th>}
+                  {selectedColumns.includes("sno") && <th style={{ padding: "0.5rem 1rem", textAlign: "left", fontSize: "0.75rem", fontWeight: "600", color: "var(--text-secondary)" }}>S.NO</th>}
+                  {selectedColumns.includes("date") && <th style={{ padding: "0.5rem 1rem", textAlign: "left", fontSize: "0.75rem", fontWeight: "600", color: "var(--text-secondary)", cursor: "pointer", userSelect: "none" }} onClick={() => requestSort("created_at")}>DATE{renderSortIndicator("created_at")}</th>}
+                  {selectedColumns.includes("studentName") && <th style={{ padding: "0.5rem 1rem", textAlign: "left", fontSize: "0.75rem", fontWeight: "600", color: "var(--text-secondary)", cursor: "pointer", userSelect: "none" }} onClick={() => requestSort("student.name")}>STUDENT</th>}
+                  {selectedColumns.includes("admissionNumber") && <th style={{ padding: "0.5rem 1rem", textAlign: "left", fontSize: "0.75rem", fontWeight: "600", color: "var(--text-secondary)", cursor: "pointer", userSelect: "none" }} onClick={() => requestSort("student.admission_number")}>ADM NO</th>}
+                  {selectedColumns.includes("class_name") && <th style={{ padding: "0.5rem 1rem", textAlign: "left", fontSize: "0.75rem", fontWeight: "600", color: "var(--text-secondary)", cursor: "pointer", userSelect: "none" }} onClick={() => requestSort("className")}>CLASS</th>}
+                  {selectedColumns.includes("feeTitle") && <th style={{ padding: "0.5rem 1rem", textAlign: "left", fontSize: "0.75rem", fontWeight: "600", color: "var(--text-secondary)", cursor: "pointer", userSelect: "none" }} onClick={() => requestSort("fee.title")}>FEE TITLE</th>}
+                  {selectedColumns.includes("amount") && <th style={{ padding: "0.5rem 1rem", textAlign: "left", fontSize: "0.75rem", fontWeight: "600", color: "var(--text-secondary)", cursor: "pointer", userSelect: "none" }} onClick={() => requestSort("amount_paid")}>AMOUNT PAID{renderSortIndicator("amount_paid")}</th>}
+                  {selectedColumns.includes("mode") && <th style={{ padding: "0.5rem 1rem", textAlign: "left", fontSize: "0.75rem", fontWeight: "600", color: "var(--text-secondary)", cursor: "pointer", userSelect: "none" }} onClick={() => requestSort("payment_mode")}>MODE{renderSortIndicator("payment_mode")}</th>}
+                  {selectedColumns.includes("actions") && <th style={{ padding: "0.5rem 1rem", textAlign: "right", fontSize: "0.75rem", fontWeight: "600", color: "var(--text-secondary)" }}>RECEIPT</th>}
                 </tr>
               ) : (
                 <tr style={{ borderBottom: "2px solid var(--glass-border)", background: "rgba(0,0,0,0.02)" }}>
-                  {selectedColumns.includes("sno") && <th style={{ padding: "1rem", textAlign: "left", fontSize: "0.75rem", fontWeight: "600", color: "var(--text-secondary)" }}>S.NO</th>}
-                  {selectedColumns.includes("name") && <th style={{ padding: "1rem", textAlign: "left", fontSize: "0.75rem", fontWeight: "600", color: "var(--text-secondary)", cursor: "pointer", userSelect: "none" }} onClick={() => requestSort("name")}>STUDENT{renderSortIndicator("name")}</th>}
-                  {selectedColumns.includes("admission_number") && <th style={{ padding: "1rem", textAlign: "left", fontSize: "0.75rem", fontWeight: "600", color: "var(--text-secondary)", cursor: "pointer", userSelect: "none" }} onClick={() => requestSort("admission_number")}>ADM NO{renderSortIndicator("admission_number")}</th>}
-                  {selectedColumns.includes("class_name") && <th style={{ padding: "1rem", textAlign: "left", fontSize: "0.75rem", fontWeight: "600", color: "var(--text-secondary)", cursor: "pointer", userSelect: "none" }} onClick={() => requestSort("className")}>CLASS{renderSortIndicator("className")}</th>}
-                  {selectedColumns.includes("total_due") && <th style={{ padding: "1rem", textAlign: "left", fontSize: "0.75rem", fontWeight: "600", color: "var(--text-secondary)", cursor: "pointer", userSelect: "none" }} onClick={() => requestSort("totalDue")}>TOTAL DUE{renderSortIndicator("totalDue")}</th>}
-                  {selectedColumns.includes("total_paid") && <th style={{ padding: "1rem", textAlign: "left", fontSize: "0.75rem", fontWeight: "600", color: "var(--text-secondary)", cursor: "pointer", userSelect: "none" }} onClick={() => requestSort("totalPaid")}>TOTAL PAID{renderSortIndicator("totalPaid")}</th>}
-                  {selectedColumns.includes("balance") && <th style={{ padding: "1rem", textAlign: "left", fontSize: "0.75rem", fontWeight: "600", color: "var(--text-secondary)", cursor: "pointer", userSelect: "none" }} onClick={() => requestSort("balance")}>BALANCE{renderSortIndicator("balance")}</th>}
-                  {selectedColumns.includes("actions") && <th style={{ padding: "1rem", textAlign: "right", fontSize: "0.75rem", fontWeight: "600", color: "var(--text-secondary)" }}>ACTIONS</th>}
+                  {selectedColumns.includes("sno") && <th style={{ padding: "0.5rem 1rem", textAlign: "left", fontSize: "0.75rem", fontWeight: "600", color: "var(--text-secondary)" }}>S.NO</th>}
+                  {selectedColumns.includes("name") && <th style={{ padding: "0.5rem 1rem", textAlign: "left", fontSize: "0.75rem", fontWeight: "600", color: "var(--text-secondary)", cursor: "pointer", userSelect: "none" }} onClick={() => requestSort("name")}>STUDENT{renderSortIndicator("name")}</th>}
+                  {selectedColumns.includes("admission_number") && <th style={{ padding: "0.5rem 1rem", textAlign: "left", fontSize: "0.75rem", fontWeight: "600", color: "var(--text-secondary)", cursor: "pointer", userSelect: "none" }} onClick={() => requestSort("admission_number")}>ADM NO{renderSortIndicator("admission_number")}</th>}
+                  {selectedColumns.includes("class_name") && <th style={{ padding: "0.5rem 1rem", textAlign: "left", fontSize: "0.75rem", fontWeight: "600", color: "var(--text-secondary)", cursor: "pointer", userSelect: "none" }} onClick={() => requestSort("className")}>CLASS{renderSortIndicator("className")}</th>}
+                  {selectedColumns.includes("total_due") && <th style={{ padding: "0.5rem 1rem", textAlign: "left", fontSize: "0.75rem", fontWeight: "600", color: "var(--text-secondary)", cursor: "pointer", userSelect: "none" }} onClick={() => requestSort("totalDue")}>TOTAL DUE{renderSortIndicator("totalDue")}</th>}
+                  {selectedColumns.includes("total_paid") && <th style={{ padding: "0.5rem 1rem", textAlign: "left", fontSize: "0.75rem", fontWeight: "600", color: "var(--text-secondary)", cursor: "pointer", userSelect: "none" }} onClick={() => requestSort("totalPaid")}>TOTAL PAID{renderSortIndicator("totalPaid")}</th>}
+                  {selectedColumns.includes("balance") && <th style={{ padding: "0.5rem 1rem", textAlign: "left", fontSize: "0.75rem", fontWeight: "600", color: "var(--text-secondary)", cursor: "pointer", userSelect: "none" }} onClick={() => requestSort("balance")}>BALANCE{renderSortIndicator("balance")}</th>}
+                  {selectedColumns.includes("actions") && <th style={{ padding: "0.5rem 1rem", textAlign: "right", fontSize: "0.75rem", fontWeight: "600", color: "var(--text-secondary)" }}>ACTIONS</th>}
                 </tr>
               )}
             </thead>
@@ -373,36 +462,42 @@ const DashboardMetrics = () => {
               {currentView === "collected" ? (
                 loadingPayments ? (
                   <tr><td colSpan="8" style={{ padding: "3rem", textAlign: "center", color: "var(--text-secondary)" }}>Loading Payments...</td></tr>
-                ) : sortedData.length > 0 ? sortedData.map((p, idx) => (
+                ) : paginatedData.length > 0 ? paginatedData.map((p, idx) => {
+                  const actualIdx = (currentPage - 1) * ITEMS_PER_PAGE + idx;
+                  return (
                   <tr key={p.id} style={{ borderBottom: "1px solid var(--glass-border)", transition: "background 0.2s" }} className="hover-row">
-                    {selectedColumns.includes("sno") && <td style={{ padding: "1rem", color: "var(--text-secondary)", fontSize: "0.875rem", fontWeight: "500" }}>{idx + 1}</td>}
-                    {selectedColumns.includes("date") && <td style={{ padding: "1rem", color: "var(--text-secondary)", fontSize: "0.875rem" }}>{new Date(p.created_at).toLocaleDateString()}</td>}
-                    {selectedColumns.includes("studentName") && <td style={{ padding: "1rem", fontWeight: "500", color: "var(--text-primary)" }}>{p.student?.name || "N/A"}</td>}
-                    {selectedColumns.includes("admissionNumber") && <td style={{ padding: "1rem", color: "var(--text-secondary)", fontSize: "0.875rem" }}>{p.student?.admission_number || "-"}</td>}
-                    {selectedColumns.includes("feeTitle") && <td style={{ padding: "1rem", color: "var(--text-secondary)" }}>{p.fee?.title || "N/A"}</td>}
-                    {selectedColumns.includes("amount") && <td style={{ padding: "1rem", color: "#10b981", fontWeight: "500" }}>₹{p.amount_paid}</td>}
+                    {selectedColumns.includes("sno") && <td style={{ padding: "0.5rem 1rem", color: "var(--text-secondary)", fontSize: "0.875rem", fontWeight: "500" }}>{actualIdx + 1}</td>}
+                    {selectedColumns.includes("date") && <td style={{ padding: "0.5rem 1rem", color: "var(--text-secondary)", fontSize: "0.875rem" }}>{new Date(p.created_at).toLocaleDateString()}</td>}
+                    {selectedColumns.includes("studentName") && <td style={{ padding: "0.5rem 1rem", fontWeight: "500", color: "var(--text-primary)" }}>{p.student?.name || "N/A"}</td>}
+                    {selectedColumns.includes("admissionNumber") && <td style={{ padding: "0.5rem 1rem", color: "var(--text-secondary)", fontSize: "0.875rem" }}>{p.student?.admission_number || "-"}</td>}
+                    {selectedColumns.includes("class_name") && <td style={{ padding: "0.5rem 1rem", color: "var(--text-secondary)", fontSize: "0.875rem" }}>{p.className || "-"}</td>}
+                    {selectedColumns.includes("feeTitle") && <td style={{ padding: "0.5rem 1rem", color: "var(--text-secondary)" }}>{p.fee?.title || p.remarks || "N/A"}</td>}
+                    {selectedColumns.includes("amount") && <td style={{ padding: "0.5rem 1rem", color: "#10b981", fontWeight: "500" }}>₹{p.amount_paid}</td>}
                     {selectedColumns.includes("mode") && (
-                      <td style={{ padding: "1rem" }}>
+                      <td style={{ padding: "0.5rem 1rem" }}>
                         <span style={{ background: "rgba(0,0,0,0.05)", padding: "2px 8px", borderRadius: "4px", fontSize: "0.75rem", fontWeight: "500" }}>{p.payment_mode}</span>
                       </td>
                     )}
                     {selectedColumns.includes("actions") && (
-                      <td style={{ padding: "1rem", textAlign: "right" }}>
+                      <td style={{ padding: "0.5rem 1rem", textAlign: "right" }}>
                         <button onClick={() => generateReceiptPDF(p, p.student)} className="btn-ghost" style={{ display: "inline-flex", alignItems: "center", padding: "0.5rem 1rem", borderRadius: "6px", fontSize: "0.875rem", color: "var(--accent-primary)", fontWeight: "500" }}>
                           <Printer size={16} style={{ marginRight: "0.5rem" }} /> Print Receipt
                         </button>
                       </td>
                     )}
                   </tr>
-                )) : (
+                  );
+                }) : (
                   <tr><td colSpan="8" style={{ padding: "3rem", textAlign: "center", color: "var(--text-secondary)" }}>No payments recorded for this period.</td></tr>
                 )
               ) : (
-                sortedData.length > 0 ? sortedData.map((s, idx) => (
+                paginatedData.length > 0 ? paginatedData.map((s, idx) => {
+                  const actualIdx = (currentPage - 1) * ITEMS_PER_PAGE + idx;
+                  return (
                   <tr key={s.id} onClick={() => { setSelectedStudent(s); setIsLedgerModalOpen(true); }} style={{ borderBottom: "1px solid var(--glass-border)", transition: "background 0.2s", cursor: "pointer" }} className="hover-row">
-                    {selectedColumns.includes("sno") && <td style={{ padding: "1rem", color: "var(--text-secondary)", fontSize: "0.875rem", fontWeight: "500" }}>{idx + 1}</td>}
+                    {selectedColumns.includes("sno") && <td style={{ padding: "0.5rem 1rem", color: "var(--text-secondary)", fontSize: "0.875rem", fontWeight: "500" }}>{actualIdx + 1}</td>}
                     {selectedColumns.includes("name") && (
-                      <td style={{ padding: "1rem" }}>
+                      <td style={{ padding: "0.5rem 1rem" }}>
                         <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
                           <div style={{ width: "32px", height: "32px", borderRadius: "50%", background: "var(--accent-light)", color: "var(--accent-primary)", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: "600", fontSize: "0.875rem" }}>
                             {s.name?.charAt(0) || "S"}
@@ -411,33 +506,95 @@ const DashboardMetrics = () => {
                         </div>
                       </td>
                     )}
-                    {selectedColumns.includes("admission_number") && <td style={{ padding: "1rem", color: "var(--text-secondary)", fontSize: "0.875rem" }}>{s.admission_number || "-"}</td>}
-                    {selectedColumns.includes("class_name") && <td style={{ padding: "1rem", color: "var(--text-secondary)" }}>{s.className}</td>}
-                    {selectedColumns.includes("total_due") && <td style={{ padding: "1rem", color: "var(--text-primary)", fontWeight: "500" }}>₹{s.totalDue}</td>}
-                    {selectedColumns.includes("total_paid") && <td style={{ padding: "1rem", color: "#10b981", fontWeight: "500" }}>₹{s.totalPaid}</td>}
+                    {selectedColumns.includes("admission_number") && <td style={{ padding: "0.5rem 1rem", color: "var(--text-secondary)", fontSize: "0.875rem" }}>{s.admission_number || "-"}</td>}
+                    {selectedColumns.includes("class_name") && <td style={{ padding: "0.5rem 1rem", color: "var(--text-secondary)" }}>{s.className}</td>}
+                    {selectedColumns.includes("total_due") && <td style={{ padding: "0.5rem 1rem", color: "var(--text-primary)", fontWeight: "500" }}>₹{s.totalDue}</td>}
+                    {selectedColumns.includes("total_paid") && <td style={{ padding: "0.5rem 1rem", color: "#10b981", fontWeight: "500" }}>₹{s.totalPaid}</td>}
                     {selectedColumns.includes("balance") && (
-                      <td style={{ padding: "1rem", color: s.balance > 0 ? "#ef4444" : "#10b981", fontWeight: "600" }}>
+                      <td style={{ padding: "0.5rem 1rem", color: s.balance > 0 ? "#ef4444" : "#10b981", fontWeight: "600" }}>
                         <div style={{ display: "inline-flex", alignItems: "center", padding: "0.25rem 0.5rem", borderRadius: "12px", background: s.balance > 0 ? "rgba(239, 68, 68, 0.1)" : "rgba(16, 185, 129, 0.1)" }}>
                           ₹{s.balance}
                         </div>
                       </td>
                     )}
                     {selectedColumns.includes("actions") && (
-                      <td style={{ padding: "1rem", textAlign: "right", display: "flex", gap: "0.5rem", justifyContent: "flex-end" }} onClick={e => e.stopPropagation()}>
+                      <td style={{ padding: "0.5rem 1rem", textAlign: "right", display: "flex", gap: "0.5rem", justifyContent: "flex-end" }} onClick={e => e.stopPropagation()}>
+                        <button onClick={(e) => { e.stopPropagation(); setSelectedStudent(s); setIsLedgerModalOpen(true); }} className="btn-ghost" style={{ display: "inline-flex", alignItems: "center", padding: "0.5rem 1rem", borderRadius: "6px", fontSize: "0.875rem", fontWeight: "500", color: "var(--text-secondary)" }}>
+                          <Receipt size={16} style={{ marginRight: "0.5rem" }} /> View Ledger
+                        </button>
                         {!s.fee_exempted && s.balance > 0 && isFinanceTeam && (
-                          <button onClick={(e) => { e.stopPropagation(); setSelectedStudent(s); setIsPaymentModalOpen(true); }} className="btn-primary" style={{ display: "inline-flex", alignItems: "center", padding: "0.5rem 1rem", borderRadius: "6px", fontSize: "0.875rem", fontWeight: "500" }}>
+                          <button onClick={(e) => { e.stopPropagation(); handleOpenPaymentModal(s); }} className="btn-primary" style={{ display: "inline-flex", alignItems: "center", padding: "0.5rem 1rem", borderRadius: "6px", fontSize: "0.875rem", fontWeight: "500" }}>
                             <PlusCircle size={16} style={{ marginRight: "0.5rem" }} /> Log Payment
                           </button>
                         )}
                       </td>
                     )}
                   </tr>
-                )) : (
+                  );
+                }) : (
                   <tr><td colSpan="8" style={{ padding: "3rem", textAlign: "center", color: "var(--text-secondary)" }}>No data available for this metric.</td></tr>
                 )
               )}
             </tbody>
           </table>
+          
+          {/* Pagination Controls */}
+          {totalPages > 1 && (
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "1rem 1.5rem", borderTop: "1px solid var(--glass-border)", background: "rgba(0,0,0,0.01)" }}>
+              <div style={{ fontSize: "0.875rem", color: "var(--text-secondary)" }}>
+                Showing {(currentPage - 1) * ITEMS_PER_PAGE + 1} to {Math.min(currentPage * ITEMS_PER_PAGE, sortedData.length)} of {sortedData.length} entries
+              </div>
+              <div style={{ display: "flex", gap: "0.5rem" }}>
+                <button 
+                  onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))} 
+                  disabled={currentPage === 1}
+                  className="btn-ghost"
+                  style={{ padding: "0.5rem 1rem", fontSize: "0.875rem", opacity: currentPage === 1 ? 0.5 : 1 }}
+                >
+                  Previous
+                </button>
+                <div style={{ display: "flex", alignItems: "center", gap: "0.25rem" }}>
+                  {[...Array(totalPages)].map((_, i) => {
+                    // Show limited pages (first, last, and around current)
+                    if (
+                      i === 0 || 
+                      i === totalPages - 1 || 
+                      (i >= currentPage - 2 && i <= currentPage)
+                    ) {
+                      return (
+                        <button
+                          key={i}
+                          onClick={() => setCurrentPage(i + 1)}
+                          style={{
+                            padding: "0.25rem 0.75rem",
+                            borderRadius: "4px",
+                            border: currentPage === i + 1 ? "none" : "1px solid var(--glass-border)",
+                            background: currentPage === i + 1 ? "var(--accent-primary)" : "transparent",
+                            color: currentPage === i + 1 ? "white" : "var(--text-primary)",
+                            fontSize: "0.875rem",
+                            cursor: "pointer"
+                          }}
+                        >
+                          {i + 1}
+                        </button>
+                      );
+                    } else if (i === currentPage - 3 || i === currentPage + 1) {
+                      return <span key={i} style={{ color: "var(--text-secondary)", margin: "0 0.25rem" }}>...</span>;
+                    }
+                    return null;
+                  })}
+                </div>
+                <button 
+                  onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))} 
+                  disabled={currentPage === totalPages}
+                  className="btn-ghost"
+                  style={{ padding: "0.5rem 1rem", fontSize: "0.875rem", opacity: currentPage === totalPages ? 0.5 : 1 }}
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
@@ -457,7 +614,7 @@ const DashboardMetrics = () => {
                 <p style={{ fontWeight: "600" }}>Student is fee exempted.</p>
                 <button onClick={() => setIsPaymentModalOpen(false)} className="btn-ghost" style={{ marginTop: "1rem" }}>Close</button>
               </div>
-            ) : studentLedger.fees.filter(f => f.payment_status !== "Paid").length === 0 ? (
+            ) : studentLedger.fees.filter(f => f.status !== "paid").length === 0 ? (
               <div style={{ padding: "2rem", textAlign: "center", background: "rgba(0, 0, 0, 0.02)", borderRadius: "8px", color: "var(--text-secondary)" }}>
                 <p style={{ fontWeight: "500" }}>No pending dues. All clear!</p>
                 <button onClick={() => setIsPaymentModalOpen(false)} className="btn-ghost" style={{ marginTop: "1rem" }}>Close</button>
@@ -468,8 +625,8 @@ const DashboardMetrics = () => {
                   <label style={{ display: "block", fontSize: "0.875rem", marginBottom: "0.5rem" }}>Select Fee</label>
                   <select required className="input-glass" style={{ width: "100%" }} value={paymentForm.feeId} onChange={e => setPaymentForm({...paymentForm, feeId: e.target.value})}>
                     <option value="">-- Choose Fee --</option>
-                    {studentLedger.fees.filter(f => f.payment_status !== "Paid").map(f => (
-                      <option key={f.fee_id} value={f.fee_id}>{f.fee?.title} (Due: ₹{Number(f.fee?.amount || 0) - Number(f.total_paid_amount || 0)})</option>
+                    {studentLedger.fees.filter(f => f.status !== "paid").map(f => (
+                      <option key={f.id} value={f.id}>{f.fee?.title} (Due: ₹{Number(f.fee?.amount || 0) - Number(f.total_paid_amount || 0)})</option>
                     ))}
                   </select>
                 </div>

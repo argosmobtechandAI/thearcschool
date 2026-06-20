@@ -1,6 +1,5 @@
 import { supabase, supabaseAdmin } from "../../../config/supabaseClient.js";
 import { calculateStudentScore } from "../../../utils/helpers.js";
-import { FeeGenerator } from "../../finance_panel/feeGenerator.js";
 
 export class UserService {
   static parseSafeDate(dateString) {
@@ -169,15 +168,6 @@ export class UserService {
     if (userData.type === 'teacher' && classes?.length > 0) {
       const teacherInserts = classes.map(cId => ({ class_id: cId, teacher_id: newUserId }));
       await supabase.from("class_teachers").insert(teacherInserts);
-    }
-
-    // Auto-assign admission fees
-    if (userData.type === 'student') {
-      try {
-        await FeeGenerator.assignAdmissionFees(newUserId);
-      } catch (err) {
-        console.error("Failed to assign admission fees:", err);
-      }
     }
 
     return { id: newUserId, ...userData };
@@ -354,7 +344,6 @@ export class UserService {
     // Fetch all related data in separate parallel queries
     const [
       { data: gradesData },
-      { data: feesData },
       { data: notificationsData },
       { data: activitiesData },
       { data: classStudentsData },
@@ -365,7 +354,6 @@ export class UserService {
       { data: studentParentsData }
     ] = await Promise.all([
       supabase.from("grades").select("*"),
-      supabase.from("student_fees").select("*, fee(*)"),
       supabase.from("notifications").select("*"),
       supabase.from("activities").select("*"),
       supabase.from("class_students").select("*"),
@@ -396,7 +384,7 @@ export class UserService {
         connections,
         classes,
         grade: (gradesData || []).filter(g => g.student_id === user.id),
-        fees: (feesData || []).filter(f => f.student_id === user.id),
+        fees: [], // Virtual Ledger: Fees are calculated dynamically on the finance panel
         notification: (notificationsData || []).filter(n => n.user_id === user.id),
         activity: (activitiesData || []).filter(a => a.user_id === user.id)
       };
@@ -658,11 +646,6 @@ export class UserService {
             }
           }
 
-          try {
-            await FeeGenerator.assignAdmissionFees(authData.user.id);
-          } catch (err) {
-            console.error("Failed to assign admission fees during bulk upload:", err);
-          }
         } else if (user.type === 'teacher') {
           const teacherDetails = {
             user_id: authData.user.id,

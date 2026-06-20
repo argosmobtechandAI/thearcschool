@@ -7,7 +7,7 @@ import { getExam } from "../shared/academics/examsController.js";
 import { getAttendance } from "../shared/attendance/controller.js";
 import { getUsers } from "../shared/users/controller.js";
 import { getTopper } from "../shared/academics/examsController.js";
-import { getFees } from "../shared/finance/controller.js";
+
 import { getTimeTable } from "../shared/timetable/controller.js";
 import { getAllEvents } from "../shared/events/controller.js";
 import communicationRouter from "../shared/communication/routes.js";
@@ -22,7 +22,7 @@ principalRouter.use(authorizeRoles('principal', 'admin'));
 principalRouter.get("/exams", getExam);
 principalRouter.get("/attendance", getAttendance);
 principalRouter.get("/users", getUsers);
-principalRouter.get("/fees", getFees);
+
 principalRouter.get("/topper", getTopper);
 
 // Timetable

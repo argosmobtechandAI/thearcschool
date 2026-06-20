@@ -66,10 +66,10 @@ const Dashboard = () => {
 
         const today = new Date().toDateString();
         dispatch(setDashboardStats({
-          pendingAdmissions: newUsers.filter(u => u.status === 'Pending').length,
+          pendingAdmissions: newUsers.filter(u => u.status?.toLowerCase() === 'pending').length,
           totalApplications: newUsers.length,
-          approvedApplications: newUsers.filter(u => u.status === 'Approved').length,
-          rejectedApplications: newUsers.filter(u => u.status === 'Rejected').length,
+          approvedApplications: newUsers.filter(u => u.status?.toLowerCase() === 'approved').length,
+          rejectedApplications: newUsers.filter(u => u.status?.toLowerCase() === 'rejected').length,
           todayInquiries: newUsers.filter(u => u.created_at && new Date(u.created_at).toDateString() === today).length,
           recentApplications: newUsers.sort((a, b) => new Date(b.created_at) - new Date(a.created_at)).slice(0, 5)
         }));
@@ -170,9 +170,9 @@ const Dashboard = () => {
                       </td>
                       <td style={{ padding: "0.75rem 0.5rem" }}>
                         <span style={{
-                          background: app.status === "Approved" ? "rgba(16, 185, 129, 0.15)" : app.status === "Rejected" ? "rgba(239, 68, 68, 0.15)" : "rgba(245, 158, 11, 0.15)",
-                          color: app.status === "Approved" ? "#047857" : app.status === "Rejected" ? "#b91c1c" : "#b45309",
-                          padding: "2px 6px", borderRadius: "4px", fontSize: "0.7rem", fontWeight: "600"
+                          background: app.status?.toLowerCase() === "approved" ? "rgba(16, 185, 129, 0.15)" : app.status?.toLowerCase() === "rejected" ? "rgba(239, 68, 68, 0.15)" : "rgba(245, 158, 11, 0.15)",
+                          color: app.status?.toLowerCase() === "approved" ? "#047857" : app.status?.toLowerCase() === "rejected" ? "#b91c1c" : "#b45309",
+                          padding: "2px 6px", borderRadius: "4px", fontSize: "0.7rem", fontWeight: "600", textTransform: "capitalize"
                         }}>
                           {app.status}
                         </span>

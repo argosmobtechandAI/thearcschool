@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useMemo } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { fetchUsers, fetchClasses, fetchFees } from "../features/dataSlice";
+import { fetchUsers, fetchClasses } from "../features/dataSlice";
+import api from "../services/api";
 import { Search, Filter, Download, FileText, CheckCircle, Clock, AlertCircle } from "lucide-react";
 import { exportToExcel, exportToPDF } from "../utils/exportUtils";
 import TableFilterHeader from "../components/TableFilterHeader";
@@ -9,7 +10,9 @@ import { useSortableData } from "../hooks/useSortableData";
 
 const Reports = () => {
   const dispatch = useDispatch();
-  const { users, classes, fees, loadingUsers, loadingClasses, loadingFees } = useSelector((state) => state.data);
+  const { users, classes, loadingUsers, loadingClasses } = useSelector((state) => state.data);
+
+  const [balancesMap, setBalancesMap] = useState({});
 
   const [searchTerm, setSearchTerm] = useState("");
   const [classFilter, setClassFilter] = useState("");
@@ -37,16 +40,28 @@ const Reports = () => {
   useEffect(() => {
     dispatch(fetchUsers());
     dispatch(fetchClasses());
-    dispatch(fetchFees());
   }, [dispatch]);
+
+  const students = useMemo(() => users.filter(u => u.type === "student" && !u.fee_exempted), [users]);
+
+  useEffect(() => {
+    if (students.length > 0) {
+      api.post("/finance_panel/studentBalances", { students: students.map(s => ({ id: s.id, type: s.type, fee_exempted: s.fee_exempted, classes: s.classes, bus_fee: s.bus_fee })) })
+        .then(res => {
+          if (res.data.success) {
+            const bMap = {};
+            res.data.data.forEach(b => bMap[b.student_id] = b);
+            setBalancesMap(bMap);
+          }
+        })
+        .catch(console.error);
+    }
+  }, [students]);
 
   // Join data
   const reportData = useMemo(() => {
     let data = [];
     
-    // Filter only students
-    const students = users.filter(u => u.type === "student" && !u.fee_exempted);
-
     students.forEach(student => {
       // Find class name
       let className = "N/A";
@@ -56,31 +71,29 @@ const Reports = () => {
       }
 
       // Process their fees
-      if (student.fees && Array.isArray(student.fees)) {
-        student.fees.forEach(sf => {
-          const feeDef = fees.find(f => f.id === sf.fee_id);
-          if (!feeDef) return;
-
-          const totalDue = Number(feeDef.amount) || 0;
-          const totalPaid = Number(sf.total_paid_amount) || 0;
+      const studentBalance = balancesMap[student.id];
+      if (studentBalance && studentBalance.feeBreakdown) {
+        studentBalance.feeBreakdown.forEach((feeItem, idx) => {
+          const totalDue = Number(feeItem.amount) || 0;
+          const totalPaid = Number(feeItem.paid) || 0;
           const balance = Math.max(0, totalDue - totalPaid);
-          const dueDate = feeDef.dueDate ? new Date(feeDef.dueDate) : null;
+          const dueDate = feeItem.dueDate ? new Date(feeItem.dueDate) : null;
           
-          let status = sf.payment_status || "Pending";
+          let status = feeItem.status || "Pending";
           if (status !== "Paid" && balance > 0 && dueDate && dueDate < new Date()) {
             status = "Overdue";
           }
 
           data.push({
-            id: `${student.id}-${sf.fee_id}`,
+            id: `${student.id}-${idx}`,
             studentName: student.name,
             admissionNumber: student.admission_number || "N/A",
             className: className,
-            feeTitle: feeDef.title,
+            feeTitle: feeItem.title,
             totalDue,
             totalPaid,
             balance,
-            dueDate: feeDef.dueDate,
+            dueDate: feeItem.dueDate,
             status
           });
         });
@@ -88,7 +101,7 @@ const Reports = () => {
     });
 
     return data;
-  }, [users, classes, fees]);
+  }, [students, classes, balancesMap]);
 
   // Apply Filters
   const filteredData = useMemo(() => {
@@ -164,7 +177,7 @@ const Reports = () => {
     }
   };
 
-  if (loadingUsers || loadingClasses || loadingFees) {
+  if (loadingUsers || loadingClasses) {
     return <div style={{ padding: "2rem", textAlign: "center" }}>Loading Reports...</div>;
   }
 

@@ -8,7 +8,7 @@ import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import Ledger from './pages/Ledger';
 import Reports from './pages/Reports';
-import FeeManagement from './pages/FeeManagement';
+
 import DashboardMetrics from './pages/DashboardMetrics';
 import FeeStructures from './pages/FeeStructures';
 import IncomeLedger from './pages/IncomeLedger';
@@ -34,7 +34,7 @@ function App() {
           <Route index element={<Navigate to="/dashboard" replace />} />
           <Route path="dashboard" element={<Dashboard />} />
           <Route path="ledger" element={<Ledger />} />
-          <Route path="fee-setup" element={<FeeManagement />} />
+
           <Route path="fee-structures" element={<FeeStructures />} />
           <Route path="income" element={<IncomeLedger />} />
           <Route path="expenses" element={<ExpenseLedger />} />

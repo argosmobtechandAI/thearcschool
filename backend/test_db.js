@@ -1,16 +1,33 @@
-import fs from 'fs';
-import supabase from './src/config/supabaseClient.js';
+import { createClient } from '@supabase/supabase-js';
+import dotenv from 'dotenv';
+dotenv.config();
 
-const run = async () => {
-  const sql = fs.readFileSync('map_subjects.sql', 'utf8');
-  // Supabase JS client doesn't have a generic query execution for raw SQL DDL easily unless using rpc.
-  // We can just check if the table exists by doing a select limit 1
-  const { data, error } = await supabase.from('class_subjects').select('*').limit(1);
-  if (error) {
-    console.log("Table does not exist or error:", error.message);
-  } else {
-    console.log("Table exists:", data);
-  }
-  process.exit(0);
+const supabaseAdmin = createClient(process.env.VITE_SUPABASE_URL, process.env.VITE_SUPABASE_SERVICE_ROLE_KEY);
+
+async function run() {
+    const { data: students, error: studentError } = await supabaseAdmin
+      .from("user")
+      .select("id, type, fee_exempted, bus_fee")
+      .eq("type", "student")
+      .eq("status", "active");
+      
+    if (studentError) {
+        console.error("Student error:", studentError);
+        return;
+    }
+    
+    const studentIds = students.map(s => s.id);
+    
+    const { data: transactions, error: txErr } = await supabaseAdmin
+        .from("transactions")
+        .select("student_id, amount")
+        .eq("status", "COMPLETED")
+        .in("student_id", studentIds);
+
+    if (txErr) {
+        console.error("TX ERROR:", txErr);
+    } else {
+        console.log("Success! TX count:", transactions?.length);
+    }
 }
 run();

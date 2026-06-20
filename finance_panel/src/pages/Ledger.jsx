@@ -34,12 +34,30 @@ const Ledger = () => {
   });
   const [isPaying, setIsPaying] = useState(false);
 
+  const [balancesMap, setBalancesMap] = useState({});
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
+
   useEffect(() => {
     dispatch(fetchUsers());
     dispatch(fetchClasses());
   }, [dispatch]);
 
   const students = useMemo(() => users.filter(u => u.type === "student"), [users]);
+
+  useEffect(() => {
+    if (students.length > 0) {
+      // Fetch student balances in batch
+      api.post("/finance_panel/studentBalances", { students: students.map(s => ({ id: s.id, type: s.type, fee_exempted: s.fee_exempted, classes: s.classes, bus_fee: s.bus_fee })) })
+        .then(res => {
+          if (res.data.success) {
+            const bMap = {};
+            res.data.data.forEach(b => bMap[b.student_id] = b);
+            setBalancesMap(bMap);
+          }
+        })
+        .catch(console.error);
+    }
+  }, [students, refreshTrigger]);
 
   // Derive class options
   const classes = useMemo(() => {
@@ -76,27 +94,14 @@ const Ledger = () => {
 
   const enrichedStudents = useMemo(() => {
     let enriched = filteredStudents.map(s => {
-      // Calculate totals based on s.fees
-      let totalDue = 0;
-      let totalPaid = 0;
+      const b = balancesMap[s.id] || { totalDue: 0, totalPaid: 0, balance: 0 };
       
-      if (!s.fee_exempted) {
-        if (s.fees && Array.isArray(s.fees)) {
-          s.fees.forEach(f => {
-            totalDue += Number(f.fee?.amount || 0);
-            totalPaid += Number(f.total_paid_amount || 0);
-          });
-        }
-      }
-
-      const balance = Math.max(0, totalDue - totalPaid);
-
       return {
         ...s,
         className: globalClasses.find(c => String(c.id) === String(s.classes?.[0]))?.name || "N/A",
-        total_due: totalDue,
-        total_paid: totalPaid,
-        balance
+        total_due: b.totalDue,
+        total_paid: b.totalPaid,
+        balance: b.balance
       };
     });
 
@@ -159,23 +164,25 @@ const Ledger = () => {
 
     setIsPaying(true);
     try {
-      const res = await api.post("/finance_panel/logPayment", {
-        data: {
-          studentId: selectedStudent.id,
-          feeId: paymentForm.feeId,
-          amount: Number(paymentForm.amount),
-          paymentMode: paymentForm.paymentMode,
-          remarks: paymentForm.remarks
-        }
-      });
+        // Automatically generate receipt
+        const feeDetails = studentLedger.fees.find(f => f.id === paymentForm.feeId)?.fee;
+        const res = await api.post("/finance_panel/logPayment", {
+          data: {
+            studentId: selectedStudent.id,
+            feeId: paymentForm.feeId,
+            amount: Number(paymentForm.amount),
+            paymentMode: paymentForm.paymentMode,
+            remarks: paymentForm.remarks,
+            title: feeDetails?.title
+          }
+        });
       if (res.data.success) {
         toast.success("Payment recorded successfully");
         
-        // Automatically generate receipt
-        const feeDetails = studentLedger.fees.find(f => f.fee_id === paymentForm.feeId)?.fee;
         const completePayment = {
             ...res.data.payment,
-            fee: feeDetails
+            fee: feeDetails,
+            fee_title: feeDetails?.title
         };
         generateReceiptPDF(completePayment, selectedStudent);
 
@@ -184,6 +191,7 @@ const Ledger = () => {
         // Refresh ledger if the big modal is still somehow open
         if (isModalOpen) handleOpenLedger(selectedStudent);
         dispatch(fetchUsers());
+        setRefreshTrigger(prev => prev + 1);
       }
     } catch (err) {
       toast.error(err.response?.data?.message || "Failed to log payment");
@@ -271,20 +279,32 @@ const Ledger = () => {
           onExportPDF={handleExportPDF}
         />
 
+        <div style={{ display: "flex", justifyContent: "flex-end", marginTop: "0.5rem", gap: "0.5rem", flexWrap: "wrap", fontSize: "0.875rem" }}>
+          <div style={{ background: "rgba(59, 130, 246, 0.1)", color: "#3b82f6", padding: "0.35rem 0.75rem", borderRadius: "6px", fontWeight: "600", display: "flex", alignItems: "center", gap: "0.25rem" }}>
+            Total Displayed Due: ₹{sortedData.reduce((acc, curr) => acc + Number(curr.total_due || 0), 0).toLocaleString()}
+          </div>
+          <div style={{ background: "rgba(16, 185, 129, 0.1)", color: "#10b981", padding: "0.35rem 0.75rem", borderRadius: "6px", fontWeight: "600", display: "flex", alignItems: "center", gap: "0.25rem" }}>
+            Total Displayed Paid: ₹{sortedData.reduce((acc, curr) => acc + Number(curr.total_paid || 0), 0).toLocaleString()}
+          </div>
+          <div style={{ background: "rgba(239, 68, 68, 0.1)", color: "#ef4444", padding: "0.35rem 0.75rem", borderRadius: "6px", fontWeight: "600", display: "flex", alignItems: "center", gap: "0.25rem" }}>
+            Total Displayed Balance: ₹{sortedData.reduce((acc, curr) => acc + Number(curr.balance || 0), 0).toLocaleString()}
+          </div>
+        </div>
+
         <div style={{ overflowX: "auto", marginTop: "1rem" }}>
           <table style={{ width: "100%", borderCollapse: "collapse", whiteSpace: "nowrap" }}>
             <thead>
               <tr style={{ borderBottom: "2px solid var(--glass-border)", background: "rgba(0,0,0,0.02)" }}>
-                {selectedColumns.includes("sno") && <th style={{ padding: "1rem", textAlign: "left", fontSize: "0.75rem", fontWeight: "600", color: "var(--text-secondary)" }}>S.NO</th>}
-                <th style={{ padding: "1rem", textAlign: "left", fontSize: "0.75rem", fontWeight: "600", color: "var(--text-secondary)", cursor: "pointer", userSelect: "none" }} onClick={() => requestSort("name")}>
+                {selectedColumns.includes("sno") && <th style={{ padding: "0.5rem 1rem", textAlign: "left", fontSize: "0.75rem", fontWeight: "600", color: "var(--text-secondary)" }}>S.NO</th>}
+                <th style={{ padding: "0.5rem 1rem", textAlign: "left", fontSize: "0.75rem", fontWeight: "600", color: "var(--text-secondary)", cursor: "pointer", userSelect: "none" }} onClick={() => requestSort("name")}>
                   STUDENT{renderSortIndicator("name")}
                 </th>
-                {selectedColumns.includes("admission_number") && <th style={{ padding: "1rem", textAlign: "left", fontSize: "0.75rem", fontWeight: "600", color: "var(--text-secondary)", cursor: "pointer", userSelect: "none" }} onClick={() => requestSort("admission_number")}>ADM NO{renderSortIndicator("admission_number")}</th>}
-                {selectedColumns.includes("total_due") && <th style={{ padding: "1rem", textAlign: "left", fontSize: "0.75rem", fontWeight: "600", color: "var(--text-secondary)", cursor: "pointer", userSelect: "none" }} onClick={() => requestSort("total_due")}>TOTAL DUE{renderSortIndicator("total_due")}</th>}
-                {selectedColumns.includes("total_paid") && <th style={{ padding: "1rem", textAlign: "left", fontSize: "0.75rem", fontWeight: "600", color: "var(--text-secondary)", cursor: "pointer", userSelect: "none" }} onClick={() => requestSort("total_paid")}>TOTAL PAID{renderSortIndicator("total_paid")}</th>}
-                {selectedColumns.includes("balance") && <th style={{ padding: "1rem", textAlign: "left", fontSize: "0.75rem", fontWeight: "600", color: "var(--text-secondary)", cursor: "pointer", userSelect: "none" }} onClick={() => requestSort("balance")}>BALANCE{renderSortIndicator("balance")}</th>}
-                {selectedColumns.includes("fee_exempted") && <th style={{ padding: "1rem", textAlign: "center", fontSize: "0.75rem", fontWeight: "600", color: "var(--text-secondary)" }}>EXEMPTED</th>}
-                <th style={{ padding: "1rem", textAlign: "right", fontSize: "0.75rem", fontWeight: "600", color: "var(--text-secondary)" }}>ACTIONS</th>
+                {selectedColumns.includes("admission_number") && <th style={{ padding: "0.5rem 1rem", textAlign: "left", fontSize: "0.75rem", fontWeight: "600", color: "var(--text-secondary)", cursor: "pointer", userSelect: "none" }} onClick={() => requestSort("admission_number")}>ADM NO{renderSortIndicator("admission_number")}</th>}
+                {selectedColumns.includes("total_due") && <th style={{ padding: "0.5rem 1rem", textAlign: "left", fontSize: "0.75rem", fontWeight: "600", color: "var(--text-secondary)", cursor: "pointer", userSelect: "none" }} onClick={() => requestSort("total_due")}>TOTAL DUE{renderSortIndicator("total_due")}</th>}
+                {selectedColumns.includes("total_paid") && <th style={{ padding: "0.5rem 1rem", textAlign: "left", fontSize: "0.75rem", fontWeight: "600", color: "var(--text-secondary)", cursor: "pointer", userSelect: "none" }} onClick={() => requestSort("total_paid")}>TOTAL PAID{renderSortIndicator("total_paid")}</th>}
+                {selectedColumns.includes("balance") && <th style={{ padding: "0.5rem 1rem", textAlign: "left", fontSize: "0.75rem", fontWeight: "600", color: "var(--text-secondary)", cursor: "pointer", userSelect: "none" }} onClick={() => requestSort("balance")}>BALANCE{renderSortIndicator("balance")}</th>}
+                {selectedColumns.includes("fee_exempted") && <th style={{ padding: "0.5rem 1rem", textAlign: "center", fontSize: "0.75rem", fontWeight: "600", color: "var(--text-secondary)" }}>EXEMPTED</th>}
+                <th style={{ padding: "0.5rem 1rem", textAlign: "right", fontSize: "0.75rem", fontWeight: "600", color: "var(--text-secondary)" }}>ACTIONS</th>
               </tr>
             </thead>
             <tbody>
@@ -295,8 +315,8 @@ const Ledger = () => {
               ) : (
                 sortedData.map((s, idx) => (
                   <tr key={s.id} onClick={() => handleOpenLedger(s)} style={{ borderBottom: "1px solid var(--glass-border)", transition: "background 0.2s", cursor: "pointer" }} className="hover-row">
-                    {selectedColumns.includes("sno") && <td style={{ padding: "1rem", color: "var(--text-secondary)", fontSize: "0.875rem", fontWeight: "500" }}>{idx + 1}</td>}
-                    <td style={{ padding: "1rem" }}>
+                    {selectedColumns.includes("sno") && <td style={{ padding: "0.5rem 1rem", color: "var(--text-secondary)", fontSize: "0.875rem", fontWeight: "500" }}>{idx + 1}</td>}
+                    <td style={{ padding: "0.5rem 1rem" }}>
                       <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
                         <div style={{ width: "32px", height: "32px", borderRadius: "50%", background: "var(--accent-light)", color: "var(--accent-primary)", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: "600", fontSize: "0.875rem" }}>
                           {s.name?.charAt(0) || "S"}
@@ -306,22 +326,22 @@ const Ledger = () => {
                         </div>
                       </div>
                     </td>
-                    {selectedColumns.includes("admission_number") && <td style={{ padding: "1rem", color: "var(--text-secondary)", fontSize: "0.875rem" }}>{s.admission_number || "-"}</td>}
-                    {selectedColumns.includes("total_due") && <td style={{ padding: "1rem", color: "var(--text-primary)", fontWeight: "500" }}>₹{s.total_due}</td>}
-                    {selectedColumns.includes("total_paid") && <td style={{ padding: "1rem", color: "#10b981", fontWeight: "500" }}>₹{s.total_paid}</td>}
+                    {selectedColumns.includes("admission_number") && <td style={{ padding: "0.5rem 1rem", color: "var(--text-secondary)", fontSize: "0.875rem" }}>{s.admission_number || "-"}</td>}
+                    {selectedColumns.includes("total_due") && <td style={{ padding: "0.5rem 1rem", color: "var(--text-primary)", fontWeight: "500" }}>₹{s.total_due}</td>}
+                    {selectedColumns.includes("total_paid") && <td style={{ padding: "0.5rem 1rem", color: "#10b981", fontWeight: "500" }}>₹{s.total_paid}</td>}
                     {selectedColumns.includes("balance") && (
-                      <td style={{ padding: "1rem", color: s.balance > 0 ? "#ef4444" : "#10b981", fontWeight: "600" }}>
+                      <td style={{ padding: "0.5rem 1rem", color: s.balance > 0 ? "#ef4444" : "#10b981", fontWeight: "600" }}>
                         <div style={{ display: "inline-flex", alignItems: "center", padding: "0.25rem 0.5rem", borderRadius: "12px", background: s.balance > 0 ? "rgba(239, 68, 68, 0.1)" : "rgba(16, 185, 129, 0.1)" }}>
                           ₹{s.balance}
                         </div>
                       </td>
                     )}
                     {selectedColumns.includes("fee_exempted") && (
-                      <td style={{ padding: "1rem", textAlign: "center" }}>
+                      <td style={{ padding: "0.5rem 1rem", textAlign: "center" }}>
                         {s.fee_exempted ? <span style={{ background: "rgba(16, 185, 129, 0.1)", color: "#10b981", padding: "2px 8px", borderRadius: "4px", fontSize: "0.75rem", fontWeight: "600" }}>YES</span> : "-"}
                       </td>
                     )}
-                    <td style={{ padding: "1rem", textAlign: "right", display: "flex", gap: "0.5rem", justifyContent: "flex-end" }}>
+                    <td style={{ padding: "0.5rem 1rem", textAlign: "right", display: "flex", gap: "0.5rem", justifyContent: "flex-end" }}>
                       <button onClick={(e) => { e.stopPropagation(); handleOpenLedger(s); }} className="btn-ghost" style={{ display: "inline-flex", alignItems: "center", padding: "0.5rem 1rem", color: "var(--accent-primary)", background: "var(--accent-light)", borderRadius: "6px", fontSize: "0.875rem", fontWeight: "500" }}>
                         <Receipt size={16} style={{ marginRight: "0.5rem" }} /> View Ledger
                       </button>
@@ -358,7 +378,7 @@ const Ledger = () => {
                 <p style={{ fontWeight: "600" }}>Student is fee exempted.</p>
                 <button onClick={() => setIsPaymentModalOpen(false)} className="btn-ghost" style={{ marginTop: "1rem" }}>Close</button>
               </div>
-            ) : studentLedger.fees.filter(f => f.payment_status !== "Paid").length === 0 ? (
+            ) : studentLedger.fees.filter(f => f.status !== "paid").length === 0 ? (
               <div style={{ padding: "2rem", textAlign: "center", background: "rgba(0, 0, 0, 0.02)", borderRadius: "8px", color: "var(--text-secondary)" }}>
                 <p style={{ fontWeight: "500" }}>No pending dues. All clear!</p>
                 <button onClick={() => setIsPaymentModalOpen(false)} className="btn-ghost" style={{ marginTop: "1rem" }}>Close</button>
@@ -369,8 +389,8 @@ const Ledger = () => {
                   <label style={{ display: "block", fontSize: "0.875rem", marginBottom: "0.5rem" }}>Select Fee</label>
                   <select required className="input-glass" style={{ width: "100%" }} value={paymentForm.feeId} onChange={e => setPaymentForm({...paymentForm, feeId: e.target.value})}>
                     <option value="">-- Choose Fee --</option>
-                    {studentLedger.fees.filter(f => f.payment_status !== "Paid").map(f => (
-                      <option key={f.fee_id} value={f.fee_id}>{f.fee?.title} (Due: ₹{Number(f.fee?.amount || 0) - Number(f.total_paid_amount || 0)})</option>
+                    {studentLedger.fees.filter(f => f.status !== "paid").map(f => (
+                      <option key={f.id} value={f.id}>{f.fee?.title} (Due: ₹{Number(f.fee?.amount || 0) - Number(f.total_paid_amount || 0)})</option>
                     ))}
                   </select>
                 </div>

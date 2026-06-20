@@ -41,29 +41,6 @@ export const fetchClasses = createAsyncThunk(
   }
 );
 
-export const fetchFees = createAsyncThunk(
-  "data/fetchFees",
-  async (_, { rejectWithValue }) => {
-    try {
-      const response = await api.get("/finance_panel/getFees");
-      return response.data.fees;
-    } catch (error) {
-      return rejectWithValue(error.response?.data || "Network Error");
-    }
-  }
-);
-
-export const createFee = createAsyncThunk(
-  "data/createFee",
-  async (feeData, { rejectWithValue }) => {
-    try {
-      const response = await api.post("/finance_panel/createFee", { data: feeData });
-      return response.data;
-    } catch (error) {
-      return rejectWithValue(error.response?.data || "Network Error");
-    }
-  }
-);
 
 export const fetchFeeStructures = createAsyncThunk(
   "data/fetchFeeStructures",
@@ -89,53 +66,31 @@ export const updateFeeStructure = createAsyncThunk(
   }
 );
 
-export const generateMonthlyFees = createAsyncThunk(
-  "data/generateMonthlyFees",
-  async ({ month, year }, { rejectWithValue }) => {
+
+export const addFeeStructure = createAsyncThunk(
+  "data/addFeeStructure",
+  async (feeData, { rejectWithValue }) => {
     try {
-      const response = await api.post("/finance_panel/generateMonthlyFees", { month, year });
-      return response.data;
+      const response = await api.post(`/finance_panel/feeStructures`, feeData);
+      return response.data.data;
     } catch (error) {
       return rejectWithValue(error.response?.data || "Network Error");
     }
   }
 );
 
-export const generateYearlyAMC = createAsyncThunk(
-  "data/generateYearlyAMC",
-  async ({ academicYear }, { rejectWithValue }) => {
+export const deleteFeeStructure = createAsyncThunk(
+  "data/deleteFeeStructure",
+  async (id, { rejectWithValue }) => {
     try {
-      const response = await api.post("/finance_panel/generateYearlyAMC", { academicYear });
-      return response.data;
+      await api.delete(`/finance_panel/feeStructures/${id}`);
+      return id;
     } catch (error) {
       return rejectWithValue(error.response?.data || "Network Error");
     }
   }
 );
 
-export const deleteFee = createAsyncThunk(
-  "data/deleteFee",
-  async (feeId, { rejectWithValue }) => {
-    try {
-      const response = await api.delete(`/finance_panel/deleteFee/${feeId}`);
-      return feeId;
-    } catch (error) {
-      return rejectWithValue(error.response?.data || "Network Error");
-    }
-  }
-);
-
-export const updateFee = createAsyncThunk(
-  "data/updateFee",
-  async ({ feeId, data }, { rejectWithValue }) => {
-    try {
-      const response = await api.put(`/finance_panel/updateFee/${feeId}`, { data });
-      return { feeId, data };
-    } catch (error) {
-      return rejectWithValue(error.response?.data || "Network Error");
-    }
-  }
-);
 
 export const fetchExams = createAsyncThunk(
   "data/fetchExams",
@@ -295,24 +250,7 @@ export const dataSlice = createSlice({
         state.loadingClasses = false;
         state.error = action.payload;
       })
-      // Fees
-      .addCase(fetchFees.pending, (state) => {
-        state.loadingFees = true;
-      })
-      .addCase(fetchFees.fulfilled, (state, action) => {
-        state.loadingFees = false;
-        state.fees = action.payload;
-      })
-      .addCase(fetchFees.rejected, (state, action) => {
-        state.loadingFees = false;
-        state.error = action.payload;
-      })
-      .addCase(updateFee.fulfilled, (state, action) => {
-        const index = state.fees.findIndex(fee => fee.id === action.payload.feeId);
-        if (index !== -1) {
-          state.fees[index] = { ...state.fees[index], ...action.payload.data };
-        }
-      })
+
       // Fee Structures
       .addCase(fetchFeeStructures.pending, (state) => {
         state.loadingFeeStructures = true;
@@ -425,11 +363,12 @@ export const dataSlice = createSlice({
           state.loading = false;
           state.error = action.error.message;
       })
-      .addCase(createFee.fulfilled, (state) => {
-        // Just invalidate/refetch could be done by UI, but we don't store individual states
+
+      .addCase(addFeeStructure.fulfilled, (state, action) => {
+        state.feeStructures.push(action.payload);
       })
-      .addCase(deleteFee.fulfilled, (state, action) => {
-        state.fees = state.fees.filter(fee => fee.id !== action.payload);
+      .addCase(deleteFeeStructure.fulfilled, (state, action) => {
+        state.feeStructures = state.feeStructures.filter(f => f.id !== action.payload);
       });
   },
 });

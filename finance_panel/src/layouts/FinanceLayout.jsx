@@ -19,8 +19,8 @@ const FinanceLayout = () => {
   };
 
   const navLinkStyle = ({ isActive }) => ({
-    display: "flex", alignItems: "center", gap: "0.5rem", padding: "0.5rem 1rem", 
-    borderRadius: "6px", fontWeight: "500", transition: "all 0.3s", fontSize: "0.875rem",
+    display: "flex", alignItems: "center", gap: "0.5rem", padding: "0.35rem 0.75rem", 
+    borderRadius: "6px", fontWeight: "500", transition: "all 0.3s", fontSize: "0.8rem",
     textDecoration: "none",
     background: isActive ? "var(--accent-light)" : "transparent",
     color: isActive ? "var(--accent-primary)" : "var(--text-secondary)",
@@ -29,75 +29,84 @@ const FinanceLayout = () => {
   const getMetricStyle = (view) => {
     const isActive = location.pathname === "/metrics" && location.search.includes(`view=${view}`);
     return {
-      display: "flex", alignItems: "center", gap: "0.5rem", padding: "0.5rem 1rem", 
-      borderRadius: "6px", fontWeight: "500", transition: "all 0.3s", fontSize: "0.875rem",
+      display: "flex", alignItems: "center", gap: "0.5rem", padding: "0.35rem 0.75rem", 
+      borderRadius: "6px", fontWeight: "500", transition: "all 0.3s", fontSize: "0.8rem",
       textDecoration: "none",
       background: isActive ? "var(--accent-light)" : "transparent",
       color: isActive ? "var(--accent-primary)" : "var(--text-secondary)",
     };
   };
 
+  const NavGroup = ({ title }) => (
+    <div style={{ 
+      marginTop: "1.25rem", 
+      marginBottom: "0.5rem", 
+      padding: "0 0.5rem", 
+      borderBottom: "1px solid var(--glass-border)", 
+      paddingBottom: "0.3rem" 
+    }}>
+      <span style={{ 
+        fontSize: "0.75rem", 
+        textTransform: "uppercase", 
+        letterSpacing: "0.1em", 
+        color: "var(--accent-primary)", 
+        fontWeight: "800" 
+      }}>{title}</span>
+    </div>
+  );
+
   return (
-    <div style={{ display: "flex", minHeight: "100vh" }}>
+    <div style={{ display: "flex", height: "100vh", overflow: "hidden" }}>
+      <style>
+        {`
+          .sidebar-nav::-webkit-scrollbar {
+            display: none;
+          }
+        `}
+      </style>
       {/* Sidebar */}
-      <aside className="glass-panel" style={{ width: "240px", padding: "1rem", display: "flex", flexDirection: "column", borderTopLeftRadius: 0, borderBottomLeftRadius: 0, height: "100vh" }}>
+      <aside className="glass-panel" style={{ width: "230px", padding: "0.75rem", display: "flex", flexDirection: "column", borderTopLeftRadius: 0, borderBottomLeftRadius: 0, height: "100vh", overflow: "hidden" }}>
         <div style={{ marginBottom: "1.5rem", display: "flex", alignItems: "center", gap: "0.75rem" }}>
-          <img src="/thearcschoollogo.jpeg" alt="The Arc School" style={{ height: "48px", width: "48px", borderRadius: "50%", objectFit: "cover", boxShadow: "0 4px 12px rgba(0,0,0,0.1)" }} />
+          <img src="/thearcschoollogo.jpeg" alt="The Arc School" style={{ height: "48px", width: "48px", borderRadius: "50%", objectFit: "cover" }} />
           <div>
-            <h2 style={{ fontSize: "1.1rem", fontWeight: "700", color: "var(--text-primary)", lineHeight: 1.2 }}>The Arc School</h2>
-            <p style={{ color: "var(--accent-primary)", fontSize: "0.875rem", fontWeight: "600" }}>Finance Panel</p>
+            <h2 style={{ fontSize: "1.25rem", fontWeight: "700", color: "var(--text-primary)", lineHeight: 1.2 }}>The Arc School</h2>
+            <p style={{ color: "var(--text-secondary)", fontSize: "0.875rem" }}>Finance Portal</p>
           </div>
         </div>
 
-        <nav style={{ flex: 1, display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+        <nav className="sidebar-nav" style={{ flex: 1, display: "flex", flexDirection: "column", gap: "0.15rem", overflowY: "auto", overflowX: "hidden", scrollbarWidth: "none", msOverflowStyle: "none", paddingBottom: "1rem" }}>
           <NavLink to="/dashboard" style={navLinkStyle}>
-            <LayoutDashboard size={18} /> Dashboard
+            <LayoutDashboard size={16} /> Dashboard
           </NavLink>
           
-          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginTop: "1.25rem", marginBottom: "0.5rem", paddingLeft: "1rem", paddingRight: "1rem" }}>
-            <span style={{ fontSize: "0.65rem", textTransform: "uppercase", letterSpacing: "0.1em", color: "#9ca3af", fontWeight: "700" }}>Metrics</span>
-            <div style={{ flex: 1, height: "1px", background: "var(--glass-border)" }}></div>
-          </div>
-          <Link to="/metrics?view=collected" style={getMetricStyle("collected")}><IndianRupee size={18} /> Total Collected</Link>
-          <Link to="/metrics?view=dues" style={getMetricStyle("dues")}><TrendingDown size={18} /> Pending Dues</Link>
-          <Link to="/metrics?view=students" style={getMetricStyle("students")}><Users size={18} /> Active Students</Link>
-          <Link to="/metrics?view=exempted" style={getMetricStyle("exempted")}><TrendingUp size={18} /> Exempted Students</Link>
+          <NavGroup title="Metrics" />
+          <Link to="/metrics?view=collected" style={getMetricStyle("collected")}><IndianRupee size={16} /> Total Collected</Link>
+          <Link to="/metrics?view=dues" style={getMetricStyle("dues")}><TrendingDown size={16} /> Pending Dues</Link>
+          <Link to="/metrics?view=students" style={getMetricStyle("students")}><Users size={16} /> Active Students</Link>
+          <Link to="/metrics?view=exempted" style={getMetricStyle("exempted")}><TrendingUp size={16} /> Exempted Students</Link>
 
-          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginTop: "1.25rem", marginBottom: "0.5rem", paddingLeft: "1rem", paddingRight: "1rem" }}>
-            <span style={{ fontSize: "0.65rem", textTransform: "uppercase", letterSpacing: "0.1em", color: "#9ca3af", fontWeight: "700" }}>Accounts & Ledger</span>
-            <div style={{ flex: 1, height: "1px", background: "var(--glass-border)" }}></div>
-          </div>
-          <NavLink to="/ledger" style={navLinkStyle}><FileSpreadsheet size={18} /> Fee Collection</NavLink>
-          <NavLink to="/income" style={navLinkStyle}><IndianRupee size={18} /> Income Ledger</NavLink>
-          <NavLink to="/expenses" style={navLinkStyle}><IndianRupee size={18} /> Expense Ledger</NavLink>
+          <NavGroup title="Accounts & Ledger" />
+          <NavLink to="/ledger" style={navLinkStyle}><FileSpreadsheet size={16} /> Fee Collection</NavLink>
+          <NavLink to="/income" style={navLinkStyle}><IndianRupee size={16} /> Income Ledger</NavLink>
+          <NavLink to="/expenses" style={navLinkStyle}><IndianRupee size={16} /> Expense Ledger</NavLink>
 
-          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginTop: "1.25rem", marginBottom: "0.5rem", paddingLeft: "1rem", paddingRight: "1rem" }}>
-            <span style={{ fontSize: "0.65rem", textTransform: "uppercase", letterSpacing: "0.1em", color: "#9ca3af", fontWeight: "700" }}>Reports</span>
-            <div style={{ flex: 1, height: "1px", background: "var(--glass-border)" }}></div>
-          </div>
-          <NavLink to="/profit-loss" style={navLinkStyle}><BarChart size={18} /> Profit & Loss</NavLink>
-          <NavLink to="/reports" style={navLinkStyle}><BarChart size={18} /> Fee Reports</NavLink>
+          <NavGroup title="Reports" />
+          <NavLink to="/profit-loss" style={navLinkStyle}><BarChart size={16} /> Profit & Loss</NavLink>
+          <NavLink to="/reports" style={navLinkStyle}><BarChart size={16} /> Fee Reports</NavLink>
 
-          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginTop: "1.25rem", marginBottom: "0.5rem", paddingLeft: "1rem", paddingRight: "1rem" }}>
-            <span style={{ fontSize: "0.65rem", textTransform: "uppercase", letterSpacing: "0.1em", color: "#9ca3af", fontWeight: "700" }}>Settings & Categories</span>
-            <div style={{ flex: 1, height: "1px", background: "var(--glass-border)" }}></div>
-          </div>
-          <NavLink to="/income-categories" style={navLinkStyle}><Settings size={18} /> Income Categories</NavLink>
-          <NavLink to="/expense-categories" style={navLinkStyle}><Settings size={18} /> Expense Categories</NavLink>
-          <NavLink to="/fee-setup" style={navLinkStyle}><Settings size={18} /> Fee Assignment</NavLink>
-          <NavLink to="/fee-structures" style={navLinkStyle}><Settings size={18} /> Fee Configuration</NavLink>
+          <NavGroup title="Settings & Categories" />
+          <NavLink to="/income-categories" style={navLinkStyle}><Settings size={16} /> Income Categories</NavLink>
+          <NavLink to="/expense-categories" style={navLinkStyle}><Settings size={16} /> Expense Categories</NavLink>
+          <NavLink to="/fee-structures" style={navLinkStyle}><Settings size={16} /> Fee Configuration</NavLink>
 
           {(user?.type === "admin" || user?.type === "principal") && (
             <>
-              <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginTop: "1.25rem", marginBottom: "0.5rem", paddingLeft: "1rem", paddingRight: "1rem" }}>
-                <span style={{ fontSize: "0.65rem", textTransform: "uppercase", letterSpacing: "0.1em", color: "#9ca3af", fontWeight: "700" }}>Portals</span>
-                <div style={{ flex: 1, height: "1px", background: "var(--glass-border)" }}></div>
-              </div>
-              <a href="http://localhost:5174/dashboard" style={{ ...navLinkStyle({ isActive: false }), color: "var(--text-secondary)" }}>
-                <ExternalLink size={18} /> Admin Portal
+              <NavGroup title="Portals" />
+              <a href="http://localhost:5174/dashboard" style={{ display: "flex", alignItems: "center", gap: "0.5rem", padding: "0.35rem 0.75rem", fontSize: "0.8rem", textDecoration: "none", color: "var(--text-secondary)" }}>
+                <ExternalLink size={16} /> Admin Portal
               </a>
-              <a href="http://localhost:5175/dashboard" style={{ ...navLinkStyle({ isActive: false }), color: "var(--text-secondary)" }}>
-                <ExternalLink size={18} /> Admission Portal
+              <a href="http://localhost:5175/dashboard" style={{ display: "flex", alignItems: "center", gap: "0.5rem", padding: "0.35rem 0.75rem", fontSize: "0.8rem", textDecoration: "none", color: "var(--text-secondary)" }}>
+                <ExternalLink size={16} /> Admission Portal
               </a>
             </>
           )}
@@ -106,7 +115,7 @@ const FinanceLayout = () => {
         <div style={{ marginTop: "auto", borderTop: "1px solid var(--glass-border)", paddingTop: "1rem" }}>
           <div style={{ marginBottom: "1rem", display: "flex", alignItems: "center", gap: "0.75rem" }}>
             <div style={{ width: "40px", height: "40px", borderRadius: "50%", background: "var(--accent-light)", color: "var(--accent-primary)", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: "bold" }}>
-              {user?.name?.charAt(0) || "C"}
+              {user?.name?.charAt(0) || "F"}
             </div>
             <div>
               <p style={{ fontSize: "0.875rem", fontWeight: "600" }}>{user?.name || "Accountant"}</p>
@@ -121,17 +130,18 @@ const FinanceLayout = () => {
 
       {/* Main Content */}
       <main style={{ flex: 1, display: "flex", flexDirection: "column", height: "100vh", overflow: "hidden", background: "var(--bg-main)" }}>
-        <header style={{ padding: "1.5rem 1.5rem 0.5rem", display: "flex", justifyContent: "flex-end", alignItems: "center", minHeight: "80px" }}>
+        <div style={{ flex: 1, padding: "1.5rem", overflowY: "auto" }}>
           {location.pathname !== "/fee-structures" && (
-            <DateRangePicker 
-              startDate={globalDateRange.startDate}
-              endDate={globalDateRange.endDate}
-              onChange={(start, end) => dispatch(setGlobalDateRange({ startDate: start, endDate: end }))}
-            />
+            <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "-2.5rem", position: "relative", zIndex: 10, pointerEvents: "none" }}>
+              <div style={{ pointerEvents: "auto" }}>
+                <DateRangePicker 
+                  startDate={globalDateRange.startDate}
+                  endDate={globalDateRange.endDate}
+                  onChange={(start, end) => dispatch(setGlobalDateRange({ startDate: start, endDate: end }))}
+                />
+              </div>
+            </div>
           )}
-        </header>
-
-        <div style={{ flex: 1, padding: "1rem 1.5rem 1.5rem", overflowY: "auto" }}>
           <Outlet />
         </div>
       </main>

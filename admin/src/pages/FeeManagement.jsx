@@ -1,474 +1,598 @@
-import { useEffect, useState, useMemo } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { fetchClasses, fetchFees, fetchUsers } from "../features/dataSlice";
-import { Search, Plus, Edit, Trash2, Users, IndianRupee } from "lucide-react";
+import { fetchUsers, fetchClasses, fetchFees } from "../features/dataSlice";
+import TableFilterHeader from "../components/TableFilterHeader";
+import { useSortableData } from "../hooks/useSortableData";
+import { exportToExcel, exportToPDF } from "../utils/exportUtils";
+import DateRangePicker from "../components/DateRangePicker";
 import { toast } from "react-toastify";
 import api from "../services/api";
-import { exportToExcel, exportToPDF } from "../utils/exportUtils";
-import TableFilterHeader from "../components/TableFilterHeader";
-import DateRangePicker from "../components/DateRangePicker";
+import { IndianRupee, Receipt } from "lucide-react";
+import StudentLedgerModal from "../components/StudentLedgerModal";
 
 const FeeManagement = () => {
   const dispatch = useDispatch();
-  const { classes, users, fees, loadingFees } = useSelector((state) => state.data);
 
-  const [viewMode, setViewMode] = useState("class"); // 'class' or 'all'
-  const [selectedClassId, setSelectedClassId] = useState("");
-  const [searchStudent, setSearchStudent] = useState("");
-  const [statusFilter, setStatusFilter] = useState("");
-  const [feeIdFilter, setFeeIdFilter] = useState("");
+  const { users, classes, loadingUsers, loadingClasses } = useSelector((state) => state.data);
+
+  const [currentView, setCurrentView] = useState("students"); // 'students', 'collected', 'structures'
   const [dateRange, setDateRange] = useState({ start: "", end: "" });
-  
-  // Modals
-  const [isFeeModalOpen, setIsFeeModalOpen] = useState(false);
-  const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
-  const [isUpdateModalOpen, setIsUpdateModalOpen] = useState(false);
-  
-  const [editingFeeId, setEditingFeeId] = useState(null);
-  const [selectedStudentForFee, setSelectedStudentForFee] = useState(null);
+  const { start: startDate, end: endDate } = dateRange;
 
-  const [feeForm, setFeeForm] = useState({
-    title: "",
-    totalAmount: "",
-    lastDate: "",
-    studentId: [],
-  });
+  const [searchTerm, setSearchTerm] = useState("");
+  const [selectedColumns, setSelectedColumns] = useState([
+    "sno", "name", "admission_number", "class_name", "total_due", "total_paid", "balance", "actions"
+  ]);
 
-  const [updateForm, setUpdateForm] = useState({
-    status: "pending",
-    paidAmount: 0,
-  });
+  const [selectedStudent, setSelectedStudent] = useState(null);
+  const [isLedgerModalOpen, setIsLedgerModalOpen] = useState(false);
+
+  const [paymentsData, setPaymentsData] = useState([]);
+  const [loadingPayments, setLoadingPayments] = useState(false);
+  const [feeStructures, setFeeStructures] = useState([]);
+  const [loadingStructures, setLoadingStructures] = useState(false);
+  const [balancesMap, setBalancesMap] = useState({});
+  const [selectedClassFilter, setSelectedClassFilter] = useState("");
+  const [selectedPaymentMode, setSelectedPaymentMode] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const ITEMS_PER_PAGE = 100;
+
+  const getCurrentAcademicYear = () => {
+    const today = new Date();
+    const month = today.getMonth();
+    let year = today.getFullYear();
+    if (month < 3) year -= 1;
+    return `${year}-${year + 1}`;
+  };
 
   useEffect(() => {
-    dispatch(fetchFees());
-    if (classes.length === 0) dispatch(fetchClasses());
-    if (users.length === 0) dispatch(fetchUsers());
-  }, [dispatch, classes.length, users.length]);
+    dispatch(fetchUsers());
+    dispatch(fetchClasses());
+  }, [dispatch]);
 
-  // Set default selected class once loaded
   useEffect(() => {
-    if (classes.length > 0 && !selectedClassId) {
-      setSelectedClassId(classes[0].id);
+    if (currentView === "structures" && feeStructures.length === 0) {
+      setLoadingStructures(true);
+      const academicYear = getCurrentAcademicYear();
+      api.get(`/finance_panel/feeStructures?academic_year=${academicYear}`)
+        .then(res => {
+          if (res.data.success) {
+            setFeeStructures(res.data.structures);
+          }
+        })
+        .catch(console.error)
+        .finally(() => setLoadingStructures(false));
     }
-  }, [classes, selectedClassId]);
+  }, [currentView, feeStructures.length]);
 
-  const selectedClass = useMemo(() => classes.find(c => c.id === selectedClassId), [classes, selectedClassId]);
+  const students = useMemo(() => users.filter(u => u.type === "student"), [users]);
 
-  const classStudents = useMemo(() => {
-    if (!selectedClass) return [];
-    return users.filter(u => selectedClass.student?.includes(String(u.id)));
-  }, [users, selectedClass]);
+  useEffect(() => {
+    if (students.length > 0) {
+      api.post("/finance_panel/studentBalances", { students: students.map(s => ({ id: s.id, type: s.type, fee_exempted: s.fee_exempted, classes: s.classes, bus_fee: s.bus_fee })) })
+        .then(res => {
+          if (res.data.success) {
+            const bMap = {};
+            res.data.data.forEach(b => bMap[b.student_id] = b);
+            setBalancesMap(bMap);
+          }
+        })
+        .catch(console.error);
+    }
+  }, [students]);
 
-  const filteredStudents = useMemo(() => {
-    return classStudents.filter(s => {
-      const matchesSearch = s.name.toLowerCase().includes(searchStudent.toLowerCase());
-      
-      let matchesStatus = true;
-      let matchesFee = true;
+  useEffect(() => {
+    if (currentView === "collected") {
+      setSelectedColumns(["sno", "date", "studentName", "admissionNumber", "class_name", "feeTitle", "amount", "mode"]);
+    } else if (currentView === "students") {
+      setSelectedColumns(["sno", "name", "admission_number", "class_name", "total_due", "total_paid", "balance", "actions"]);
+    } else if (currentView === "structures") {
+      setSelectedColumns(["category", "class", "amount"]);
+    }
+  }, [currentView]);
 
-      if (statusFilter) {
-        if (statusFilter === "none") {
-          matchesStatus = (!s.fees || s.fees.length === 0);
-        } else {
-          matchesStatus = s.fees?.some(f => f.status === statusFilter);
+  useEffect(() => {
+    if (currentView === "collected") {
+      const fetchPayments = async () => {
+        setLoadingPayments(true);
+        try {
+          const params = new URLSearchParams();
+          if (startDate) params.append("startDate", startDate);
+          if (endDate) params.append("endDate", endDate);
+          const res = await api.get(`/finance_panel/getAllPayments?${params.toString()}`);
+          if (res.data.success) {
+            setPaymentsData(res.data.payments);
+          }
+        } catch (error) {
+          toast.error("Failed to load payments ledger");
+        } finally {
+          setLoadingPayments(false);
+        }
+      };
+      fetchPayments();
+    }
+  }, [currentView, startDate, endDate]);
+
+  const viewOptions = [
+    { id: "students", label: "Class View (Dues & Balances)" },
+    { id: "collected", label: "Ledger (Payment History)" },
+    { id: "structures", label: "Fee Structures" }
+  ];
+
+  // Process data based on view
+  const processedData = useMemo(() => {
+    if (currentView === "structures") return feeStructures;
+
+    let data = users.filter(u => u.type === "student");
+
+    const enriched = data.map(s => {
+      let className = "N/A";
+      let baseClassName = "N/A";
+      if (s.classes && s.classes.length > 0) {
+        const cls = classes.find(c => c.id === s.classes[0]);
+        if (cls) {
+          className = `${cls.name} ${cls.section || ''}`.trim();
+          baseClassName = cls.name;
         }
       }
 
-      if (feeIdFilter) {
-        matchesFee = s.fees?.some(f => String(f.feeId) === String(feeIdFilter));
-      }
+      const b = balancesMap[s.id] || { totalDue: 0, totalPaid: 0, balance: 0 };
 
-      return matchesSearch && matchesStatus && matchesFee;
+      return {
+        ...s,
+        className,
+        baseClassName,
+        totalDue: b.totalDue,
+        totalPaid: b.totalPaid,
+        balance: s.fee_exempted ? 0 : b.balance
+      };
     });
-  }, [classStudents, searchStudent, statusFilter, feeIdFilter]);
 
-  const filteredGlobalFees = useMemo(() => {
-    if (!dateRange.start && !dateRange.end) return fees;
-    return fees.filter(f => {
-      const fDate = new Date(f.lastDate);
-      if (dateRange.start && dateRange.end) {
-        return fDate >= new Date(dateRange.start) && fDate <= new Date(dateRange.end);
-      } else if (dateRange.start) {
-        return fDate >= new Date(dateRange.start);
-      } else if (dateRange.end) {
-        return fDate <= new Date(dateRange.end);
+    return enriched;
+  }, [users, classes, currentView, balancesMap, feeStructures]);
+
+  const formatCategory = (cat) => {
+    if (!cat) return "Unknown";
+    return cat.split("_").map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
+  };
+
+  const filteredData = useMemo(() => {
+    if (currentView === "structures") {
+      return processedData.filter(f => formatCategory(f.fee_category).toLowerCase().includes(searchTerm.toLowerCase()));
+    }
+
+    return processedData.filter(item => 
+      ((item.name?.toLowerCase() || "").includes(searchTerm.toLowerCase()) || 
+      (item.admission_number?.toLowerCase() || "").includes(searchTerm.toLowerCase())) &&
+      (!selectedClassFilter || item.baseClassName === selectedClassFilter)
+    );
+  }, [processedData, searchTerm, selectedClassFilter, currentView]);
+
+  const filteredPayments = useMemo(() => {
+    return paymentsData.map(item => {
+      const u = users.find(u => u.id === item.student_id);
+      let className = "N/A";
+      let baseClassName = "N/A";
+      if (u && u.classes && u.classes.length > 0) {
+        const cls = classes.find(c => c.id === u.classes[0]);
+        if (cls) {
+          className = `${cls.name} ${cls.section || ''}`.trim();
+          baseClassName = cls.name;
+        }
       }
-      return true;
+      return { ...item, student: u, className, baseClassName };
+    }).filter(item => {
+      const s = item.student;
+      const matchesSearch = (s?.name?.toLowerCase() || "").includes(searchTerm.toLowerCase()) || 
+             (s?.admission_number?.toLowerCase() || "").includes(searchTerm.toLowerCase()) ||
+             (item.fee?.title?.toLowerCase() || "").includes(searchTerm.toLowerCase()) ||
+             (item.remarks?.toLowerCase() || "").includes(searchTerm.toLowerCase());
+      const matchesMode = !selectedPaymentMode || item.payment_mode === selectedPaymentMode;
+      const matchesClass = !selectedClassFilter || item.baseClassName === selectedClassFilter;
+      return matchesSearch && matchesMode && matchesClass;
     });
-  }, [fees, dateRange]);
+  }, [paymentsData, searchTerm, selectedPaymentMode, users, classes, selectedClassFilter]);
 
-  // --- Handlers ---
-  const handleOpenFeeModal = (fee = null) => {
-    if (fee) {
-      setEditingFeeId(fee.id);
-      setFeeForm({ title: fee.title, totalAmount: fee.totalAmount, lastDate: fee.lastDate, studentId: fee.studentId || [] });
-    } else {
-      setEditingFeeId(null);
-      setFeeForm({ title: "", totalAmount: "", lastDate: "", studentId: [] });
-    }
-    setIsFeeModalOpen(true);
+  const { items: sortedData, requestSort, sortConfig } = useSortableData(
+    currentView === "collected" ? filteredPayments : filteredData
+  );
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [currentView, searchTerm, selectedClassFilter, selectedPaymentMode, sortedData.length]);
+
+  const totalPages = Math.ceil(sortedData.length / ITEMS_PER_PAGE);
+  const paginatedData = useMemo(() => {
+    const start = (currentPage - 1) * ITEMS_PER_PAGE;
+    return sortedData.slice(start, start + ITEMS_PER_PAGE);
+  }, [sortedData, currentPage]);
+
+  const renderSortIndicator = (key) => {
+    if (!sortConfig || sortConfig.key !== key) return null;
+    return sortConfig.direction === 'ascending' ? ' ▲' : ' ▼';
   };
 
-  const handleSaveFee = async (e) => {
-    e.preventDefault();
-    try {
-      if (editingFeeId) {
-        await api.put(`/finance_panel/updateFee/${editingFeeId}`, { data: feeForm });
-        toast.success("Fee updated");
-      } else {
-        await api.post("/finance_panel/createFee", { data: feeForm });
-        toast.success("Fee created");
-      }
-      setIsFeeModalOpen(false);
-      dispatch(fetchFees());
-    } catch (err) {
-      toast.error("Operation failed");
-    }
-  };
+  const exportColumnsList = currentView === "collected" ? [
+    { key: "sno", label: "S.No" },
+    { key: "date", label: "Date" },
+    { key: "studentName", label: "Student Name" },
+    { key: "admissionNumber", label: "Admission No" },
+    { key: "class_name", label: "Class" },
+    { key: "feeTitle", label: "Fee Title" },
+    { key: "amount", label: "Amount Paid" },
+    { key: "mode", label: "Mode" }
+  ] : currentView === "students" ? [
+    { key: "sno", label: "S.No" },
+    { key: "name", label: "Name" },
+    { key: "admission_number", label: "Admission No" },
+    { key: "class_name", label: "Class" },
+    { key: "total_due", label: "Total Due" },
+    { key: "total_paid", label: "Total Paid" },
+    { key: "balance", label: "Balance" }
+  ] : [
+    { key: "category", label: "Fee Category" },
+    { key: "class", label: "Class / Identifier" },
+    { key: "amount", label: "Amount (₹)" },
+  ];
 
-  const handleDeleteFee = async (id) => {
-    if (window.confirm("Delete this fee?")) {
-      try {
-        await api.delete(`/finance_panel/deleteFee/${id}`);
-        toast.success("Deleted successfully");
-        dispatch(fetchFees());
-      } catch (err) {
-        toast.error("Delete failed");
-      }
-    }
-  };
-
-  const handleOpenAssign = () => {
-    if (!selectedClass) return toast.error("Select a class first");
-    setFeeForm({ title: "", totalAmount: "", lastDate: "", studentId: selectedClass.student || [] });
-    setIsAssignModalOpen(false);
-    setIsFeeModalOpen(true);
-  };
-
-  const handleUpdateStudentFee = async (e) => {
-    e.preventDefault();
-    try {
-      await api.put(`/user/submitFees/${selectedStudentForFee.studentId}/${selectedStudentForFee.feeId}`, { 
-        data: updateForm 
-      });
-      toast.success("Student fee updated");
-      setIsUpdateModalOpen(false);
-      dispatch(fetchUsers()); // Student fee statuses are inside the user object
-    } catch (err) {
-      toast.error("Failed to update student fee");
-    }
-  };
-
-  // --- Helpers ---
-  const getFeeName = (id) => fees.find((f) => f.id === id)?.title || "Unknown Fee";
-  const getFeeAmount = (id) => fees.find((f) => f.id === id)?.totalAmount || 0;
-
-  const exportColumnsList = useMemo(() => {
-    if (viewMode === "class") {
-      return [
-        { key: "name", label: "Student Name" },
-        { key: "class", label: "Class" },
-        { key: "fees", label: "Assigned Fees" }
-      ];
-    } else {
-      return [
-        { key: "title", label: "Fee Title" },
-        { key: "totalAmount", label: "Total Amount" },
-        { key: "lastDate", label: "Last Date" },
-        { key: "status", label: "Status" }
-      ];
-    }
-  }, [viewMode]);
-
-  const handleExportExcel = (selectedKeys) => {
-    let dataToExport = [];
-    if (viewMode === "class") {
-      dataToExport = filteredStudents.map(s => {
-        let feesStr = "None";
-        if (s.fees && s.fees.length > 0) {
-          feesStr = s.fees.map(f => `${getFeeName(f.feeId)} (${f.status})`).join(", ");
-        }
-        const row = {};
-        const addIfSelected = (key, val) => {
-           if (!selectedKeys || selectedKeys.includes(key)) {
-             const label = exportColumnsList.find(c => c.key === key)?.label;
-             if (label) row[label] = val;
-           }
-        };
-        addIfSelected("name", s.name);
-        addIfSelected("class", selectedClass ? `${selectedClass.className} - ${selectedClass.section}` : "N/A");
-        addIfSelected("fees", feesStr);
-        return row;
-      });
-      exportToExcel(dataToExport, "Class_Fees_Report");
-    } else {
-      dataToExport = filteredGlobalFees.map(f => {
-        const row = {};
-        const addIfSelected = (key, val) => {
-           if (!selectedKeys || selectedKeys.includes(key)) {
-             const label = exportColumnsList.find(c => c.key === key)?.label;
-             if (label) row[label] = val;
-           }
-        };
-        addIfSelected("title", f.title);
-        addIfSelected("totalAmount", f.totalAmount);
-        addIfSelected("lastDate", f.lastDate);
-        addIfSelected("status", new Date(f.lastDate) < new Date() ? "Overdue" : "Active");
-        return row;
-      });
-      exportToExcel(dataToExport, "Global_Fees_Report");
-    }
-    toast.success("Excel downloaded");
-  };
-
-  const handleExportPDF = (selectedKeys) => {
-    const activeColumns = exportColumnsList.filter(c => !selectedKeys || selectedKeys.includes(c.key));
-    const columnLabels = activeColumns.map(c => c.label);
-
-    let dataToExport = [];
-    if (viewMode === "class") {
-      dataToExport = filteredStudents.map(s => {
-        let feesStr = "None";
-        if (s.fees && s.fees.length > 0) {
-          feesStr = s.fees.map(f => `${getFeeName(f.feeId)} (${f.status})`).join(", ");
-        }
+  const handleExportPDF = () => {
+    const columns = exportColumnsList.filter(c => selectedColumns.includes(c.key)).map(c => c.label);
+    let rows = [];
+    if (currentView === "collected") {
+      rows = sortedData.map((item, index) => {
         const row = [];
-        const addIfSelected = (key, val) => {
-           if (!selectedKeys || selectedKeys.includes(key)) row.push(val);
-        };
-        addIfSelected("name", s.name);
-        addIfSelected("class", selectedClass ? `${selectedClass.className} - ${selectedClass.section}` : "N/A");
-        addIfSelected("fees", feesStr);
+        if (selectedColumns.includes("sno")) row.push(index + 1);
+        if (selectedColumns.includes("date")) row.push(new Date(item.created_at).toLocaleDateString());
+        if (selectedColumns.includes("studentName")) row.push(item.student?.name || "N/A");
+        if (selectedColumns.includes("admissionNumber")) row.push(item.student?.admission_number || "-");
+        if (selectedColumns.includes("class_name")) row.push(item.className);
+        if (selectedColumns.includes("feeTitle")) row.push(item.fee?.title || item.remarks || "N/A");
+        if (selectedColumns.includes("amount")) row.push(`Rs. ${item.amount_paid}`);
+        if (selectedColumns.includes("mode")) row.push(item.payment_mode);
         return row;
       });
-      exportToPDF(columnLabels, dataToExport, "Class_Fees_Report", "Class Fees Report");
-    } else {
-      dataToExport = filteredGlobalFees.map(f => {
+    } else if (currentView === "students") {
+      rows = sortedData.map((item, index) => {
         const row = [];
-        const addIfSelected = (key, val) => {
-           if (!selectedKeys || selectedKeys.includes(key)) row.push(val);
-        };
-        addIfSelected("title", f.title);
-        addIfSelected("totalAmount", f.totalAmount);
-        addIfSelected("lastDate", f.lastDate);
-        addIfSelected("status", new Date(f.lastDate) < new Date() ? "Overdue" : "Active");
+        if (selectedColumns.includes("sno")) row.push(index + 1);
+        if (selectedColumns.includes("name")) row.push(item.name);
+        if (selectedColumns.includes("admission_number")) row.push(item.admission_number || "-");
+        if (selectedColumns.includes("class_name")) row.push(item.className);
+        if (selectedColumns.includes("total_due")) row.push(`Rs. ${item.totalDue}`);
+        if (selectedColumns.includes("total_paid")) row.push(`Rs. ${item.totalPaid}`);
+        if (selectedColumns.includes("balance")) row.push(`Rs. ${item.balance}`);
         return row;
       });
-      exportToPDF(columnLabels, dataToExport, "Global_Fees_Report", "Global Fees Report");
+    } else if (currentView === "structures") {
+      rows = sortedData.map((item, index) => {
+        const row = [];
+        if (selectedColumns.includes("category")) row.push(formatCategory(item.fee_category));
+        if (selectedColumns.includes("class")) row.push(item.class_name || "All Classes");
+        if (selectedColumns.includes("amount")) row.push(`Rs. ${item.amount}`);
+        return row;
+      });
     }
-    toast.success("PDF downloaded");
+    exportToPDF(columns, rows, `Fee_Management_${currentView}`, `Fee Management - ${currentView.toUpperCase()}`);
   };
+
+  const handleExportExcel = () => {
+    const data = sortedData.map((item, index) => {
+      const row = {};
+      if (currentView === "collected") {
+        if (selectedColumns.includes("sno")) row["S.No"] = index + 1;
+        if (selectedColumns.includes("date")) row["Date"] = new Date(item.created_at).toLocaleDateString();
+        if (selectedColumns.includes("studentName")) row["Student Name"] = item.student?.name || "N/A";
+        if (selectedColumns.includes("admissionNumber")) row["Admission No"] = item.student?.admission_number || "-";
+        if (selectedColumns.includes("class_name")) row["Class"] = item.className;
+        if (selectedColumns.includes("feeTitle")) row["Fee Title"] = item.fee?.title || item.remarks || "N/A";
+        if (selectedColumns.includes("amount")) row["Amount Paid"] = `Rs. ${item.amount_paid}`;
+        if (selectedColumns.includes("mode")) row["Mode"] = item.payment_mode;
+      } else if (currentView === "students") {
+        if (selectedColumns.includes("sno")) row["S.No"] = index + 1;
+        if (selectedColumns.includes("name")) row["Name"] = item.name;
+        if (selectedColumns.includes("admission_number")) row["Admission No"] = item.admission_number || "-";
+        if (selectedColumns.includes("class_name")) row["Class"] = item.className;
+        if (selectedColumns.includes("total_due")) row["Total Due"] = `Rs. ${item.totalDue}`;
+        if (selectedColumns.includes("total_paid")) row["Total Paid"] = `Rs. ${item.totalPaid}`;
+        if (selectedColumns.includes("balance")) row["Balance"] = `Rs. ${item.balance}`;
+      } else if (currentView === "structures") {
+        if (selectedColumns.includes("category")) row["Fee Category"] = formatCategory(item.fee_category);
+        if (selectedColumns.includes("class")) row["Class / Identifier"] = item.class_name || "All Classes";
+        if (selectedColumns.includes("amount")) row["Amount (₹)"] = `Rs. ${item.amount}`;
+      }
+      return row;
+    });
+    exportToExcel(data, `Fee_Management_${currentView}`);
+  };
+
+  if (loadingUsers || loadingClasses || loadingStructures) {
+    return <div style={{ padding: "2rem", textAlign: "center" }}>Loading Metrics...</div>;
+  }
 
   return (
-    <div>
+    <div className="animate-fade-in">
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "2rem", flexWrap: "wrap", gap: "1rem" }}>
         <div>
           <h1 style={{ fontSize: "2rem", fontWeight: "700" }}>Fee Management</h1>
-          <p style={{ color: "var(--text-secondary)" }}>Manage global fee structures and student payments</p>
-        </div>
-        
-        <div style={{ display: "flex", gap: "1rem", alignItems: "center" }}>
-          <div style={{ display: "flex", background: "rgba(0,0,0,0.05)", borderRadius: "8px", padding: "4px" }}>
-            <button onClick={() => setViewMode("class")} className={`btn ${viewMode === "class" ? "btn-primary" : "btn-ghost"}`} style={{ padding: "6px 12px" }}>Class View</button>
-            <button onClick={() => setViewMode("all")} className={`btn ${viewMode === "all" ? "btn-primary" : "btn-ghost"}`} style={{ padding: "6px 12px" }}>All Global Fees</button>
-          </div>
-          <button onClick={() => setIsAssignModalOpen(true)} className="btn btn-primary">
-            <Plus size={18} /> Create Fee
-          </button>
+          <p style={{ color: "var(--text-secondary)" }}>High-level overview of school finances</p>
         </div>
       </div>
 
-      {viewMode === "class" ? (
-        <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
-          <TableFilterHeader
-            searchQuery={searchStudent}
-            setSearchQuery={setSearchStudent}
-            searchPlaceholder="Search student..."
-            exportColumns={exportColumnsList}
-            onExportExcel={handleExportExcel}
-            onExportPDF={handleExportPDF}
-            filters={[
-              {
-                label: "All Classes",
-                value: selectedClassId,
-                onChange: setSelectedClassId,
-                options: classes.map(c => ({ value: c.id, label: `${c.className} - ${c.section}` }))
-              },
-              {
-                label: "All Fees",
-                value: feeIdFilter,
-                onChange: setFeeIdFilter,
-                options: fees.map(f => ({ value: String(f.id), label: f.title }))
-              },
-              {
-                label: "All Statuses",
-                value: statusFilter,
-                onChange: setStatusFilter,
-                options: [
-                  { value: "paid", label: "Paid" },
-                  { value: "partial", label: "Partial" },
-                  { value: "pending", label: "Pending" },
-                  { value: "none", label: "No Fees" }
-                ]
-              }
-            ]}
-          />
-
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(350px, 1fr))", gap: "1.5rem" }}>
-            {filteredStudents.length === 0 ? (
-              <div style={{ gridColumn: "1 / -1", padding: "3rem", textAlign: "center", color: "var(--text-secondary)" }}>No students found in this class.</div>
-            ) : (
-              filteredStudents.map(student => (
-                <div key={student.id} className="glass-card">
-                  <div style={{ display: "flex", alignItems: "center", gap: "12px", borderBottom: "1px solid var(--glass-border)", paddingBottom: "1rem", marginBottom: "1rem" }}>
-                    <div style={{ width: "40px", height: "40px", borderRadius: "50%", background: "rgba(59, 130, 246, 0.2)", color: "#93c5fd", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: "bold" }}>
-                      {student.name.charAt(0)}
-                    </div>
-                    <div>
-                      <h3 style={{ fontSize: "1.1rem", fontWeight: "600" }}>{student.name}</h3>
-                      <p style={{ fontSize: "12px", color: "var(--text-secondary)" }}>ID: {student.id}</p>
-                    </div>
-                  </div>
-
-                  <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-                    {(!student.fees || student.fees.length === 0) ? (
-                      <p style={{ color: "var(--text-secondary)", fontSize: "14px" }}>No fees assigned.</p>
-                    ) : (
-                      student.fees.map(fee => (
-                        <div key={fee.feeId} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "0.75rem", background: "rgba(0,0,0,0.02)", borderRadius: "8px" }}>
-                          <div>
-                            <div style={{ fontWeight: "500" }}>{getFeeName(fee.feeId)}</div>
-                            <div style={{ fontSize: "12px", color: "var(--text-secondary)" }}>₹{fee.paidAmount || 0} / ₹{getFeeAmount(fee.feeId)} Paid</div>
-                          </div>
-                          <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-                            <span style={{ 
-                              padding: "4px 8px", borderRadius: "12px", fontSize: "12px", textTransform: "capitalize",
-                              background: fee.status === "paid" ? "rgba(16, 185, 129, 0.2)" : fee.status === "partial" ? "rgba(245, 158, 11, 0.2)" : "rgba(239, 68, 68, 0.2)",
-                              color: fee.status === "paid" ? "#6ee7b7" : fee.status === "partial" ? "#fcd34d" : "#fca5a5"
-                            }}>
-                              {fee.status}
-                            </span>
-                            <button onClick={() => {
-                              setSelectedStudentForFee({ studentId: student.id, feeId: fee.feeId });
-                              setUpdateForm({ status: fee.status, paidAmount: fee.paidAmount || 0 });
-                              setIsUpdateModalOpen(true);
-                            }} className="btn-ghost" style={{ padding: "4px", color: "#93c5fd" }}>
-                              <Edit size={16} />
-                            </button>
-                          </div>
-                        </div>
-                      ))
-                    )}
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
-      ) : (
-        <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
-          <TableFilterHeader
-            exportColumns={exportColumnsList}
-            onExportExcel={handleExportExcel}
-            onExportPDF={handleExportPDF}
+      <div style={{ display: "flex", gap: "0.5rem", marginBottom: "1.5rem", overflowX: "auto", paddingBottom: "0.25rem" }}>
+        {viewOptions.map(opt => (
+          <button
+            key={opt.id}
+            onClick={() => setCurrentPage(1) || setCurrentView(opt.id)}
+            style={{
+              padding: "0.75rem 1.5rem",
+              borderRadius: "12px",
+              fontWeight: "600",
+              fontSize: "0.875rem",
+              background: currentView === opt.id ? "var(--accent-primary)" : "rgba(255, 255, 255, 0.05)",
+              color: currentView === opt.id ? "white" : "var(--text-secondary)",
+              border: "1px solid",
+              borderColor: currentView === opt.id ? "var(--accent-primary)" : "var(--glass-border)",
+              cursor: "pointer",
+              transition: "all 0.2s"
+            }}
           >
-            <DateRangePicker onRangeChange={setDateRange} />
-          </TableFilterHeader>
-          {loadingFees ? (
-            <div style={{ textAlign: "center", padding: "3rem" }}>Loading...</div>
-          ) : filteredGlobalFees.length === 0 ? (
+            {opt.label}
+          </button>
+        ))}
+      </div>
+
+      {currentView === "structures" ? (
+        <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+          {filteredData.length === 0 ? (
             <div className="glass-panel" style={{ padding: "4rem", textAlign: "center", color: "var(--text-secondary)" }}>
-              No global fees found.
+              No fee structures configured by finance team yet.
             </div>
           ) : (
-            filteredGlobalFees.map(fee => {
-              const isOverdue = new Date(fee.lastDate) < new Date();
+            filteredData.map((fee, index) => {
               return (
-                <div key={fee.id} className="glass-panel" style={{ padding: "1.5rem", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <div key={fee.id || index} className="glass-panel" style={{ padding: "1.5rem", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                   <div>
-                    <h3 style={{ fontSize: "1.25rem", fontWeight: "600", marginBottom: "4px" }}>{fee.title}</h3>
+                    <h3 style={{ fontSize: "1.25rem", fontWeight: "600", marginBottom: "4px" }}>{formatCategory(fee.fee_category)}</h3>
                     <div style={{ display: "flex", gap: "1.5rem", fontSize: "14px", color: "var(--text-secondary)", alignItems: "center" }}>
-                      <span style={{ display: "flex", alignItems: "center", gap: "4px", color: "#a78bfa" }}><IndianRupee size={14} /> {fee.totalAmount}</span>
-                      <span>📅 {fee.lastDate}</span>
+                      <span style={{ display: "flex", alignItems: "center", gap: "4px", color: "#a78bfa" }}><IndianRupee size={14} /> {fee.amount}</span>
+                      <span>Class: {fee.class_name || "All Classes"}</span>
                       <span style={{ 
                         padding: "2px 8px", borderRadius: "12px", fontSize: "12px",
-                        background: isOverdue ? "rgba(239, 68, 68, 0.2)" : "rgba(16, 185, 129, 0.2)",
-                        color: isOverdue ? "#fca5a5" : "#6ee7b7"
+                        background: "rgba(16, 185, 129, 0.2)",
+                        color: "#6ee7b7"
                       }}>
-                        {isOverdue ? "Overdue" : "Active"}
+                        {fee.academic_year || "Active"}
                       </span>
                     </div>
-                  </div>
-                  <div style={{ display: "flex", gap: "0.5rem" }}>
-                    <button onClick={() => handleOpenFeeModal(fee)} className="btn btn-ghost" style={{ padding: "8px" }}><Edit size={18} /></button>
-                    <button onClick={() => handleDeleteFee(fee.id)} className="btn btn-ghost" style={{ padding: "8px", color: "#ef4444" }}><Trash2 size={18} /></button>
                   </div>
                 </div>
               );
             })
           )}
         </div>
-      )}
+      ) : (
+        <div className="glass-panel" style={{ padding: "1.5rem" }}>
+          <TableFilterHeader
+            searchQuery={searchTerm}
+            setSearchQuery={setSearchTerm}
+            searchPlaceholder={currentView === "collected" ? "Search payments..." : "Search students..."}
+            filters={currentView === "collected" ? [
+              {
+                label: "All Payment Modes",
+                value: selectedPaymentMode,
+                onChange: setSelectedPaymentMode,
+                options: [
+                  { label: "Cash", value: "Cash" },
+                  { label: "Online", value: "Online" },
+                  { label: "Bank Transfer", value: "Bank Transfer" },
+                  { label: "Cheque", value: "Cheque" }
+                ]
+              }
+            ] : [
+              {
+                label: "All Classes",
+                value: selectedClassFilter,
+                onChange: setSelectedClassFilter,
+                options: Array.from(new Set(classes.map(c => c.name))).filter(Boolean).map(name => ({ label: name, value: name }))
+              }
+            ]}
+            exportColumns={exportColumnsList}
+            onExportPDF={handleExportPDF}
+            onExportExcel={handleExportExcel}
+            selectedColumns={selectedColumns}
+            setSelectedColumns={setSelectedColumns}
+          >
+            {currentView === "collected" && (
+              <DateRangePicker 
+                startDate={startDate}
+                endDate={endDate}
+                onRangeChange={(range) => setDateRange(range)}
+                setStartDate={(s) => setDateRange(prev => ({ ...prev, start: s }))}
+                setEndDate={(e) => setDateRange(prev => ({ ...prev, end: e }))}
+              />
+            )}
+          </TableFilterHeader>
 
-      {/* Creation Modal */}
-      {isFeeModalOpen && (
-        <div className="animate-fade-in" style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 50 }} onClick={() => setIsFeeModalOpen(false)}>
-          <div className="glass-panel modal-content" style={{ width: "100%", maxWidth: "500px", padding: "2rem" }} onClick={(e) => e.stopPropagation()}>
-            <h2 style={{ fontSize: "1.5rem", fontWeight: "700", marginBottom: "1.5rem" }}>{editingFeeId ? "Edit Fee" : "Create New Fee"}</h2>
-            <form onSubmit={handleSaveFee} style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
-              <div><label>Fee Title</label><input required className="input-glass" value={feeForm.title} onChange={e => setFeeForm({...feeForm, title: e.target.value})} /></div>
-              <div><label>Total Amount (₹)</label><input required type="number" className="input-glass" value={feeForm.totalAmount} onChange={e => setFeeForm({...feeForm, totalAmount: e.target.value})} /></div>
-              <div><label>Last Date</label><input required type="date" className="input-glass" value={feeForm.lastDate} onChange={e => setFeeForm({...feeForm, lastDate: e.target.value})} /></div>
-              <div style={{ display: "flex", justifyContent: "flex-end", gap: "1rem", marginTop: "1rem" }}>
-                <button type="button" onClick={() => setIsFeeModalOpen(false)} className="btn btn-ghost">Cancel</button>
-                <button type="submit" className="btn btn-primary">Save Fee</button>
+          <div style={{ display: "flex", justifyContent: "flex-end", marginTop: "0.5rem", gap: "0.5rem", flexWrap: "wrap", fontSize: "0.875rem" }}>
+            {currentView === "collected" && (
+              <div style={{ background: "rgba(16, 185, 129, 0.1)", color: "#10b981", padding: "0.35rem 0.75rem", borderRadius: "6px", fontWeight: "600", display: "flex", alignItems: "center", gap: "0.25rem" }}>
+                Total Displayed Amount: ₹{sortedData.reduce((acc, curr) => acc + Number(curr.amount_paid || 0), 0).toLocaleString()}
               </div>
-            </form>
+            )}
+            {currentView === "students" && (
+              <>
+                <div style={{ background: "rgba(59, 130, 246, 0.1)", color: "#3b82f6", padding: "0.35rem 0.75rem", borderRadius: "6px", fontWeight: "600", display: "flex", alignItems: "center", gap: "0.25rem" }}>
+                  Total Displayed Due: ₹{sortedData.reduce((acc, curr) => acc + Number(curr.totalDue || 0), 0).toLocaleString()}
+                </div>
+                <div style={{ background: "rgba(16, 185, 129, 0.1)", color: "#10b981", padding: "0.35rem 0.75rem", borderRadius: "6px", fontWeight: "600", display: "flex", alignItems: "center", gap: "0.25rem" }}>
+                  Total Displayed Paid: ₹{sortedData.reduce((acc, curr) => acc + Number(curr.totalPaid || 0), 0).toLocaleString()}
+                </div>
+                <div style={{ background: "rgba(239, 68, 68, 0.1)", color: "#ef4444", padding: "0.35rem 0.75rem", borderRadius: "6px", fontWeight: "600", display: "flex", alignItems: "center", gap: "0.25rem" }}>
+                  Total Displayed Balance: ₹{sortedData.reduce((acc, curr) => acc + Number(curr.balance || 0), 0).toLocaleString()}
+                </div>
+              </>
+            )}
+          </div>
+
+          <div style={{ overflowX: "auto", marginTop: "1rem" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse", whiteSpace: "nowrap" }}>
+              <thead>
+                {currentView === "collected" ? (
+                  <tr style={{ borderBottom: "2px solid var(--glass-border)", background: "rgba(0,0,0,0.02)" }}>
+                    {selectedColumns.includes("sno") && <th style={{ padding: "0.5rem 1rem", textAlign: "left", fontSize: "0.75rem", fontWeight: "600", color: "var(--text-secondary)" }}>S.NO</th>}
+                    {selectedColumns.includes("date") && <th style={{ padding: "0.5rem 1rem", textAlign: "left", fontSize: "0.75rem", fontWeight: "600", color: "var(--text-secondary)", cursor: "pointer", userSelect: "none" }} onClick={() => requestSort("created_at")}>DATE{renderSortIndicator("created_at")}</th>}
+                    {selectedColumns.includes("studentName") && <th style={{ padding: "0.5rem 1rem", textAlign: "left", fontSize: "0.75rem", fontWeight: "600", color: "var(--text-secondary)", cursor: "pointer", userSelect: "none" }} onClick={() => requestSort("student.name")}>STUDENT</th>}
+                    {selectedColumns.includes("admissionNumber") && <th style={{ padding: "0.5rem 1rem", textAlign: "left", fontSize: "0.75rem", fontWeight: "600", color: "var(--text-secondary)", cursor: "pointer", userSelect: "none" }} onClick={() => requestSort("student.admission_number")}>ADM NO</th>}
+                    {selectedColumns.includes("class_name") && <th style={{ padding: "0.5rem 1rem", textAlign: "left", fontSize: "0.75rem", fontWeight: "600", color: "var(--text-secondary)", cursor: "pointer", userSelect: "none" }} onClick={() => requestSort("className")}>CLASS</th>}
+                    {selectedColumns.includes("feeTitle") && <th style={{ padding: "0.5rem 1rem", textAlign: "left", fontSize: "0.75rem", fontWeight: "600", color: "var(--text-secondary)", cursor: "pointer", userSelect: "none" }} onClick={() => requestSort("fee.title")}>FEE TITLE</th>}
+                    {selectedColumns.includes("amount") && <th style={{ padding: "0.5rem 1rem", textAlign: "left", fontSize: "0.75rem", fontWeight: "600", color: "var(--text-secondary)", cursor: "pointer", userSelect: "none" }} onClick={() => requestSort("amount_paid")}>AMOUNT PAID{renderSortIndicator("amount_paid")}</th>}
+                    {selectedColumns.includes("mode") && <th style={{ padding: "0.5rem 1rem", textAlign: "left", fontSize: "0.75rem", fontWeight: "600", color: "var(--text-secondary)", cursor: "pointer", userSelect: "none" }} onClick={() => requestSort("payment_mode")}>MODE{renderSortIndicator("payment_mode")}</th>}
+                  </tr>
+                ) : (
+                  <tr style={{ borderBottom: "2px solid var(--glass-border)", background: "rgba(0,0,0,0.02)" }}>
+                    {selectedColumns.includes("sno") && <th style={{ padding: "0.5rem 1rem", textAlign: "left", fontSize: "0.75rem", fontWeight: "600", color: "var(--text-secondary)" }}>S.NO</th>}
+                    {selectedColumns.includes("name") && <th style={{ padding: "0.5rem 1rem", textAlign: "left", fontSize: "0.75rem", fontWeight: "600", color: "var(--text-secondary)", cursor: "pointer", userSelect: "none" }} onClick={() => requestSort("name")}>STUDENT{renderSortIndicator("name")}</th>}
+                    {selectedColumns.includes("admission_number") && <th style={{ padding: "0.5rem 1rem", textAlign: "left", fontSize: "0.75rem", fontWeight: "600", color: "var(--text-secondary)", cursor: "pointer", userSelect: "none" }} onClick={() => requestSort("admission_number")}>ADM NO{renderSortIndicator("admission_number")}</th>}
+                    {selectedColumns.includes("class_name") && <th style={{ padding: "0.5rem 1rem", textAlign: "left", fontSize: "0.75rem", fontWeight: "600", color: "var(--text-secondary)", cursor: "pointer", userSelect: "none" }} onClick={() => requestSort("className")}>CLASS{renderSortIndicator("className")}</th>}
+                    {selectedColumns.includes("total_due") && <th style={{ padding: "0.5rem 1rem", textAlign: "left", fontSize: "0.75rem", fontWeight: "600", color: "var(--text-secondary)", cursor: "pointer", userSelect: "none" }} onClick={() => requestSort("totalDue")}>TOTAL DUE{renderSortIndicator("totalDue")}</th>}
+                    {selectedColumns.includes("total_paid") && <th style={{ padding: "0.5rem 1rem", textAlign: "left", fontSize: "0.75rem", fontWeight: "600", color: "var(--text-secondary)", cursor: "pointer", userSelect: "none" }} onClick={() => requestSort("totalPaid")}>TOTAL PAID{renderSortIndicator("totalPaid")}</th>}
+                    {selectedColumns.includes("balance") && <th style={{ padding: "0.5rem 1rem", textAlign: "left", fontSize: "0.75rem", fontWeight: "600", color: "var(--text-secondary)", cursor: "pointer", userSelect: "none" }} onClick={() => requestSort("balance")}>BALANCE{renderSortIndicator("balance")}</th>}
+                    {selectedColumns.includes("actions") && <th style={{ padding: "0.5rem 1rem", textAlign: "right", fontSize: "0.75rem", fontWeight: "600", color: "var(--text-secondary)" }}>ACTIONS</th>}
+                  </tr>
+                )}
+              </thead>
+              <tbody>
+                {currentView === "collected" ? (
+                  loadingPayments ? (
+                    <tr><td colSpan="8" style={{ padding: "3rem", textAlign: "center", color: "var(--text-secondary)" }}>Loading Payments...</td></tr>
+                  ) : paginatedData.length > 0 ? paginatedData.map((p, idx) => {
+                    const actualIdx = (currentPage - 1) * ITEMS_PER_PAGE + idx;
+                    return (
+                    <tr key={p.id} style={{ borderBottom: "1px solid var(--glass-border)", transition: "background 0.2s" }} className="hover-row">
+                      {selectedColumns.includes("sno") && <td style={{ padding: "0.5rem 1rem", color: "var(--text-secondary)", fontSize: "0.875rem", fontWeight: "500" }}>{actualIdx + 1}</td>}
+                      {selectedColumns.includes("date") && <td style={{ padding: "0.5rem 1rem", color: "var(--text-secondary)", fontSize: "0.875rem" }}>{new Date(p.created_at).toLocaleDateString()}</td>}
+                      {selectedColumns.includes("studentName") && <td style={{ padding: "0.5rem 1rem", fontWeight: "500", color: "var(--text-primary)" }}>{p.student?.name || "N/A"}</td>}
+                      {selectedColumns.includes("admissionNumber") && <td style={{ padding: "0.5rem 1rem", color: "var(--text-secondary)", fontSize: "0.875rem" }}>{p.student?.admission_number || "-"}</td>}
+                      {selectedColumns.includes("class_name") && <td style={{ padding: "0.5rem 1rem", color: "var(--text-secondary)", fontSize: "0.875rem" }}>{p.className || "-"}</td>}
+                      {selectedColumns.includes("feeTitle") && <td style={{ padding: "0.5rem 1rem", color: "var(--text-secondary)" }}>{p.fee?.title || p.remarks || "N/A"}</td>}
+                      {selectedColumns.includes("amount") && <td style={{ padding: "0.5rem 1rem", color: "#10b981", fontWeight: "500" }}>₹{p.amount_paid}</td>}
+                      {selectedColumns.includes("mode") && (
+                        <td style={{ padding: "0.5rem 1rem" }}>
+                          <span style={{ background: "rgba(0,0,0,0.05)", padding: "2px 8px", borderRadius: "4px", fontSize: "0.75rem", fontWeight: "500" }}>{p.payment_mode}</span>
+                        </td>
+                      )}
+                    </tr>
+                    );
+                  }) : (
+                    <tr><td colSpan="8" style={{ padding: "3rem", textAlign: "center", color: "var(--text-secondary)" }}>No payments recorded for this period.</td></tr>
+                  )
+                ) : (
+                  paginatedData.length > 0 ? paginatedData.map((s, idx) => {
+                    const actualIdx = (currentPage - 1) * ITEMS_PER_PAGE + idx;
+                    return (
+                    <tr key={s.id} onClick={() => { setSelectedStudent(s); setIsLedgerModalOpen(true); }} style={{ borderBottom: "1px solid var(--glass-border)", transition: "background 0.2s", cursor: "pointer" }} className="hover-row">
+                      {selectedColumns.includes("sno") && <td style={{ padding: "0.5rem 1rem", color: "var(--text-secondary)", fontSize: "0.875rem", fontWeight: "500" }}>{actualIdx + 1}</td>}
+                      {selectedColumns.includes("name") && (
+                        <td style={{ padding: "0.5rem 1rem" }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
+                            <div style={{ width: "32px", height: "32px", borderRadius: "50%", background: "var(--accent-light)", color: "var(--accent-primary)", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: "600", fontSize: "0.875rem" }}>
+                              {s.name?.charAt(0) || "S"}
+                            </div>
+                            <div style={{ fontWeight: "500", color: "var(--text-primary)" }}>{s.name}</div>
+                          </div>
+                        </td>
+                      )}
+                      {selectedColumns.includes("admission_number") && <td style={{ padding: "0.5rem 1rem", color: "var(--text-secondary)", fontSize: "0.875rem" }}>{s.admission_number || "-"}</td>}
+                      {selectedColumns.includes("class_name") && <td style={{ padding: "0.5rem 1rem", color: "var(--text-secondary)" }}>{s.className}</td>}
+                      {selectedColumns.includes("total_due") && <td style={{ padding: "0.5rem 1rem", color: "var(--text-primary)", fontWeight: "500" }}>₹{s.totalDue}</td>}
+                      {selectedColumns.includes("total_paid") && <td style={{ padding: "0.5rem 1rem", color: "#10b981", fontWeight: "500" }}>₹{s.totalPaid}</td>}
+                      {selectedColumns.includes("balance") && (
+                        <td style={{ padding: "0.5rem 1rem", color: s.balance > 0 ? "#ef4444" : "#10b981", fontWeight: "600" }}>
+                          <div style={{ display: "inline-flex", alignItems: "center", padding: "0.25rem 0.5rem", borderRadius: "12px", background: s.balance > 0 ? "rgba(239, 68, 68, 0.1)" : "rgba(16, 185, 129, 0.1)" }}>
+                            ₹{s.balance}
+                          </div>
+                        </td>
+                      )}
+                      {selectedColumns.includes("actions") && (
+                        <td style={{ padding: "0.5rem 1rem", textAlign: "right", display: "flex", gap: "0.5rem", justifyContent: "flex-end" }} onClick={e => e.stopPropagation()}>
+                          <button onClick={(e) => { e.stopPropagation(); setSelectedStudent(s); setIsLedgerModalOpen(true); }} className="btn-ghost" style={{ display: "inline-flex", alignItems: "center", padding: "0.5rem 1rem", borderRadius: "6px", fontSize: "0.875rem", fontWeight: "500", color: "var(--text-secondary)" }}>
+                            <Receipt size={16} style={{ marginRight: "0.5rem" }} /> View Ledger
+                          </button>
+                        </td>
+                      )}
+                    </tr>
+                    );
+                  }) : (
+                    <tr><td colSpan="8" style={{ padding: "3rem", textAlign: "center", color: "var(--text-secondary)" }}>No data available for this metric.</td></tr>
+                  )
+                )}
+              </tbody>
+            </table>
+            
+            {/* Pagination Controls */}
+            {totalPages > 1 && (
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "1rem 1.5rem", borderTop: "1px solid var(--glass-border)", background: "rgba(0,0,0,0.01)" }}>
+                <div style={{ fontSize: "0.875rem", color: "var(--text-secondary)" }}>
+                  Showing {(currentPage - 1) * ITEMS_PER_PAGE + 1} to {Math.min(currentPage * ITEMS_PER_PAGE, sortedData.length)} of {sortedData.length} entries
+                </div>
+                <div style={{ display: "flex", gap: "0.5rem" }}>
+                  <button 
+                    onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))} 
+                    disabled={currentPage === 1}
+                    className="btn-ghost"
+                    style={{ padding: "0.5rem 1rem", fontSize: "0.875rem", opacity: currentPage === 1 ? 0.5 : 1 }}
+                  >
+                    Previous
+                  </button>
+                  <div style={{ display: "flex", alignItems: "center", gap: "0.25rem" }}>
+                    {[...Array(totalPages)].map((_, i) => {
+                      if (
+                        i === 0 || 
+                        i === totalPages - 1 || 
+                        (i >= currentPage - 2 && i <= currentPage)
+                      ) {
+                        return (
+                          <button
+                            key={i}
+                            onClick={() => setCurrentPage(i + 1)}
+                            style={{
+                              padding: "0.25rem 0.75rem",
+                              borderRadius: "4px",
+                              border: currentPage === i + 1 ? "none" : "1px solid var(--glass-border)",
+                              background: currentPage === i + 1 ? "var(--accent-primary)" : "transparent",
+                              color: currentPage === i + 1 ? "white" : "var(--text-primary)",
+                              fontSize: "0.875rem",
+                              cursor: "pointer"
+                            }}
+                          >
+                            {i + 1}
+                          </button>
+                        );
+                      } else if (i === currentPage - 3 || i === currentPage + 1) {
+                        return <span key={i} style={{ color: "var(--text-secondary)", margin: "0 0.25rem" }}>...</span>;
+                      }
+                      return null;
+                    })}
+                  </div>
+                  <button 
+                    onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))} 
+                    disabled={currentPage === totalPages}
+                    className="btn-ghost"
+                    style={{ padding: "0.5rem 1rem", fontSize: "0.875rem", opacity: currentPage === totalPages ? 0.5 : 1 }}
+                  >
+                    Next
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
-
-      {/* Assignment Wizard Modal */}
-      {isAssignModalOpen && (
-        <div className="animate-fade-in" style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 50 }} onClick={() => setIsAssignModalOpen(false)}>
-          <div className="glass-panel modal-content" style={{ width: "100%", maxWidth: "450px", padding: "2rem", textAlign: "center" }} onClick={(e) => e.stopPropagation()}>
-            <div style={{ background: "rgba(99, 102, 241, 0.2)", width: "64px", height: "64px", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 1.5rem", color: "#818cf8" }}><Users size={32} /></div>
-            <h2 style={{ fontSize: "1.5rem", fontWeight: "700", marginBottom: "0.5rem" }}>Assign Fee To Class</h2>
-            <p style={{ color: "var(--text-secondary)", marginBottom: "2rem" }}>You are about to assign a new fee to all {classStudents.length} students in Class {selectedClass?.className}-{selectedClass?.section}.</p>
-            <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
-              <button onClick={handleOpenAssign} className="btn btn-primary" style={{ width: "100%", justifyContent: "center" }}>Proceed to Fee Details</button>
-              <button onClick={() => setIsAssignModalOpen(false)} className="btn btn-ghost" style={{ width: "100%", justifyContent: "center" }}>Cancel</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Update Student Fee Status */}
-      {isUpdateModalOpen && (
-        <div className="animate-fade-in" style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 50 }} onClick={() => setIsUpdateModalOpen(false)}>
-          <div className="glass-panel modal-content" style={{ width: "100%", maxWidth: "400px", padding: "2rem" }} onClick={(e) => e.stopPropagation()}>
-            <h2 style={{ fontSize: "1.25rem", fontWeight: "700", marginBottom: "1.5rem" }}>Update Payment</h2>
-            <form onSubmit={handleUpdateStudentFee} style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
-              <div>
-                <label>Status</label>
-                <select className="input-glass" style={{ appearance: "none" }} value={updateForm.status} onChange={e => setUpdateForm({...updateForm, status: e.target.value})}>
-                  <option value="pending" style={{ color: "black" }}>Pending</option>
-                  <option value="partial" style={{ color: "black" }}>Partial</option>
-                  <option value="paid" style={{ color: "black" }}>Paid</option>
-                </select>
-              </div>
-              <div>
-                <label>Paid Amount (₹)</label>
-                <input type="number" className="input-glass" value={updateForm.paidAmount} onChange={e => setUpdateForm({...updateForm, paidAmount: e.target.value})} />
-              </div>
-              <div style={{ display: "flex", justifyContent: "flex-end", gap: "1rem", marginTop: "1rem" }}>
-                <button type="button" onClick={() => setIsUpdateModalOpen(false)} className="btn btn-ghost">Cancel</button>
-                <button type="submit" className="btn btn-primary">Update</button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+      <StudentLedgerModal 
+        isOpen={isLedgerModalOpen} 
+        onClose={() => setIsLedgerModalOpen(false)} 
+        student={selectedStudent} 
+      />
     </div>
   );
 };

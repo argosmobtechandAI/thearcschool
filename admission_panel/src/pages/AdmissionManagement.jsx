@@ -316,13 +316,14 @@ const AdmissionManagement = () => {
       case "status": return (
         <span
           style={{
-            background: user.status === "Approved" ? "rgba(16, 185, 129, 0.15)" : user.status === "Rejected" ? "rgba(239, 68, 68, 0.15)" : "rgba(245, 158, 11, 0.15)",
-            color: user.status === "Approved" ? "#047857" : user.status === "Rejected" ? "#b91c1c" : "#b45309",
+            background: user.status?.toLowerCase() === "approved" ? "rgba(16, 185, 129, 0.15)" : user.status?.toLowerCase() === "rejected" ? "rgba(239, 68, 68, 0.15)" : "rgba(245, 158, 11, 0.15)",
+            color: user.status?.toLowerCase() === "approved" ? "#047857" : user.status?.toLowerCase() === "rejected" ? "#b91c1c" : "#b45309",
             padding: "4px 8px",
             borderRadius: "6px",
             fontSize: "0.75rem",
             fontWeight: "600",
-            border: `1px solid ${user.status === "Approved" ? "rgba(16, 185, 129, 0.3)" : user.status === "Rejected" ? "rgba(239, 68, 68, 0.3)" : "rgba(245, 158, 11, 0.3)"}`
+            textTransform: "capitalize",
+            border: `1px solid ${user.status?.toLowerCase() === "approved" ? "rgba(16, 185, 129, 0.3)" : user.status?.toLowerCase() === "rejected" ? "rgba(239, 68, 68, 0.3)" : "rgba(245, 158, 11, 0.3)"}`
           }}
         >
           {user.status}
@@ -451,7 +452,7 @@ const AdmissionManagement = () => {
                         <button onClick={() => handleDelete(user.id)} className="btn-ghost" style={{ display: "flex", alignItems: "center", fontSize: "0.75rem", padding: "0.25rem 0.5rem", color: "#ef4444", background: "rgba(239, 68, 68, 0.1)", borderRadius: "4px" }}>
                           <Trash2 size={14} style={{ marginRight: "0.25rem" }}/> Delete
                         </button>
-                        {(user.status === "Pending" && currentUser?.type === "admission") && (
+                        {(user.status?.toLowerCase() === "pending" && currentUser?.type === "admission") && (
                           <>
                             <button onClick={() => handleStatusUpdate(user, "Approved")} className="btn-ghost" style={{ display: "flex", alignItems: "center", fontSize: "0.75rem", padding: "0.25rem 0.5rem", color: "#10b981", background: "rgba(16, 185, 129, 0.1)", borderRadius: "4px" }}>
                               <CheckCircle size={14} style={{ marginRight: "0.25rem" }}/> Approve

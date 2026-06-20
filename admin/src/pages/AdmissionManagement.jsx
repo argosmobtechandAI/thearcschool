@@ -164,8 +164,7 @@ const AdmissionManagement = () => {
       gender: user.gender,
       documents: user.documents || [],
       monthly_fee: user.monthly_fee || "",
-      transport_required: user.transport_required || false,
-      transport_distance_km: user.transport_distance_km || 0,
+
       assigned_to: user.assigned_to || "",
     });
     setOpenModal(true);
@@ -441,19 +440,6 @@ const AdmissionManagement = () => {
                   <label style={{ display: "block", marginBottom: "0.5rem", fontSize: "0.875rem" }}>Monthly Fee</label>
                   <input type="number" className="input-glass" value={formData.monthly_fee} onChange={(e) => setFormData({ ...formData, monthly_fee: e.target.value })} />
                 </div>
-                <div>
-                  <label style={{ display: "block", marginBottom: "0.5rem", fontSize: "0.875rem" }}>Transport Required</label>
-                  <select className="input-glass" value={formData.transport_required} onChange={(e) => setFormData({ ...formData, transport_required: e.target.value === "true" })}>
-                    <option value="false">No</option>
-                    <option value="true">Yes</option>
-                  </select>
-                </div>
-                {formData.transport_required && (
-                  <div>
-                    <label style={{ display: "block", marginBottom: "0.5rem", fontSize: "0.875rem" }}>Transport Distance (km)</label>
-                    <input type="number" step="0.1" className="input-glass" value={formData.transport_distance_km} onChange={(e) => setFormData({ ...formData, transport_distance_km: e.target.value })} />
-                  </div>
-                )}
                 <div>
                   <label style={{ display: "block", marginBottom: "0.5rem", fontSize: "0.875rem" }}>Assign Counselor</label>
                   <select className="input-glass" value={formData.assigned_to} onChange={(e) => setFormData({ ...formData, assigned_to: e.target.value })}>
