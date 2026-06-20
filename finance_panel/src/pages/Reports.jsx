@@ -207,6 +207,8 @@ const Reports = () => {
           columns={exportColumnsList}
           selectedColumns={selectedColumns}
           setSelectedColumns={setSelectedColumns}
+          onExportExcel={handleExportExcel}
+          onExportPDF={handleExportPDF}
         >
           <DateRangePicker 
             startDate={startDate} 

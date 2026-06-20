@@ -5,7 +5,8 @@ import { fetchUsers, fetchClasses } from "../features/dataSlice";
 import { ChevronLeft, CheckCircle } from "lucide-react";
 import { toast } from "react-toastify";
 import api from "../services/api";
-import { formatDate } from "../components/DateRangePicker";
+import DateRangePicker, { formatDate } from "../components/DateRangePicker";
+import AttendanceMatrixTable from "../components/AttendanceMatrixTable";
 
 const AttendanceClassView = () => {
   const { classId } = useParams();
@@ -14,10 +15,21 @@ const AttendanceClassView = () => {
   
   const { users, classes, loadingUsers } = useSelector((state) => state.data);
 
+  const [viewMode, setViewMode] = useState("daily");
+  const [matrixDateRange, setMatrixDateRange] = useState({ 
+    start: formatDate(new Date(new Date().getFullYear(), new Date().getMonth(), 1)), 
+    end: formatDate(new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0))
+  });
+
   const [attendanceRecords, setAttendanceRecords] = useState([]);
   const [loadingAttendance, setLoadingAttendance] = useState(false);
+  const [publicHolidays, setPublicHolidays] = useState([]);
   
   const [selectedDate, setSelectedDate] = useState(formatDate(new Date()));
+
+  useEffect(() => {
+    api.get('/holidays').then(res => setPublicHolidays(res.data.data || [])).catch(console.error);
+  }, []);
 
   useEffect(() => {
     if (users.length === 0) dispatch(fetchUsers());
@@ -27,8 +39,17 @@ const AttendanceClassView = () => {
   const fetchAttendance = async () => {
     try {
       setLoadingAttendance(true);
+      let start, end;
+      if (viewMode === "matrix") {
+        start = matrixDateRange.start;
+        end = matrixDateRange.end;
+      } else {
+        start = selectedDate;
+        end = selectedDate;
+      }
+      
       const res = await api.get('/user/attendance', {
-        params: { startDate: selectedDate, endDate: selectedDate }
+        params: { startDate: start, endDate: end }
       });
       if (res.data.success) {
         setAttendanceRecords(res.data.records);
@@ -42,7 +63,32 @@ const AttendanceClassView = () => {
 
   useEffect(() => {
     fetchAttendance();
-  }, [selectedDate]);
+  }, [selectedDate, viewMode, matrixDateRange]);
+
+  const gridDays = useMemo(() => {
+    if (viewMode !== "matrix" || !matrixDateRange.start || !matrixDateRange.end) return [];
+    const days = [];
+    const dayNames = ["S", "M", "T", "W", "T", "F", "S"];
+    let curr = new Date(matrixDateRange.start);
+    const end = new Date(matrixDateRange.end);
+    let limit = 0; // Prevent infinite loop if dates are too far apart
+    while(curr <= end && limit < 100) {
+      const isWeekend = curr.getDay() === 0;
+      const fullDateString = formatDate(curr);
+      const isPublicHoliday = publicHolidays.some(h => h.date === fullDateString);
+      days.push({
+        dateNumber: curr.getDate(),
+        monthName: curr.toLocaleDateString('en-US', { month: 'short' }),
+        dayName: dayNames[curr.getDay()],
+        fullDateString,
+        isWeekend,
+        isPublicHoliday
+      });
+      curr.setDate(curr.getDate() + 1);
+      limit++;
+    }
+    return days;
+  }, [matrixDateRange, publicHolidays, viewMode]);
 
   const activeClass = useMemo(() => classes.find(c => c.id === Number(classId)), [classes, classId]);
   
@@ -50,13 +96,18 @@ const AttendanceClassView = () => {
     return users
       .filter(u => u.type === 'student' && u.classes && u.classes.includes(Number(classId)))
       .map(user => {
-        const record = attendanceRecords.find(a => a.student_id === user.id);
-        return {
-          ...user,
-          status: record ? record.status : "not marked"
-        };
+        if (viewMode === "matrix") {
+          const records = attendanceRecords.filter(a => a.student_id === user.id);
+          return { ...user, records };
+        } else {
+          const record = attendanceRecords.find(a => a.student_id === user.id && a.date === selectedDate);
+          return {
+            ...user,
+            status: record ? record.status : "not marked"
+          };
+        }
       });
-  }, [users, classId, attendanceRecords]);
+  }, [users, classId, attendanceRecords, viewMode, selectedDate]);
 
   const handleMarkAllPresent = async () => {
     const records = classStudents.map(student => ({
@@ -105,106 +156,145 @@ const AttendanceClassView = () => {
           <h1 style={{ fontSize: "2rem", fontWeight: "700" }}>Class {activeClass.className} - {activeClass.section}</h1>
           <p style={{ color: "var(--text-secondary)" }}>Manage attendance for this class</p>
         </div>
+        <div style={{ marginLeft: "auto", display: "flex", background: "rgba(0,0,0,0.05)", borderRadius: "8px", padding: "4px" }}>
+          <button 
+            onClick={() => setViewMode("daily")}
+            style={{ padding: "6px 12px", borderRadius: "6px", background: viewMode === "daily" ? "white" : "transparent", boxShadow: viewMode === "daily" ? "0 2px 4px rgba(0,0,0,0.1)" : "none", border: "none", fontWeight: "600", cursor: "pointer", color: viewMode === "daily" ? "#3b82f6" : "var(--text-secondary)", transition: "all 0.2s" }}
+          >
+            Daily View
+          </button>
+          <button 
+            onClick={() => setViewMode("matrix")}
+            style={{ padding: "6px 12px", borderRadius: "6px", background: viewMode === "matrix" ? "white" : "transparent", boxShadow: viewMode === "matrix" ? "0 2px 4px rgba(0,0,0,0.1)" : "none", border: "none", fontWeight: "600", cursor: "pointer", color: viewMode === "matrix" ? "#3b82f6" : "var(--text-secondary)", transition: "all 0.2s" }}
+          >
+            Matrix View
+          </button>
+        </div>
       </div>
 
       <div className="glass-panel" style={{ padding: "1.5rem", marginBottom: "1.5rem", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "1rem" }}>
         <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
-          <label style={{ fontWeight: "600" }}>Date:</label>
-          <input 
-            type="date" 
-            className="input-glass" 
-            value={selectedDate} 
-            onChange={(e) => setSelectedDate(e.target.value)} 
-          />
+          {viewMode === "daily" ? (
+            <>
+              <label style={{ fontWeight: "600" }}>Date:</label>
+              <input 
+                type="date" 
+                className="input-glass" 
+                value={selectedDate} 
+                onChange={(e) => setSelectedDate(e.target.value)} 
+              />
+            </>
+          ) : (
+            <>
+              <DateRangePicker 
+                startDate={matrixDateRange.start}
+                endDate={matrixDateRange.end}
+                setStartDate={(s) => setMatrixDateRange(prev => ({...prev, start: s}))}
+                setEndDate={(e) => setMatrixDateRange(prev => ({...prev, end: e}))}
+                defaultRange="mtd"
+              />
+            </>
+          )}
         </div>
         
-        <button onClick={handleMarkAllPresent} className="btn" style={{ background: "#10b981", color: "white", display: "flex", alignItems: "center", gap: "8px" }}>
-          <CheckCircle size={18} /> Mark All Present
-        </button>
+        {viewMode === "daily" && (
+          <button onClick={handleMarkAllPresent} className="btn" style={{ background: "#10b981", color: "white", display: "flex", alignItems: "center", gap: "8px" }}>
+            <CheckCircle size={18} /> Mark All Present
+          </button>
+        )}
       </div>
 
       <div className="glass-panel">
         <div style={{ overflowX: "auto" }}>
-          <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left" }}>
-            <thead>
-              <tr>
-                <th style={{ padding: "1rem", borderBottom: "1px solid rgba(0,0,0,0.1)" }}>Student Name</th>
-                <th style={{ padding: "1rem", borderBottom: "1px solid rgba(0,0,0,0.1)" }}>Status</th>
-                <th style={{ padding: "1rem", borderBottom: "1px solid rgba(0,0,0,0.1)", textAlign: "right" }}>Action</th>
-              </tr>
-            </thead>
-            <tbody>
-              {loadingUsers || loadingAttendance ? (
-                <tr><td colSpan={3} style={{ padding: "2rem", textAlign: "center" }}>Loading...</td></tr>
-              ) : classStudents.length === 0 ? (
-                <tr><td colSpan={3} style={{ padding: "2rem", textAlign: "center", color: "var(--text-secondary)" }}>No students found in this class.</td></tr>
-              ) : (
-                classStudents.map(user => (
-                  <tr key={user.id} style={{ borderBottom: "1px solid rgba(0,0,0,0.05)", cursor: "pointer" }} onClick={() => navigate(`/attendance/student/${user.id}`)}>
-                    <td style={{ padding: "1rem" }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: "12px", fontWeight: "500" }}>
-                        <div style={{ width: "36px", height: "36px", borderRadius: "50%", background: "var(--primary-gradient)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                          {user.name.charAt(0)}
+          {viewMode === "daily" ? (
+            <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left" }}>
+              <thead>
+                <tr>
+                  <th style={{ padding: "1rem", borderBottom: "1px solid rgba(0,0,0,0.1)" }}>Student Name</th>
+                  <th style={{ padding: "1rem", borderBottom: "1px solid rgba(0,0,0,0.1)" }}>Status</th>
+                  <th style={{ padding: "1rem", borderBottom: "1px solid rgba(0,0,0,0.1)", textAlign: "right" }}>Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {loadingUsers || loadingAttendance ? (
+                  <tr><td colSpan={3} style={{ padding: "2rem", textAlign: "center" }}>Loading...</td></tr>
+                ) : classStudents.length === 0 ? (
+                  <tr><td colSpan={3} style={{ padding: "2rem", textAlign: "center", color: "var(--text-secondary)" }}>No students found in this class.</td></tr>
+                ) : (
+                  classStudents.map(user => (
+                    <tr key={user.id} style={{ borderBottom: "1px solid rgba(0,0,0,0.05)", cursor: "pointer" }} onClick={() => navigate(`/attendance/student/${user.id}`)}>
+                      <td style={{ padding: "1rem" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: "12px", fontWeight: "500" }}>
+                          <div style={{ width: "36px", height: "36px", borderRadius: "50%", background: "var(--primary-gradient)", display: "flex", alignItems: "center", justifyContent: "center", color: "white" }}>
+                            {user.name.charAt(0)}
+                          </div>
+                          {user.name}
                         </div>
-                        {user.name}
-                      </div>
-                    </td>
-                    
-                    <td style={{ padding: "1rem" }}>
-                      <span style={{ 
-                        padding: "4px 10px", borderRadius: "12px", fontSize: "12px", fontWeight: "500", textTransform: "capitalize",
-                        background: user.status === "present" ? "rgba(16, 185, 129, 0.2)" : user.status === "late" ? "rgba(245, 158, 11, 0.2)" : user.status === "absent" ? "rgba(239, 68, 68, 0.2)" : "rgba(0,0,0,0.08)",
-                        color: user.status === "present" ? "#10b981" : user.status === "late" ? "#f59e0b" : user.status === "absent" ? "#ef4444" : "var(--text-secondary)"
-                      }}>
-                        {user.status}
-                      </span>
-                    </td>
+                      </td>
+                      
+                      <td style={{ padding: "1rem" }}>
+                        <span style={{ 
+                          padding: "4px 10px", borderRadius: "12px", fontSize: "12px", fontWeight: "500", textTransform: "capitalize",
+                          background: user.status === "present" ? "rgba(16, 185, 129, 0.2)" : user.status === "late" ? "rgba(245, 158, 11, 0.2)" : user.status === "absent" ? "rgba(239, 68, 68, 0.2)" : "rgba(0,0,0,0.08)",
+                          color: user.status === "present" ? "#10b981" : user.status === "late" ? "#f59e0b" : user.status === "absent" ? "#ef4444" : "var(--text-secondary)"
+                        }}>
+                          {user.status}
+                        </span>
+                      </td>
 
-                    <td style={{ padding: "1rem", textAlign: "right" }} onClick={(e) => e.stopPropagation()}>
-                      <div style={{ display: "flex", justifyContent: "flex-end", gap: "8px" }}>
-                        <button 
-                          onClick={() => handleSingleUpdate(user.id, "present")}
-                          style={{ 
-                            padding: "4px 12px", borderRadius: "6px", border: "1px solid #10b981",
-                            background: "transparent", color: "#10b981", fontSize: "12px", fontWeight: "600",
-                            cursor: "pointer", transition: "all 0.2s"
-                          }}
-                          onMouseEnter={(e) => { e.target.style.background = "#10b981"; e.target.style.color = "white"; }}
-                          onMouseLeave={(e) => { e.target.style.background = "transparent"; e.target.style.color = "#10b981"; }}
-                        >
-                          Present
-                        </button>
-                        <button 
-                          onClick={() => handleSingleUpdate(user.id, "late")}
-                          style={{ 
-                            padding: "4px 12px", borderRadius: "6px", border: "1px solid #f59e0b",
-                            background: "transparent", color: "#f59e0b", fontSize: "12px", fontWeight: "600",
-                            cursor: "pointer", transition: "all 0.2s"
-                          }}
-                          onMouseEnter={(e) => { e.target.style.background = "#f59e0b"; e.target.style.color = "white"; }}
-                          onMouseLeave={(e) => { e.target.style.background = "transparent"; e.target.style.color = "#f59e0b"; }}
-                        >
-                          Late
-                        </button>
-                        <button 
-                          onClick={() => handleSingleUpdate(user.id, "absent")}
-                          style={{ 
-                            padding: "4px 12px", borderRadius: "6px", border: "1px solid #ef4444",
-                            background: "transparent", color: "#ef4444", fontSize: "12px", fontWeight: "600",
-                            cursor: "pointer", transition: "all 0.2s"
-                          }}
-                          onMouseEnter={(e) => { e.target.style.background = "#ef4444"; e.target.style.color = "white"; }}
-                          onMouseLeave={(e) => { e.target.style.background = "transparent"; e.target.style.color = "#ef4444"; }}
-                        >
-                          Absent
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+                      <td style={{ padding: "1rem", textAlign: "right" }} onClick={(e) => e.stopPropagation()}>
+                        <div style={{ display: "flex", justifyContent: "flex-end", gap: "8px" }}>
+                          <button 
+                            onClick={() => handleSingleUpdate(user.id, "present")}
+                            style={{ 
+                              padding: "4px 12px", borderRadius: "6px", border: "1px solid #10b981",
+                              background: "transparent", color: "#10b981", fontSize: "12px", fontWeight: "600",
+                              cursor: "pointer", transition: "all 0.2s"
+                            }}
+                            onMouseEnter={(e) => { e.target.style.background = "#10b981"; e.target.style.color = "white"; }}
+                            onMouseLeave={(e) => { e.target.style.background = "transparent"; e.target.style.color = "#10b981"; }}
+                          >
+                            Present
+                          </button>
+                          <button 
+                            onClick={() => handleSingleUpdate(user.id, "late")}
+                            style={{ 
+                              padding: "4px 12px", borderRadius: "6px", border: "1px solid #f59e0b",
+                              background: "transparent", color: "#f59e0b", fontSize: "12px", fontWeight: "600",
+                              cursor: "pointer", transition: "all 0.2s"
+                            }}
+                            onMouseEnter={(e) => { e.target.style.background = "#f59e0b"; e.target.style.color = "white"; }}
+                            onMouseLeave={(e) => { e.target.style.background = "transparent"; e.target.style.color = "#f59e0b"; }}
+                          >
+                            Late
+                          </button>
+                          <button 
+                            onClick={() => handleSingleUpdate(user.id, "absent")}
+                            style={{ 
+                              padding: "4px 12px", borderRadius: "6px", border: "1px solid #ef4444",
+                              background: "transparent", color: "#ef4444", fontSize: "12px", fontWeight: "600",
+                              cursor: "pointer", transition: "all 0.2s"
+                            }}
+                            onMouseEnter={(e) => { e.target.style.background = "#ef4444"; e.target.style.color = "white"; }}
+                            onMouseLeave={(e) => { e.target.style.background = "transparent"; e.target.style.color = "#ef4444"; }}
+                          >
+                            Absent
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          ) : (
+            <AttendanceMatrixTable 
+              gridDays={gridDays}
+              loadingUsers={loadingUsers}
+              loadingAttendance={loadingAttendance}
+              classStudents={classStudents}
+            />
+          )}
         </div>
       </div>
     </div>

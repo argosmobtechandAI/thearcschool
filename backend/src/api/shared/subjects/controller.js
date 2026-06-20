@@ -12,7 +12,7 @@ export const createSubject = async (req, res) => {
 
   try {
     const { data: subject, error } = await supabase
-      .from("subjects")
+      .from("subject")
       .insert([{ name: data.name }])
       .select();
 
@@ -42,7 +42,7 @@ export const createSubject = async (req, res) => {
 export const getSubjects = async (req, res) => {
   try {
     const { data: subjects, error } = await supabase
-      .from("subjects")
+      .from("subject")
       .select("*")
       .order("name", { ascending: true });
 
@@ -74,7 +74,7 @@ export const updateSubject = async (req, res) => {
 
   try {
     const { data: updatedSubject, error } = await supabase
-      .from("subjects")
+      .from("subject")
       .update({ name: data.name })
       .eq("id", id)
       .select();
@@ -104,7 +104,7 @@ export const deleteSubject = async (req, res) => {
 
   try {
     const { error } = await supabase
-      .from("subjects")
+      .from("subject")
       .delete()
       .eq("id", id);
 

@@ -24,7 +24,10 @@ export class ExamService {
   
   
   static async getTopper() {
-    const { data: students, error } = await supabase.from("user").select("*, grades:grades!student_id(*)").eq("type", "student");
+    const [{ data: students, error }, { data: gradesData }] = await Promise.all([
+      supabase.from("user").select("*").eq("type", "student"),
+      supabase.from("grades").select("*")
+    ]);
     if (error) throw error;
     if (!students || !students.length) return { topper: null, score: 0 };
 
@@ -33,8 +36,9 @@ export class ExamService {
     for (let student of students) {
       let totalMarks = 0;
       let totalExams = 0;
-      if (student.grades && student.grades.length > 0) {
-        student.grades.forEach(g => {
+      const studentGrades = (gradesData || []).filter(g => g.student_id === student.id);
+      if (studentGrades.length > 0) {
+        studentGrades.forEach(g => {
           if (g.marks != null) {
             totalMarks += Number(g.marks);
             totalExams++;

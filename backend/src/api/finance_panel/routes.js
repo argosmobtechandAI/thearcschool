@@ -3,7 +3,7 @@ import { deleteFees, getFees, updateFees, addFee } from "../shared/finance/contr
 import { auth } from "../../middlewares/authMiddleware.js";
 import { authorizeRoles } from "../../middlewares/roleMiddleware.js";
 
-import { getStudentLedger, logPayment, getAccountantStats, getDashboardStats, getAllPayments, generateMonthlyFeesController, generateYearlyAMCController, getFeeStructures, updateFeeStructure } from "./controller.js";
+import { getStudentLedger, logPayment, getAccountantStats, getDashboardStats, getAllPayments, generateMonthlyFeesController, generateYearlyAMCController, getFeeStructures, updateFeeStructure, getCategories, createCategory, logTransaction, getTransactions, getFinanceDashboard, toggleRevenueAccess, updateTransaction, deleteTransaction, deleteCategory } from "./controller.js";
 
 const feeRouter = Router();
 
@@ -28,5 +28,21 @@ feeRouter.post("/generateMonthlyFees", authorizeRoles(...editRoles), generateMon
 feeRouter.post("/generateYearlyAMC", authorizeRoles(...editRoles), generateYearlyAMCController);
 feeRouter.put("/feeStructures/:id", authorizeRoles(...editRoles), updateFeeStructure);
 feeRouter.post("/logPayment", authorizeRoles(...editRoles), logPayment);
+
+// New Finance Ledger Routes
+feeRouter.get("/categories", authorizeRoles(...viewRoles), getCategories);
+feeRouter.post("/categories", authorizeRoles(...editRoles, 'super_admin'), createCategory);
+feeRouter.delete("/categories/:id", authorizeRoles(...editRoles, 'super_admin'), deleteCategory);
+
+feeRouter.post("/transactions", authorizeRoles(...editRoles), logTransaction);
+feeRouter.get("/transactions", authorizeRoles(...viewRoles), getTransactions);
+feeRouter.put("/transactions/:id", authorizeRoles(...editRoles), updateTransaction);
+feeRouter.delete("/transactions/:id", authorizeRoles(...editRoles), deleteTransaction);
+
+// Special Dashboard (Protected by can_view_revenue check in controller)
+feeRouter.get("/financeDashboard", authorizeRoles(...viewRoles), getFinanceDashboard);
+
+// Super Admin toggles revenue access
+feeRouter.put("/users/:userId/revenue-access", authorizeRoles('super_admin', 'admin'), toggleRevenueAccess);
 
 export default feeRouter;

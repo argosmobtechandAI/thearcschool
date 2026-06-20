@@ -28,6 +28,8 @@ import RoomManagement from './pages/RoomManagement';
 import CounselorProfile from './pages/CounselorProfile';
 import FinanceProfile from './pages/FinanceProfile';
 import Holidays from './pages/Holidays';
+import StudentProfile from './pages/StudentProfile';
+import TeacherProfile from './pages/TeacherProfile';
 
 const ProtectedRoute = ({ children, allowedRoles }) => {
   const { isAuthenticated, user } = useSelector((state) => state.auth);
@@ -62,6 +64,8 @@ function App() {
           
           {/* Admin Only Routes */}
           <Route path="users/:type" element={<ProtectedRoute allowedRoles={["admin"]}><UserManagement /></ProtectedRoute>} />
+          <Route path="student-profile/:id" element={<ProtectedRoute allowedRoles={["admin"]}><StudentProfile /></ProtectedRoute>} />
+          <Route path="teacher-profile/:id" element={<ProtectedRoute allowedRoles={["admin"]}><TeacherProfile /></ProtectedRoute>} />
           <Route path="counselor/:id" element={<ProtectedRoute allowedRoles={["admin"]}><CounselorProfile /></ProtectedRoute>} />
           <Route path="finance-profile/:id" element={<ProtectedRoute allowedRoles={["admin"]}><FinanceProfile /></ProtectedRoute>} />
           <Route path="admissions" element={<ProtectedRoute allowedRoles={["admin", "principal"]}><AdmissionManagement /></ProtectedRoute>} />

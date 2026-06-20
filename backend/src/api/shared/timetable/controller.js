@@ -29,7 +29,7 @@ export const createTimeTable = async (req, res) => {
     }));
 
     const { error: insertError } = await supabase
-      .from("timeTable")
+      .from("timetable")
       .insert(timeTableInserts);
 
     if (insertError) throw insertError;
@@ -55,7 +55,7 @@ export const duplicateDay = async (req, res) => {
 
   try {
     const { data: sourcePeriods, error: sourceError } = await supabase
-      .from("timeTable")
+      .from("timetable")
       .select("*")
       .eq("class_id", classId)
       .eq("date", sourceDate);
@@ -80,7 +80,7 @@ export const duplicateDay = async (req, res) => {
     }
 
     const { error: deleteError } = await supabase
-      .from("timeTable")
+      .from("timetable")
       .delete()
       .eq("class_id", classId)
       .in("date", targetDates);
@@ -106,7 +106,7 @@ export const duplicateDay = async (req, res) => {
 
     if (inserts.length > 0) {
       const { error: insertError } = await supabase
-        .from("timeTable")
+        .from("timetable")
         .insert(inserts);
       if (insertError) throw insertError;
     }
@@ -122,7 +122,7 @@ export const getTimeTable = async (req, res) => {
   try {
     // Fetch all normalized timetable rows
     const { data: timetables, error } = await supabase
-      .from("timeTable")
+      .from("timetable")
       .select("*, class(name)");
 
     if (error) throw error;
@@ -203,7 +203,7 @@ export const updatePeriod = async (req, res) => {
     }
 
     const { data: updated, error } = await supabase
-      .from("timeTable")
+      .from("timetable")
       .update(payload)
       .eq("id", id)
       .select();
@@ -250,7 +250,7 @@ export const addPeriod = async (req, res) => {
     };
 
     const { data: inserted, error } = await supabase
-      .from("timeTable")
+      .from("timetable")
       .insert(payload)
       .select();
 
@@ -271,7 +271,7 @@ export const deletePeriod = async (req, res) => {
 
   try {
     const { error } = await supabase
-      .from("timeTable")
+      .from("timetable")
       .delete()
       .eq("id", id);
 
@@ -310,7 +310,7 @@ export const getStudentTimetable = async (req, res) => {
 
     // Fetch timetable for that specific class
     const { data: timetables, error } = await supabase
-      .from("timeTable")
+      .from("timetable")
       .select("*, class(name)")
       .eq("class_id", studentClass.class_id);
 
@@ -360,7 +360,7 @@ export const getTeacherTimetable = async (req, res) => {
 
     // Fetch timetable where teacher_id matches
     const { data: timetables, error } = await supabase
-      .from("timeTable")
+      .from("timetable")
       .select("*, class(name)")
       .eq("teacher_id", userId);
 

@@ -72,6 +72,7 @@ const UserManagement = () => {
     tc_document_url: "",
     slc_document_url: "",
     character_certificate_document_url: "",
+    can_view_revenue: false,
   });
 
   const students = useMemo(() => users.filter(u => u.type === 'student'), [users]);
@@ -113,7 +114,7 @@ const UserManagement = () => {
         if (!matchesSearch) return false;
 
         if (type === 'student') {
-          if (classFilter && (!u.classes || !u.classes.includes(Number(classFilter)))) return false;
+          if (classFilter && (!u.classes || !u.classes.includes(classFilter))) return false;
           if (formSubmittedFilter && String(!!u.form_submitted) !== formSubmittedFilter) return false;
           if (leftSchoolFilter && String(!!u.leave_school) !== leftSchoolFilter) return false;
           if (tcStatusFilter && String(!!u.tc_received) !== tcStatusFilter) return false;
@@ -263,6 +264,7 @@ const UserManagement = () => {
         tc_document_url: user.tc_document_url || "",
         slc_document_url: user.slc_document_url || "",
         character_certificate_document_url: user.character_certificate_document_url || "",
+        can_view_revenue: user.can_view_revenue || false,
       });
     } else {
       setEditingUser(null);
@@ -272,7 +274,8 @@ const UserManagement = () => {
         admission_number: "", house: "", father_name: "", mother_name: "", monthly_fee: "", bus_fee: "", fee_exempted: false,
         admission_date: "", form_submitted: false, address: "", dob: "", doj: "", father_spouse_name: "", leave_school: false, tc_received: false, tc_date: "",
         slc_received: false, slc_date: "", character_certificate_received: false, character_certificate_date: "",
-        tc_document_url: "", slc_document_url: "", character_certificate_document_url: ""
+        tc_document_url: "", slc_document_url: "", character_certificate_document_url: "",
+        can_view_revenue: false,
       });
     }
     setIsModalOpen(true);
@@ -364,15 +367,24 @@ const UserManagement = () => {
 
         const mappedData = jsonRows.map(row => {
           if (type === 'teacher') {
+            const getVal = (...keys) => {
+              for (const key of keys) {
+                const found = Object.keys(row).find(k => k.replace(/[^a-zA-Z0-9]/g, '').toLowerCase() === key.replace(/[^a-zA-Z0-9]/g, '').toLowerCase());
+                if (found && row[found]) return String(row[found]);
+              }
+              return "";
+            };
+
+            const phone = getVal("MOB", "MOBILE", "PHONE", "CONTACT");
             return {
               type: type,
-              name: String(row["NAME"] || ""),
-              phone: String(row["MOB"] || ""),
-              dob: String(row["DOB"] || ""),
-              doj: String(row["DOJ"] || ""),
-              father_spouse_name: String(row["FATHERS/HUSBAND"] || row["FATHER"] || row["SPOUSE"] || ""),
-              email: String(row["EMAIL"] || `teacher_${Math.floor(Math.random()*10000)}@thearcschool.in`),
-              address: String(row["ADDRESS"] || ""),
+              name: getVal("NAME", "TEACHERNAME", "FULLNAME"),
+              phone: phone,
+              dob: getVal("DOB", "DATEOFBIRTH", "BIRTHDATE"),
+              doj: getVal("DOJ", "DATEOFJOINING", "JOININGDATE"),
+              father_spouse_name: getVal("FATHERSHUSBAND", "FATHERSHUSHBAND", "FATHERSNAME", "HUSBANDSNAME", "FATHERSPOUSENAME", "FATHER", "SPOUSE"),
+              email: getVal("EMAIL", "EMAILID", "MAIL") || (phone ? `teacher_${phone}@thearcschool.in` : `teacher_${Math.floor(Math.random()*10000)}@thearcschool.in`),
+              address: getVal("ADDRESS", "RESIDENTIALADDRESS", "HOMEADDRESS"),
               password: `password@1`, 
             };
           }
@@ -634,12 +646,16 @@ const UserManagement = () => {
           <p style={{ color: "var(--text-secondary)" }}>Manage your {type} accounts</p>
         </div>
         <div style={{ display: "flex", gap: "0.5rem" }}>
-          <button onClick={handleDownloadSample} className="btn btn-ghost" style={{ display: "flex", alignItems: "center" }}>
-            <FileSpreadsheet size={18} style={{ marginRight: "0.5rem" }} /> Download Format
-          </button>
-          <button className="btn btn-secondary" onClick={() => setIsBulkUploadModalOpen(true)} style={{ display: "flex", alignItems: "center" }}>
-            <Upload size={18} style={{ marginRight: "0.5rem" }} /> Bulk Upload Excel
-          </button>
+          {(type === 'student' || type === 'teacher') && (
+            <>
+              <button onClick={handleDownloadSample} className="btn btn-ghost" style={{ display: "flex", alignItems: "center" }}>
+                <FileSpreadsheet size={18} style={{ marginRight: "0.5rem" }} /> Download Format
+              </button>
+              <button className="btn btn-secondary" onClick={() => setIsBulkUploadModalOpen(true)} style={{ display: "flex", alignItems: "center" }}>
+                <Upload size={18} style={{ marginRight: "0.5rem" }} /> Bulk Upload Excel
+              </button>
+            </>
+          )}
           <button onClick={() => handleOpenModal()} className="btn btn-primary">
             <Plus size={18} /> Add {type}
           </button>
@@ -697,8 +713,13 @@ const UserManagement = () => {
                     })}
                     <td style={{ textAlign: "right", whiteSpace: "nowrap" }}>
                       <div style={{ display: "flex", gap: "0.5rem", justifyContent: "flex-end" }}>
-                        {(type === 'admission' || type === 'finance') && (
-                          <button onClick={() => navigate(type === 'admission' ? `/counselor/${user.id}` : `/finance-profile/${user.id}`)} className="btn-ghost" style={{ display: "flex", alignItems: "center", fontSize: "0.75rem", padding: "0.25rem 0.5rem", color: "#10b981", background: "rgba(16, 185, 129, 0.1)", borderRadius: "4px", border: "none", cursor: "pointer" }}>
+                        {(type === 'admission' || type === 'finance' || type === 'student' || type === 'teacher') && (
+                          <button onClick={() => {
+                            if (type === 'admission') navigate(`/counselor/${user.id}`);
+                            else if (type === 'finance') navigate(`/finance-profile/${user.id}`);
+                            else if (type === 'student') navigate(`/student-profile/${user.id}`);
+                            else if (type === 'teacher') navigate(`/teacher-profile/${user.id}`);
+                          }} className="btn-ghost" style={{ display: "flex", alignItems: "center", fontSize: "0.75rem", padding: "0.25rem 0.5rem", color: "#10b981", background: "rgba(16, 185, 129, 0.1)", borderRadius: "4px", border: "none", cursor: "pointer" }}>
                             <Eye size={14} style={{ marginRight: "0.25rem" }} /> View
                           </button>
                         )}
@@ -798,8 +819,8 @@ const UserManagement = () => {
                     <label style={{ display: "block", marginBottom: "0.5rem", fontSize: "0.875rem" }}>Class</label>
                     <select 
                       className="input-glass" 
-                      value={formData.classId} 
-                      onChange={e => setFormData({...formData, classId: e.target.value === "" ? null : Number(e.target.value)})}
+                      value={formData.classId || ""} 
+                      onChange={e => setFormData({...formData, classId: e.target.value === "" ? null : e.target.value})}
                     >
                       <option value="">Select a class...</option>
                       {classes.map(c => (
@@ -868,6 +889,13 @@ const UserManagement = () => {
                 </div>
               )}
 
+              {(type === 'finance' || type === 'accountant') && (
+                <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginTop: "1rem", padding: "1rem", background: "rgba(16, 185, 129, 0.1)", borderRadius: "8px" }}>
+                  <input type="checkbox" checked={formData.can_view_revenue} onChange={(e) => setFormData({ ...formData, can_view_revenue: e.target.checked })} style={{ width: "16px", height: "16px" }} />
+                  <label style={{ fontSize: "0.875rem", color: "#10b981", fontWeight: "600" }}>Allow Viewing Revenue / Dashboard Analytics</label>
+                </div>
+              )}
+
               {type === 'student' && (
                 <div style={{ display: "flex", flexDirection: "column", gap: "1rem", marginTop: "1rem", borderTop: "1px solid rgba(255,255,255,0.1)", paddingTop: "1rem" }}>
                   <h3 style={{ fontSize: "1.1rem", fontWeight: "600", color: "var(--text-primary)" }}>Admission & Family</h3>
@@ -879,6 +907,10 @@ const UserManagement = () => {
                     <div>
                       <label style={{ display: "block", marginBottom: "0.5rem", fontSize: "0.875rem" }}>Date of Admission</label>
                       <input type="date" className="input-glass" value={formData.admission_date} onChange={(e) => setFormData({ ...formData, admission_date: e.target.value })} />
+                    </div>
+                    <div>
+                      <label style={{ display: "block", marginBottom: "0.5rem", fontSize: "0.875rem" }}>Date of Birth</label>
+                      <input type="date" className="input-glass" value={formData.dob} onChange={(e) => setFormData({ ...formData, dob: e.target.value })} />
                     </div>
                     <div>
                       <label style={{ display: "block", marginBottom: "0.5rem", fontSize: "0.875rem" }}>House</label>

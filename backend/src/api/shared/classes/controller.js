@@ -73,13 +73,12 @@ export const createClasses = async (req, res) => {
 
 export const getClasses = async (req, res)=>{
     try {
-        const { data: classes, error } = await supabase
-            .from("class")
-            .select(`
-                *,
-                class_students(student_id),
-                class_teachers(teacher_id)
-            `);
+        // Fetch classes and related data separately to avoid schema cache issues
+        const [{ data: classes, error }, { data: classStudentsData }, { data: classTeachersData }] = await Promise.all([
+            supabase.from("class").select("*"),
+            supabase.from("class_students").select("*"),
+            supabase.from("class_teachers").select("*")
+        ]);
             
         if (error) throw error;
 
@@ -95,8 +94,8 @@ export const getClasses = async (req, res)=>{
         const mappedClasses = classes.map(c => ({
             ...c,
             className: c.name,
-            student: c.class_students.map(cs => cs.student_id),
-            teacher: c.class_teachers.map(ct => ct.teacher_id)
+            student: (classStudentsData || []).filter(cs => cs.class_id === c.id).map(cs => cs.student_id),
+            teacher: (classTeachersData || []).filter(ct => ct.class_id === c.id).map(ct => ct.teacher_id)
         }));
 
         return res.status(200).json({
@@ -124,14 +123,11 @@ export const getClassesById = async(req, res) =>{
             });
         }
 
-        const { data: classes, error } = await supabase
-            .from("class")
-            .select(`
-                *,
-                class_students(student_id),
-                class_teachers(teacher_id)
-            `)
-            .eq("id", Number(id));
+        const [{ data: classes, error }, { data: classStudentsData }, { data: classTeachersData }] = await Promise.all([
+            supabase.from("class").select("*").eq("id", id),
+            supabase.from("class_students").select("*").eq("class_id", id),
+            supabase.from("class_teachers").select("*").eq("class_id", id)
+        ]);
             
         if (error) throw error;
 
@@ -146,8 +142,8 @@ export const getClassesById = async(req, res) =>{
         const mappedClass = {
             ...c,
             className: c.name,
-            student: c.class_students.map(cs => cs.student_id),
-            teacher: c.class_teachers.map(ct => ct.teacher_id)
+            student: (classStudentsData || []).map(cs => cs.student_id),
+            teacher: (classTeachersData || []).map(ct => ct.teacher_id)
         };
 
         return res.status(200).json({

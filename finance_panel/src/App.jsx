@@ -11,6 +11,11 @@ import Reports from './pages/Reports';
 import FeeManagement from './pages/FeeManagement';
 import DashboardMetrics from './pages/DashboardMetrics';
 import FeeStructures from './pages/FeeStructures';
+import IncomeLedger from './pages/IncomeLedger';
+import ExpenseLedger from './pages/ExpenseLedger';
+import IncomeCategories from './pages/IncomeCategories';
+import ExpenseCategories from './pages/ExpenseCategories';
+import ProfitLoss from './pages/ProfitLoss';
 import FinanceLayout from './layouts/FinanceLayout';
 
 const PrivateRoute = ({ children }) => {
@@ -31,7 +36,12 @@ function App() {
           <Route path="ledger" element={<Ledger />} />
           <Route path="fee-setup" element={<FeeManagement />} />
           <Route path="fee-structures" element={<FeeStructures />} />
+          <Route path="income" element={<IncomeLedger />} />
+          <Route path="expenses" element={<ExpenseLedger />} />
+          <Route path="income-categories" element={<IncomeCategories />} />
+          <Route path="expense-categories" element={<ExpenseCategories />} />
           <Route path="reports" element={<Reports />} />
+          <Route path="profit-loss" element={<ProfitLoss />} />
           <Route path="metrics" element={<DashboardMetrics />} />
         </Route>
         

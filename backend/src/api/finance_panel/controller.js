@@ -347,3 +347,211 @@ export const updateFeeStructure = async (req, res) => {
     });
   }
 };
+
+// ==========================================
+// NEW FULL FINANCE MODULE API (INCOME/EXPENSE)
+// ==========================================
+
+export const getCategories = async (req, res) => {
+  try {
+    const { type } = req.query; // optional filter by INCOME or EXPENSE
+    let query = supabase.from("transaction_categories").select("*").order("name");
+    if (type) query = query.eq("type", type);
+    
+    const { data: categories, error } = await query;
+    if (error) throw error;
+    
+    return res.status(200).json({ success: true, categories });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+export const createCategory = async (req, res) => {
+  try {
+    const { name, type, description } = req.body;
+    if (!name || !type) return res.status(400).json({ success: false, message: "Name and type required" });
+    
+    const { data: category, error } = await supabase.from("transaction_categories").insert([{ name, type, description }]).select().single();
+    if (error) throw error;
+    return res.status(201).json({ success: true, category, message: "Category created" });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+export const deleteCategory = async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // Check if category is in use
+    const { data: txs, error: txError } = await supabase.from("transactions").select("id").eq("category_id", id).limit(1);
+    if (txError) throw txError;
+    
+    if (txs && txs.length > 0) {
+      return res.status(400).json({ success: false, message: "Cannot delete category because it is being used by existing transactions." });
+    }
+    
+    const { error } = await supabase.from("transaction_categories").delete().eq("id", id);
+    if (error) throw error;
+    
+    return res.status(200).json({ success: true, message: "Category deleted successfully" });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+export const logTransaction = async (req, res) => {
+  try {
+    const { type, category_id, amount, transaction_date, description, payment_method, reference_number } = req.body;
+    const logged_by = req.user.id;
+    
+    if (!type || !amount || !transaction_date) {
+      return res.status(400).json({ success: false, message: "Type, amount, and date are required" });
+    }
+    
+    const { data: transaction, error } = await supabase
+      .from("transactions")
+      .insert([{ type, category_id, amount, transaction_date, description, payment_method, reference_number, logged_by }])
+      .select().single();
+      
+    if (error) throw error;
+    return res.status(200).json({ success: true, transaction });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+export const updateTransaction = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { category_id, amount, transaction_date, description, payment_method, reference_number } = req.body;
+    
+    if (!amount || !transaction_date) {
+      return res.status(400).json({ success: false, message: "Amount and date are required" });
+    }
+    
+    const { data: transaction, error } = await supabase
+      .from("transactions")
+      .update({ category_id, amount, transaction_date, description, payment_method, reference_number })
+      .eq("id", id)
+      .select().single();
+      
+    if (error) throw error;
+    return res.status(200).json({ success: true, transaction, message: "Transaction updated successfully" });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+export const deleteTransaction = async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    const { error } = await supabase
+      .from("transactions")
+      .delete()
+      .eq("id", id);
+      
+    if (error) throw error;
+    return res.status(200).json({ success: true, message: "Transaction deleted successfully" });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+export const getTransactions = async (req, res) => {
+  try {
+    const { startDate, endDate, type, category_id } = req.query;
+    let query = supabase.from("transactions").select("*, category:transaction_categories(*), logged_by:user(id, name)").order("transaction_date", { ascending: false });
+    
+    if (startDate) query = query.gte("transaction_date", startDate);
+    if (endDate) query = query.lte("transaction_date", endDate);
+    if (type) query = query.eq("type", type);
+    if (category_id) query = query.eq("category_id", category_id);
+    
+    const { data: transactions, error } = await query;
+    if (error) throw error;
+    
+    return res.status(200).json({ success: true, transactions });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+export const getFinanceDashboard = async (req, res) => {
+  try {
+    const { data: user, error: userError } = await supabase.from("user").select("can_view_revenue, type").eq("id", req.user.id).single();
+    if (userError) throw userError;
+    
+    // Check permission - Only super_admin or users with specific permission can view the revenue dashboard
+    if (!user.can_view_revenue && user.type !== 'super_admin' && user.type !== 'admin') {
+      return res.status(403).json({ success: false, message: "You do not have permission to view revenue data." });
+    }
+    
+    const { startDate, endDate } = req.query;
+    
+    let expenseQuery = supabase.from("transactions").select("amount, category:transaction_categories(*)").eq("type", "EXPENSE");
+    if (startDate) expenseQuery = expenseQuery.gte("transaction_date", startDate);
+    if (endDate) expenseQuery = expenseQuery.lte("transaction_date", endDate);
+    
+    const { data: expenses, error: expenseError } = await expenseQuery;
+    if (expenseError) throw expenseError;
+    
+    let incomeQuery = supabase.from("transactions").select("amount, category:transaction_categories(*)").eq("type", "INCOME");
+    if (startDate) incomeQuery = incomeQuery.gte("transaction_date", startDate);
+    if (endDate) incomeQuery = incomeQuery.lte("transaction_date", endDate);
+    
+    const { data: incomes, error: incomeError } = await incomeQuery;
+    if (incomeError) throw incomeError;
+    
+    // Fetch fee income from payments_ledger (using created_at timestamps)
+    let feeQuery = supabase.from("payments_ledger").select("amount_paid");
+    if (startDate) feeQuery = feeQuery.gte("created_at", `${startDate}T00:00:00.000Z`);
+    if (endDate) feeQuery = feeQuery.lte("created_at", `${endDate}T23:59:59.999Z`);
+    
+    const { data: fees, error: feeError } = await feeQuery;
+    if (feeError) throw feeError;
+    
+    const totalFeeIncome = fees.reduce((sum, f) => sum + Number(f.amount_paid || 0), 0);
+    const totalOtherIncome = incomes.reduce((sum, i) => sum + Number(i.amount || 0), 0);
+    const totalIncome = totalFeeIncome + totalOtherIncome;
+    const totalExpenses = expenses.reduce((sum, e) => sum + Number(e.amount || 0), 0);
+    const netRevenue = totalIncome - totalExpenses;
+    
+    return res.status(200).json({
+      success: true,
+      dashboard: {
+        totalFeeIncome,
+        totalOtherIncome,
+        totalIncome,
+        totalExpenses,
+        netRevenue,
+        expenses,
+        incomes
+      }
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+export const toggleRevenueAccess = async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { can_view_revenue } = req.body;
+    
+    const { data: updatedUser, error } = await supabase
+      .from("user")
+      .update({ can_view_revenue })
+      .eq("id", userId)
+      .select("id, name, can_view_revenue")
+      .single();
+      
+    if (error) throw error;
+    
+    return res.status(200).json({ success: true, message: "Access updated", user: updatedUser });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};

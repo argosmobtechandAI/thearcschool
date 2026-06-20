@@ -139,7 +139,7 @@ const DateRangePicker = ({ startDate, endDate, setStartDate, setEndDate, onChang
     <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
       <select 
         className="input-glass"
-        style={{ padding: "0.5rem", cursor: "pointer", width: "160px", appearance: "auto" }}
+        style={{ padding: "0.5rem", cursor: "pointer", width: "220px", appearance: "auto" }}
         value={selectedRange}
         onChange={handleRangeChange}
       >
@@ -160,7 +160,7 @@ const DateRangePicker = ({ startDate, endDate, setStartDate, setEndDate, onChang
               setSelectedRange('custom');
             }} 
             className="input-glass"
-            style={{ padding: "0.4rem 0.4rem 0.4rem 2.2rem", width: "145px", fontSize: "0.8rem" }}
+            style={{ padding: "0.4rem 0.4rem 0.4rem 2.2rem", width: "160px", fontSize: "0.8rem" }}
           />
         </div>
         <span style={{ color: "var(--text-secondary)", alignSelf: "center", fontSize: "0.8rem" }}>to</span>
@@ -175,7 +175,7 @@ const DateRangePicker = ({ startDate, endDate, setStartDate, setEndDate, onChang
               setSelectedRange('custom');
             }} 
             className="input-glass"
-            style={{ padding: "0.4rem 0.4rem 0.4rem 2.2rem", width: "145px", fontSize: "0.8rem" }}
+            style={{ padding: "0.4rem 0.4rem 0.4rem 2.2rem", width: "160px", fontSize: "0.8rem" }}
           />
         </div>
       </div>

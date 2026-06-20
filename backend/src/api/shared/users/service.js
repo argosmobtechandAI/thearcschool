@@ -291,21 +291,30 @@ export class UserService {
   }
 
   static async getUsers() {
-    // Fetch users with all their related normalized data to match frontend expectations
-    const { data: users, error } = await supabase.from("user").select(`
-      *,
-      grade:grades!student_id(*),
-      fees:student_fees!student_id(*, fee(*)),
-      notification:notifications(*),
-      activity:activities(*),
-      class_students(class_id),
-      class_teachers(class_id),
-      teacher_details(*)
-    `);
+    // Fetch users (base data only - no relationship joins to avoid schema cache issues)
+    const { data: users, error } = await supabase.from("user").select("*");
     if (error) throw error;
-    
-    // For connections, we need to fetch user_connections and map them
-    const { data: connectionsData } = await supabase.from("user_connections").select("*");
+
+    // Fetch all related data in separate parallel queries
+    const [
+      { data: gradesData },
+      { data: feesData },
+      { data: notificationsData },
+      { data: activitiesData },
+      { data: classStudentsData },
+      { data: classTeachersData },
+      { data: teacherDetailsData },
+      { data: connectionsData }
+    ] = await Promise.all([
+      supabase.from("grades").select("*"),
+      supabase.from("student_fees").select("*, fee(*)"),
+      supabase.from("notifications").select("*"),
+      supabase.from("activities").select("*"),
+      supabase.from("class_students").select("*"),
+      supabase.from("class_teachers").select("*"),
+      supabase.from("teacher_details").select("*"),
+      supabase.from("user_connections").select("*")
+    ]);
     
     const mappedUsers = users.map(user => {
       let connections = [];
@@ -318,23 +327,27 @@ export class UserService {
       }
       let classes = [];
       if (user.type === 'student') {
-        classes = user.class_students?.map(c => c.class_id) || [];
+        classes = (classStudentsData || []).filter(c => c.student_id === user.id).map(c => c.class_id);
       } else if (user.type === 'teacher') {
-        classes = user.class_teachers?.map(c => c.class_id) || [];
+        classes = (classTeachersData || []).filter(c => c.teacher_id === user.id).map(c => c.class_id);
       }
 
-      const u = { ...user, connections, classes };
+      const u = {
+        ...user,
+        connections,
+        classes,
+        grade: (gradesData || []).filter(g => g.student_id === user.id),
+        fees: (feesData || []).filter(f => f.student_id === user.id),
+        notification: (notificationsData || []).filter(n => n.user_id === user.id),
+        activity: (activitiesData || []).filter(a => a.user_id === user.id)
+      };
       
-      if (u.type === 'teacher' && u.teacher_details && u.teacher_details.length > 0) {
-        u.doj = u.teacher_details[0].doj;
-        u.father_spouse_name = u.teacher_details[0].father_spouse_name;
+      const tDetails = (teacherDetailsData || []).filter(t => t.user_id === user.id);
+      if (u.type === 'teacher' && tDetails.length > 0) {
+        u.doj = tDetails[0].doj;
+        u.father_spouse_name = tDetails[0].father_spouse_name;
       }
       
-      delete u.teacher_details;
-      delete u.staff_details;
-      
-      delete u.class_students;
-      delete u.class_teachers;
       return u;
     });
 
@@ -344,13 +357,7 @@ export class UserService {
   static async getUserById(id) {
     const { data: user, error } = await supabase
       .from("user")
-      .select(`
-        *,
-        grade:grades!student_id(*),
-        fees:student_fees!student_id(*, fee(*)),
-        notification:notifications(*),
-        activity:activities(*)
-      `)
+      .select("*")
       .eq("id", id);
 
     if (error) throw error;
@@ -359,9 +366,21 @@ export class UserService {
     }
     
     const u = user[0];
-    const { data: connectionsData } = await supabase.from("user_connections")
-      .select("*")
-      .or(`student_id.eq.${u.id},parent_id.eq.${u.id}`);
+
+    // Fetch related data in parallel
+    const [
+      { data: gradesData },
+      { data: feesData },
+      { data: notificationsData },
+      { data: activitiesData },
+      { data: connectionsData }
+    ] = await Promise.all([
+      supabase.from("grades").select("*").eq("student_id", u.id),
+      supabase.from("student_fees").select("*, fee(*)").eq("student_id", u.id),
+      supabase.from("notifications").select("*").eq("user_id", u.id),
+      supabase.from("activities").select("*").eq("user_id", u.id),
+      supabase.from("user_connections").select("*").or(`student_id.eq.${u.id},parent_id.eq.${u.id}`)
+    ]);
       
     let connections = [];
     if (connectionsData) {
@@ -372,7 +391,14 @@ export class UserService {
       }
     }
     
-    return { ...u, connections };
+    return {
+      ...u,
+      connections,
+      grade: gradesData || [],
+      fees: feesData || [],
+      notification: notificationsData || [],
+      activity: activitiesData || []
+    };
   }
 
   static async deleteUser(id) {
@@ -452,16 +478,37 @@ export class UserService {
 
       console.log(`Creating user with metadata:`, metadata);
 
-      const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
-        email: user.email,
-        password: user.password,
-        email_confirm: true,
-        user_metadata: metadata
-      });
+      // Retry logic for Supabase Auth rate-limiting
+      let authData = null;
+      let lastAuthError = null;
+      for (let attempt = 1; attempt <= 3; attempt++) {
+        const { data: ad, error: ae } = await supabaseAdmin.auth.admin.createUser({
+          email: user.email,
+          password: user.password,
+          email_confirm: true,
+          user_metadata: metadata
+        });
+        if (!ae) {
+          authData = ad;
+          lastAuthError = null;
+          break;
+        }
+        if (ae.message && ae.message.toLowerCase().includes("already registered")) {
+          const { data: existing } = await supabase.from("user").select("id").eq("email", user.email).single();
+          if (existing) {
+            authData = { user: { id: existing.id } };
+            lastAuthError = null;
+            break;
+          }
+        }
+        lastAuthError = ae;
+        console.warn(`Auth attempt ${attempt}/3 failed for ${user.email}: ${ae.message || 'AuthRetryableFetchError'}. Retrying in ${attempt * 1000}ms...`);
+        await new Promise(r => setTimeout(r, attempt * 1000)); // 1s, 2s, 3s backoff
+      }
       
-      if (authError) {
-        console.error("Auth creation failed for user:", user.email, authError);
-        throw new Error(`Failed to create Auth user for ${user.email}: ${authError.message || JSON.stringify(authError)}`);
+      if (lastAuthError) {
+        console.error("Auth creation failed permanently for user:", user.email, lastAuthError);
+        throw new Error(`Failed to create Auth user for ${user.email}: ${lastAuthError.message || JSON.stringify(lastAuthError)}`);
       }
 
       if (authData?.user) {
@@ -492,7 +539,7 @@ export class UserService {
           Object.keys(studentFields).forEach(key => (studentFields[key] === undefined || studentFields[key] === '') && delete studentFields[key]);
           
           if (Object.keys(studentFields).length > 0) {
-            const { error: updateError } = await supabase.from("user").update(studentFields).eq("id", authData.user.id);
+            const { error: updateError } = await supabaseAdmin.from("user").update(studentFields).eq("id", authData.user.id);
             if (updateError) {
               await supabaseAdmin.auth.admin.deleteUser(authData.user.id); // Rollback auth creation
               throw new Error(`Failed to save student profile for ${user.email}: ${updateError.message}`);
@@ -510,7 +557,7 @@ export class UserService {
             let matchedClass = currentClasses.find(c => String(c.name).toUpperCase() === targetClassName && String(c.section).toUpperCase() === targetSection);
             
             if (!matchedClass) {
-              const { data: newClassData } = await supabase.from("class").insert([{ name: targetClassName, section: targetSection }]).select("id, name, section");
+              const { data: newClassData } = await supabaseAdmin.from("class").insert([{ name: targetClassName, section: targetSection }]).select("id, name, section");
               if (newClassData && newClassData.length > 0) {
                 matchedClass = newClassData[0];
                 currentClasses.push(matchedClass);
@@ -518,7 +565,7 @@ export class UserService {
             }
             
             if (matchedClass) {
-              await supabase.from("class_students").insert([{ class_id: matchedClass.id, student_id: authData.user.id }]);
+              await supabaseAdmin.from("class_students").insert([{ class_id: matchedClass.id, student_id: authData.user.id }]);
             }
           }
 
@@ -536,20 +583,24 @@ export class UserService {
           Object.keys(teacherDetails).forEach(key => (teacherDetails[key] === undefined || teacherDetails[key] === '') && delete teacherDetails[key]);
           
           if (Object.keys(teacherDetails).length > 1) {
-            await supabase.from("teacher_details").insert([teacherDetails]);
+            await supabaseAdmin.from("teacher_details").insert([teacherDetails]);
           }
           
-          const commonFields = { address: user.address, dob: user.dob };
+          const commonFields = { address: user.address, dob: user.dob, phone: user.phone };
           Object.keys(commonFields).forEach(key => (commonFields[key] === undefined || commonFields[key] === '') && delete commonFields[key]);
           if (Object.keys(commonFields).length > 0) {
-            const { error: updateError } = await supabase.from("user").update(commonFields).eq("id", authData.user.id);
+            const { error: updateError } = await supabaseAdmin.from("user").update(commonFields).eq("id", authData.user.id);
             if (updateError) {
-              console.error("Failed to update teacher common fields", updateError);
+              await supabaseAdmin.auth.admin.deleteUser(authData.user.id);
+              throw new Error(`Failed to save teacher profile for ${user.email}: ${updateError.message}`);
             }
           }
         }
         createdUsers.push(authData.user);
       }
+
+      // Small delay between users to avoid Auth API rate limits
+      await new Promise(r => setTimeout(r, 500));
     }
     return createdUsers;
   }

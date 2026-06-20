@@ -64,13 +64,28 @@ const FinanceLayout = () => {
           <Link to="/metrics?view=exempted" style={getMetricStyle("exempted")}><TrendingUp size={18} /> Exempted Students</Link>
 
           <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginTop: "1.25rem", marginBottom: "0.5rem", paddingLeft: "1rem", paddingRight: "1rem" }}>
-            <span style={{ fontSize: "0.65rem", textTransform: "uppercase", letterSpacing: "0.1em", color: "#9ca3af", fontWeight: "700" }}>Accounts</span>
+            <span style={{ fontSize: "0.65rem", textTransform: "uppercase", letterSpacing: "0.1em", color: "#9ca3af", fontWeight: "700" }}>Accounts & Ledger</span>
             <div style={{ flex: 1, height: "1px", background: "var(--glass-border)" }}></div>
           </div>
-          <NavLink to="/ledger" style={navLinkStyle}><FileSpreadsheet size={18} /> Student Ledger</NavLink>
+          <NavLink to="/ledger" style={navLinkStyle}><FileSpreadsheet size={18} /> Fee Collection</NavLink>
+          <NavLink to="/income" style={navLinkStyle}><IndianRupee size={18} /> Income Ledger</NavLink>
+          <NavLink to="/expenses" style={navLinkStyle}><IndianRupee size={18} /> Expense Ledger</NavLink>
+
+          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginTop: "1.25rem", marginBottom: "0.5rem", paddingLeft: "1rem", paddingRight: "1rem" }}>
+            <span style={{ fontSize: "0.65rem", textTransform: "uppercase", letterSpacing: "0.1em", color: "#9ca3af", fontWeight: "700" }}>Reports</span>
+            <div style={{ flex: 1, height: "1px", background: "var(--glass-border)" }}></div>
+          </div>
+          <NavLink to="/profit-loss" style={navLinkStyle}><BarChart size={18} /> Profit & Loss</NavLink>
+          <NavLink to="/reports" style={navLinkStyle}><BarChart size={18} /> Fee Reports</NavLink>
+
+          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginTop: "1.25rem", marginBottom: "0.5rem", paddingLeft: "1rem", paddingRight: "1rem" }}>
+            <span style={{ fontSize: "0.65rem", textTransform: "uppercase", letterSpacing: "0.1em", color: "#9ca3af", fontWeight: "700" }}>Settings & Categories</span>
+            <div style={{ flex: 1, height: "1px", background: "var(--glass-border)" }}></div>
+          </div>
+          <NavLink to="/income-categories" style={navLinkStyle}><Settings size={18} /> Income Categories</NavLink>
+          <NavLink to="/expense-categories" style={navLinkStyle}><Settings size={18} /> Expense Categories</NavLink>
           <NavLink to="/fee-setup" style={navLinkStyle}><Settings size={18} /> Fee Assignment</NavLink>
           <NavLink to="/fee-structures" style={navLinkStyle}><Settings size={18} /> Fee Configuration</NavLink>
-          <NavLink to="/reports" style={navLinkStyle}><BarChart size={18} /> Fee Reports</NavLink>
 
           {(user?.type === "admin" || user?.type === "principal") && (
             <>

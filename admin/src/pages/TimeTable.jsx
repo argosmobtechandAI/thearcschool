@@ -12,17 +12,70 @@ import format from 'date-fns/format';
 import parse from 'date-fns/parse';
 import startOfWeek from 'date-fns/startOfWeek';
 import getDay from 'date-fns/getDay';
-import enUS from 'date-fns/locale/en-US';
+import enGB from 'date-fns/locale/en-GB';
 import 'react-big-calendar/lib/css/react-big-calendar.css';
 import dragAndDropModule from 'react-big-calendar/lib/addons/dragAndDrop';
 import 'react-big-calendar/lib/addons/dragAndDrop/styles.css';
 import './calendar-theme.css';
+import Select from 'react-select';
+import CreatableSelect from 'react-select/creatable';
+const selectStyles = {
+  control: (base, state) => ({
+    ...base,
+    background: 'white',
+    borderColor: state.isFocused ? '#3b82f6' : '#e5e7eb',
+    borderRadius: '0.5rem',
+    minHeight: '42px',
+    boxShadow: state.isFocused ? '0 0 0 1px #3b82f6' : 'none',
+    '&:hover': {
+      borderColor: state.isFocused ? '#3b82f6' : '#d1d5db'
+    }
+  }),
+  menu: (base) => ({
+    ...base,
+    background: 'white',
+    border: '1px solid #e5e7eb',
+    borderRadius: '0.5rem',
+    overflow: 'hidden',
+    zIndex: 100,
+    boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)'
+  }),
+  menuList: (base) => ({
+    ...base,
+    padding: 0
+  }),
+  option: (base, state) => ({
+    ...base,
+    background: state.isSelected ? '#eff6ff' : state.isFocused ? '#f3f4f6' : 'white',
+    color: state.isSelected ? '#1d4ed8' : '#374151',
+    cursor: 'pointer',
+    fontSize: '0.875rem',
+    '&:active': {
+      background: '#e5edff'
+    }
+  }),
+  singleValue: (base) => ({
+    ...base,
+    color: '#111827',
+    fontSize: '0.875rem'
+  }),
+  input: (base) => ({
+    ...base,
+    color: '#111827',
+    fontSize: '0.875rem'
+  }),
+  placeholder: (base) => ({
+    ...base,
+    color: '#9ca3af',
+    fontSize: '0.875rem'
+  })
+};
 
 const withDragAndDrop = dragAndDropModule.default || dragAndDropModule;
 const DnDCalendar = withDragAndDrop(BigCalendar);
 
 const locales = {
-  'en-US': enUS,
+  'en-GB': enGB,
 }
 const localizer = dateFnsLocalizer({
   format,
@@ -377,6 +430,22 @@ export default function TimeTable() {
     s.setDate(s.getDate() + intervalDays);
     e.setDate(e.getDate() + intervalDays);
     setDateRange({ start: formatDate(s), end: formatDate(e) });
+  };
+
+  const handleCreateSubject = async (inputValue) => {
+    try {
+      setLoading(true);
+      await api.post("/admin_panel/subjects/createSubject", {
+        data: { name: inputValue.toUpperCase() }
+      });
+      toast.success(`Subject "${inputValue.toUpperCase()}" created successfully`);
+      dispatch(fetchSubjects());
+      setTimeSubject({ ...timeSubject, subject: inputValue.toUpperCase() });
+    } catch (error) {
+      toast.error(error.response?.data?.message || "Failed to create subject");
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleAddPeriod = () => {
@@ -854,6 +923,7 @@ export default function TimeTable() {
           <div style={{ height: "calc(100vh - 280px)", minHeight: "600px", marginTop: "1rem" }}>
             <DnDCalendar
               localizer={localizer}
+              culture="en-GB"
               events={calendarEvents}
               startAccessor="start"
               endAccessor="end"
@@ -936,25 +1006,29 @@ export default function TimeTable() {
                     <div style={{ marginBottom: "1rem", display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
                       <div>
                         <label style={{ display: "block", marginBottom: "0.5rem", fontSize: "0.75rem" }}>Teacher</label>
-                        <select className="input-glass" value={timeSubject.teacher} onChange={(e) => setTimeSubject({ ...timeSubject, teacher: e.target.value })}>
-                          <option value="">Select Teacher</option>
-                          {allTeachers.map((t) => (
-                            <option key={t.id} value={t.id}>
-                              {t.name}
-                            </option>
-                          ))}
-                        </select>
+                        <Select 
+                          styles={selectStyles}
+                          options={allTeachers.map(t => ({ value: t.id, label: t.name }))}
+                          value={allTeachers.map(t => ({ value: t.id, label: t.name })).find(opt => opt.value === timeSubject.teacher) || null}
+                          onChange={(option) => setTimeSubject({ ...timeSubject, teacher: option ? option.value : "" })}
+                          placeholder="Search Teacher..."
+                          isClearable
+                          menuPlacement="auto"
+                        />
                       </div>
                       <div>
                         <label style={{ display: "block", marginBottom: "0.5rem", fontSize: "0.75rem" }}>Subject</label>
-                        <select className="input-glass" value={timeSubject.subject} onChange={(e) => setTimeSubject({ ...timeSubject, subject: e.target.value })}>
-                          <option value="">Select Subject</option>
-                          {subjects?.map((s) => (
-                            <option key={s.id} value={s.name}>
-                              {s.name}
-                            </option>
-                          ))}
-                        </select>
+                        <CreatableSelect 
+                          styles={selectStyles}
+                          options={subjects?.map(s => ({ value: s.name, label: s.name })) || []}
+                          value={timeSubject.subject ? { value: timeSubject.subject, label: timeSubject.subject } : null}
+                          onChange={(option) => setTimeSubject({ ...timeSubject, subject: option ? option.value : "" })}
+                          onCreateOption={handleCreateSubject}
+                          formatCreateLabel={(inputValue) => `Create new subject: "${inputValue.toUpperCase()}"`}
+                          placeholder="Search or Create..."
+                          isClearable
+                          menuPlacement="auto"
+                        />
                       </div>
                     </div>
                   )}
@@ -1037,25 +1111,29 @@ export default function TimeTable() {
                   <div style={{ marginBottom: "1rem", display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
                     <div>
                       <label style={{ display: "block", marginBottom: "0.5rem", fontSize: "0.75rem" }}>Teacher</label>
-                      <select className="input-glass" value={timeSubject.teacher} onChange={(e) => setTimeSubject({ ...timeSubject, teacher: e.target.value })}>
-                        <option value="">Select Teacher</option>
-                        {allTeachers.map((t) => (
-                          <option key={t.id} value={t.id}>
-                            {t.name}
-                          </option>
-                        ))}
-                      </select>
+                      <Select 
+                        styles={selectStyles}
+                        options={allTeachers.map(t => ({ value: t.id, label: t.name }))}
+                        value={allTeachers.map(t => ({ value: t.id, label: t.name })).find(opt => opt.value === timeSubject.teacher) || null}
+                        onChange={(option) => setTimeSubject({ ...timeSubject, teacher: option ? option.value : "" })}
+                        placeholder="Search Teacher..."
+                        isClearable
+                        menuPlacement="auto"
+                      />
                     </div>
                     <div>
                       <label style={{ display: "block", marginBottom: "0.5rem", fontSize: "0.75rem" }}>Subject</label>
-                      <select className="input-glass" value={timeSubject.subject} onChange={(e) => setTimeSubject({ ...timeSubject, subject: e.target.value })}>
-                        <option value="">Select Subject</option>
-                        {subjects?.map((s) => (
-                          <option key={s.id} value={s.name}>
-                            {s.name}
-                          </option>
-                        ))}
-                      </select>
+                      <CreatableSelect 
+                        styles={selectStyles}
+                        options={subjects?.map(s => ({ value: s.name, label: s.name })) || []}
+                        value={timeSubject.subject ? { value: timeSubject.subject, label: timeSubject.subject } : null}
+                        onChange={(option) => setTimeSubject({ ...timeSubject, subject: option ? option.value : "" })}
+                        onCreateOption={handleCreateSubject}
+                        formatCreateLabel={(inputValue) => `Create new subject: "${inputValue.toUpperCase()}"`}
+                        placeholder="Search or Create..."
+                        isClearable
+                        menuPlacement="auto"
+                      />
                     </div>
                   </div>
                 )}
@@ -1126,25 +1204,29 @@ export default function TimeTable() {
                   <div style={{ marginBottom: "1rem", display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
                     <div>
                       <label style={{ display: "block", marginBottom: "0.5rem", fontSize: "0.75rem" }}>Teacher</label>
-                      <select className="input-glass" value={timeSubject.teacher} onChange={(e) => setTimeSubject({ ...timeSubject, teacher: e.target.value })}>
-                        <option value="">Select Teacher</option>
-                        {allTeachers.map((t) => (
-                          <option key={t.id} value={t.id}>
-                            {t.name}
-                          </option>
-                        ))}
-                      </select>
+                      <Select 
+                        styles={selectStyles}
+                        options={allTeachers.map(t => ({ value: t.id, label: t.name }))}
+                        value={allTeachers.map(t => ({ value: t.id, label: t.name })).find(opt => opt.value === timeSubject.teacher) || null}
+                        onChange={(option) => setTimeSubject({ ...timeSubject, teacher: option ? option.value : "" })}
+                        placeholder="Search Teacher..."
+                        isClearable
+                        menuPlacement="auto"
+                      />
                     </div>
                     <div>
                       <label style={{ display: "block", marginBottom: "0.5rem", fontSize: "0.75rem" }}>Subject</label>
-                      <select className="input-glass" value={timeSubject.subject} onChange={(e) => setTimeSubject({ ...timeSubject, subject: e.target.value })}>
-                        <option value="">Select Subject</option>
-                        {subjects?.map((s) => (
-                          <option key={s.id} value={s.name}>
-                            {s.name}
-                          </option>
-                        ))}
-                      </select>
+                      <CreatableSelect 
+                        styles={selectStyles}
+                        options={subjects?.map(s => ({ value: s.name, label: s.name })) || []}
+                        value={timeSubject.subject ? { value: timeSubject.subject, label: timeSubject.subject } : null}
+                        onChange={(option) => setTimeSubject({ ...timeSubject, subject: option ? option.value : "" })}
+                        onCreateOption={handleCreateSubject}
+                        formatCreateLabel={(inputValue) => `Create new subject: "${inputValue.toUpperCase()}"`}
+                        placeholder="Search or Create..."
+                        isClearable
+                        menuPlacement="auto"
+                      />
                     </div>
                   </div>
                 )}

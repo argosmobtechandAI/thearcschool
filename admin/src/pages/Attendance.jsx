@@ -5,7 +5,8 @@ import { Users, UserX, Clock, HelpCircle, ChevronRight, PieChart } from "lucide-
 import { useNavigate } from "react-router-dom";
 import api from "../services/api";
 import { toast } from "react-toastify";
-import { formatDate } from "../components/DateRangePicker";
+import DateRangePicker, { formatDate } from "../components/DateRangePicker";
+import AttendanceMatrixTable from "../components/AttendanceMatrixTable";
 
 const Attendance = () => {
   const dispatch = useDispatch();
@@ -14,6 +15,16 @@ const Attendance = () => {
 
   const [attendanceRecords, setAttendanceRecords] = useState([]);
   const [loadingAttendance, setLoadingAttendance] = useState(false);
+
+  const [activeTab, setActiveTab] = useState("overview");
+  const [matrixClassId, setMatrixClassId] = useState("");
+  const [matrixDateRange, setMatrixDateRange] = useState({
+    start: formatDate(new Date(new Date().getFullYear(), new Date().getMonth(), 1)), 
+    end: formatDate(new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0))
+  });
+  const [matrixAttendance, setMatrixAttendance] = useState([]);
+  const [loadingMatrix, setLoadingMatrix] = useState(false);
+  const [publicHolidays, setPublicHolidays] = useState([]);
 
   const todayString = formatDate(new Date());
 
@@ -40,7 +51,63 @@ const Attendance = () => {
 
   useEffect(() => {
     fetchAttendance();
+    api.get('/settings/holidays').then(res => setPublicHolidays(res.data)).catch(console.error);
   }, []);
+
+  useEffect(() => {
+    if (activeTab === "matrix" && matrixClassId) {
+      const fetchMatrixData = async () => {
+        setLoadingMatrix(true);
+        try {
+          const res = await api.get('/user/attendance', {
+            params: { startDate: matrixDateRange.start, endDate: matrixDateRange.end, classId: matrixClassId }
+          });
+          if (res.data.success) {
+            setMatrixAttendance(res.data.records);
+          }
+        } catch (error) {
+          toast.error("Failed to load matrix attendance");
+        } finally {
+          setLoadingMatrix(false);
+        }
+      };
+      fetchMatrixData();
+    }
+  }, [activeTab, matrixClassId, matrixDateRange.start, matrixDateRange.end]);
+
+  const gridDays = useMemo(() => {
+    if (activeTab !== "matrix" || !matrixDateRange.start || !matrixDateRange.end) return [];
+    const days = [];
+    const dayNames = ["S", "M", "T", "W", "T", "F", "S"];
+    let curr = new Date(matrixDateRange.start);
+    const end = new Date(matrixDateRange.end);
+    let limit = 0;
+    while(curr <= end && limit < 100) {
+      const isWeekend = curr.getDay() === 0;
+      const fullDateString = formatDate(curr);
+      const isPublicHoliday = publicHolidays.some(h => h.date === fullDateString);
+      days.push({
+        dateNumber: curr.getDate(),
+        monthName: curr.toLocaleDateString('en-US', { month: 'short' }),
+        dayName: dayNames[curr.getDay()],
+        fullDateString,
+        isWeekend,
+        isPublicHoliday
+      });
+      curr.setDate(curr.getDate() + 1);
+      limit++;
+    }
+    return days;
+  }, [matrixDateRange, publicHolidays, activeTab]);
+
+  const matrixClassStudents = useMemo(() => {
+    if (!matrixClassId) return [];
+    const students = users.filter(u => u.type === 'student' && u.classes && u.classes.includes(Number(matrixClassId)));
+    return students.map(student => ({
+      ...student,
+      records: matrixAttendance.filter(r => r.student_id === student.id)
+    })).sort((a, b) => (a.name || "").localeCompare(b.name || ""));
+  }, [matrixClassId, users, matrixAttendance]);
 
   const stats = useMemo(() => {
     let studentTotal = 0;
@@ -113,14 +180,30 @@ const Attendance = () => {
 
   return (
     <div>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "2rem" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "2rem", flexWrap: "wrap", gap: "1rem" }}>
         <div>
           <h1 style={{ fontSize: "2rem", fontWeight: "700" }}>Student Attendance Dashboard</h1>
-          <p style={{ color: "var(--text-secondary)" }}>Snapshot of today's attendance metrics</p>
+          <p style={{ color: "var(--text-secondary)" }}>{activeTab === "overview" ? "Snapshot of today's attendance metrics" : "Detailed matrix view of class attendance"}</p>
+        </div>
+        <div style={{ display: "flex", background: "rgba(0,0,0,0.05)", borderRadius: "8px", padding: "4px" }}>
+          <button 
+            onClick={() => setActiveTab("overview")}
+            style={{ padding: "6px 12px", borderRadius: "6px", background: activeTab === "overview" ? "white" : "transparent", boxShadow: activeTab === "overview" ? "0 2px 4px rgba(0,0,0,0.1)" : "none", border: "none", fontWeight: "600", cursor: "pointer", color: activeTab === "overview" ? "#3b82f6" : "var(--text-secondary)", transition: "all 0.2s" }}
+          >
+            Overview
+          </button>
+          <button 
+            onClick={() => setActiveTab("matrix")}
+            style={{ padding: "6px 12px", borderRadius: "6px", background: activeTab === "matrix" ? "white" : "transparent", boxShadow: activeTab === "matrix" ? "0 2px 4px rgba(0,0,0,0.1)" : "none", border: "none", fontWeight: "600", cursor: "pointer", color: activeTab === "matrix" ? "#3b82f6" : "var(--text-secondary)", transition: "all 0.2s" }}
+          >
+            Matrix View
+          </button>
         </div>
       </div>
 
-      {/* Snapshot Cards */}
+      {activeTab === "overview" ? (
+        <>
+          {/* Snapshot Cards */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: "1.5rem", marginBottom: "2rem" }}>
         
         {/* Present */}
@@ -262,6 +345,52 @@ const Attendance = () => {
               </div>
             </div>
           ))}
+        </div>
+      )}
+        </>
+      ) : (
+        <div className="animate-fade-in">
+          <div className="glass-card" style={{ padding: "1.5rem", marginBottom: "2rem", display: "flex", gap: "1rem", alignItems: "center", flexWrap: "wrap" }}>
+            <div>
+              <label style={{ display: "block", fontSize: "0.875rem", fontWeight: "600", marginBottom: "0.5rem" }}>Select Class</label>
+              <select 
+                className="input-glass" 
+                value={matrixClassId} 
+                onChange={(e) => setMatrixClassId(e.target.value)}
+                style={{ padding: "0.5rem", width: "200px", appearance: "auto" }}
+              >
+                <option value="">-- Choose Class --</option>
+                {classes.map(cls => (
+                  <option key={cls.id} value={cls.id}>Class {cls.className} - {cls.section}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label style={{ display: "block", fontSize: "0.875rem", fontWeight: "600", marginBottom: "0.5rem" }}>Date Range</label>
+              <DateRangePicker 
+                startDate={matrixDateRange.start}
+                endDate={matrixDateRange.end}
+                setStartDate={(s) => setMatrixDateRange(prev => ({...prev, start: s}))}
+                setEndDate={(e) => setMatrixDateRange(prev => ({...prev, end: e}))}
+                defaultRange="mtd"
+              />
+            </div>
+          </div>
+
+          {!matrixClassId ? (
+            <div style={{ padding: "4rem 2rem", textAlign: "center", color: "var(--text-secondary)", background: "rgba(0,0,0,0.02)", borderRadius: "12px", border: "1px dashed rgba(0,0,0,0.1)" }}>
+              <PieChart size={48} style={{ opacity: 0.2, margin: "0 auto 1rem" }} />
+              <h3 style={{ fontSize: "1.25rem", fontWeight: "600", color: "var(--text-primary)" }}>Select a class to view matrix</h3>
+              <p>Choose a class from the dropdown above to view student attendance over time.</p>
+            </div>
+          ) : (
+            <AttendanceMatrixTable 
+              gridDays={gridDays}
+              loadingUsers={loadingUsers}
+              loadingAttendance={loadingMatrix}
+              classStudents={matrixClassStudents}
+            />
+          )}
         </div>
       )}
     </div>

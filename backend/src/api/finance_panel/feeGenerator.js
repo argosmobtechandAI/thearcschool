@@ -14,10 +14,9 @@ export class FeeGenerator {
 
     // Fetch admission fee structures
     const { data: structures, error: structError } = await supabase
-      .from("fee_structures")
+      .from("fee")
       .select("*")
-      .in('fee_category', ['admission_form', 'admission_fee', 'essentials_kit', 'amc'])
-      .eq('academic_year', '2024-2025');
+      .in('fee_type', ['admission_form', 'admission_fee', 'essentials_kit', 'amc']);
 
     if (structError) throw new Error("Could not fetch fee structures: " + structError.message);
 
@@ -125,14 +124,27 @@ export class FeeGenerator {
       });
     }
 
-    // 3. Fetch all active non-exempted students
-    const { data: students, error: studentError } = await supabase
-      .from("user")
-      .select("id, fee_exempted, transport_required, transport_distance_km, class_students(class:class_id(name, section))")
-      .eq("type", "student")
-      .eq("status", "active");
+    // 3. Fetch all active non-exempted students, their class mappings, and classes separately
+    const [
+      { data: students, error: studentError },
+      { data: classStudentsData },
+      { data: classesData }
+    ] = await Promise.all([
+      supabase.from("user").select("id, fee_exempted, transport_required, transport_distance_km").eq("type", "student").eq("status", "active"),
+      supabase.from("class_students").select("*"),
+      supabase.from("class").select("id, name, section")
+    ]);
 
     if (studentError) throw new Error("Failed to fetch students: " + studentError.message);
+
+    // Build a lookup: student_id -> class name
+    const classMap = {};
+    (classesData || []).forEach(c => { classMap[c.id] = c; });
+    const studentClassMap = {};
+    (classStudentsData || []).forEach(cs => {
+      const cls = classMap[cs.class_id];
+      if (cls) studentClassMap[cs.student_id] = cls.name;
+    });
 
     const notificationInserts = [];
     const studentFeeInserts = [];
@@ -148,7 +160,7 @@ export class FeeGenerator {
     for (const student of students) {
       if (student.fee_exempted) continue;
       
-      const classNameStr = student.class_students?.[0]?.class?.name?.toUpperCase() || null;
+      const classNameStr = (studentClassMap[student.id] || "").toUpperCase() || null;
       
       // Tuition
       if (classNameStr && tuitionMap[classNameStr]) {

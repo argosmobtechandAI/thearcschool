@@ -1,0 +1,70 @@
+Table: complaints
+  id: integer (PK?), user_id: string, title: string, description: string, status: string, created_at: string
+Table: payments_ledger
+  id: string (PK?), student_id: string, fee_id: string, amount_paid: number, payment_mode: string, collected_by: string, remarks: string, created_at: string
+Table: notifications
+  id: integer (PK?), user_id: string, title: string, message: string, type: string, is_read: boolean, created_at: string
+Table: class_students
+  student_id: string, class_id: string
+Table: subjects
+  id: integer (PK?), name: string, created_at: string
+Table: staff_details
+  user_id: string, access_level: string, office_location: string, job_title: string
+Table: school_settings
+  id: string (PK?), instagram_url: string, whatsapp_url: string, linkedin_url: string, twitter_url: string, updated_at: string
+Table: transaction_categories
+  id: string (PK?), name: string, type: string, description: string, created_at: string
+Table: parent_details
+  user_id: string, occupation: string, annual_income: string
+Table: communication
+  id: integer (PK?), sender_id: string, receiver_id: string, subject: string, message: string, type: string, created_at: string
+Table: events
+  id: integer (PK?), title: string, description: string, date: string, time: string, location: string, created_at: string, attendees: integer, status: string, approval: string
+Table: subject
+  id: string (PK?), name: string, class_id: string, teacher_id: string, created_at: string
+Table: course
+  id: integer (PK?), class_id: integer, subject: string, title: string, chapter: string, dueDate: string, created_at: string
+Table: attendance
+  id: string (PK?), user_id: string, date: string, status: string, marked_by: string, created_at: string
+Table: timeTable
+  id: integer (PK?), class_id: integer, subject: string, teacher_id: string, day_of_week: string, time_slot: string, created_at: string, is_break: boolean, room_number: string, date: string
+Table: activities
+  id: integer (PK?), user_id: string, title: string, message: string, type: string, is_read: boolean, created_at: string
+Table: course_submissions
+  id: integer (PK?), course_id: integer, student_id: string, content: string, submittedAt: string
+Table: class
+  id: string (PK?), name: string, section: string, class_teacher_id: string, created_at: string
+Table: transactions
+  id: string (PK?), type: string, category_id: string, amount: number, transaction_date: string, description: string, logged_by: string, payment_method: string, reference_number: string, created_at: string
+Table: fee
+  id: string (PK?), fee_type: string, title: string, amount: number, due_date: string, created_at: string
+Table: school_newsletters
+  id: string (PK?), document_url: string, created_at: string
+Table: student_details
+  user_id: string, admission_number: string, house: string, blood_group: string, admission_date: string, form_submitted: boolean, tc_received: boolean, tc_date: string, tc_document_url: string, slc_received: boolean, slc_date: string, slc_document_url: string, character_certificate_received: boolean, character_certificate_date: string, character_certificate_document_url: string, leave_school: boolean, father_name: string, mother_name: string
+Table: teacher_details
+  user_id: string, doj: string, father_spouse_name: string, created_at: string
+Table: school_gallery
+  id: string (PK?), image_url: string, created_at: string
+Table: school_champions
+  id: string (PK?), student_id: string, game_name: string, achievement_level: string, marks_score: string, created_at: string
+Table: rooms
+  id: integer (PK?), name: string, capacity: integer, created_at: string
+Table: user
+  id: string (PK?), email: string, name: string, type: string, admission_number: string, parent_name: string, parent_phone: string, contact_number: string, address: string, fee_exempted: boolean, can_view_revenue: boolean, created_at: string, phone: string, dob: string, gender: string, status: string, house: string, father_name: string, mother_name: string, monthly_fee: integer, bus_fee: integer, admission_date: string, alternate_number: string, form_submitted: boolean, leave_school: boolean, tc_received: boolean, tc_date: string, slc_received: boolean, slc_date: string, character_certificate_received: boolean, character_certificate_date: string, tc_document_url: string, slc_document_url: string, character_certificate_document_url: string
+Table: exams
+  id: string (PK?), title: string, start_date: string, end_date: string, created_at: string
+Table: user_connections
+  parent_id: string, student_id: string
+Table: schoolInfo
+  id: integer (PK?), key: string, value: string, created_at: string
+Table: public_holidays
+  id: string (PK?), date: string, name: string, type: string, created_at: string
+Table: newUsers
+  id: string (PK?), name: string, email: string, parent: string, parentEmail: string, phone: string, status: string, dob: string, gender: string, documents: jsonb, assigned_to: string, created_at: string
+Table: student_fees
+  id: string (PK?), student_id: string, fee_id: string, total_paid_amount: number, payment_status: string, due_date: string, created_at: string
+Table: grades
+  id: integer (PK?), student_id: string, subject: string, created_at: string, exam_id: integer, course_id: integer, marks: number, max_marks: number
+Table: class_teachers
+  teacher_id: string, class_id: string
