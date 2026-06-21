@@ -8,7 +8,7 @@ import { getStudentFees } from "../shared/finance/controller.js";
 import { getStudentCourses } from "../shared/academics/courseController.js";
 import { getStudentTimetable } from "../shared/timetable/controller.js";
 
-import { getAllEvents } from "../shared/events/controller.js";
+import { getPlannerEvents } from "../admin_panel/planner/controller.js";
 import communicationRouter from "../shared/communication/routes.js";
 
 const studentRouter = Router();
@@ -24,7 +24,7 @@ studentRouter.get("/course", getStudentCourses);
 studentRouter.get("/timetable", getStudentTimetable);
 
 // Read-only global access
-studentRouter.get("/events", getAllEvents);
+studentRouter.get("/events", getPlannerEvents);
 
 // Chat
 studentRouter.use("/communication", communicationRouter);

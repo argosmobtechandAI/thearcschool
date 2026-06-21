@@ -191,7 +191,8 @@ const Reports = () => {
       </div>
 
       <div className="glass-panel" style={{ padding: "1.5rem", marginBottom: "2rem" }}>
-        <TableFilterHeader
+        <div style={{ flexShrink: 0 }}>
+          <TableFilterHeader
           searchQuery={searchTerm}
           setSearchQuery={setSearchTerm}
           searchPlaceholder="Search by student name or admission no..."
@@ -231,6 +232,7 @@ const Reports = () => {
             defaultRange="mtd" 
           />
         </TableFilterHeader>
+        </div>
       </div>
 
       <div className="glass-panel" style={{ overflow: "hidden" }}>

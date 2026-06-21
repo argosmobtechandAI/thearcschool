@@ -9,7 +9,7 @@ import { getUsers } from "../shared/users/controller.js";
 import { getTopper } from "../shared/academics/examsController.js";
 
 import { getTimeTable } from "../shared/timetable/controller.js";
-import { getAllEvents } from "../shared/events/controller.js";
+import { getPlannerEvents } from "../admin_panel/planner/controller.js";
 import communicationRouter from "../shared/communication/routes.js";
 
 const principalRouter = Router();
@@ -29,7 +29,7 @@ principalRouter.get("/topper", getTopper);
 principalRouter.get("/timetable", getTimeTable);
 
 // Events & Info (Read-only)
-principalRouter.get("/events", getAllEvents);
+principalRouter.get("/events", getPlannerEvents);
 
 // Chat
 principalRouter.use("/communication", communicationRouter);

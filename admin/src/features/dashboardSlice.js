@@ -15,6 +15,8 @@ const initialState = {
   },
   topper: null,
   loading: false,
+  globalDateRange: { start: "", end: "" },
+  feeStatusFilter: "All"
 };
 
 export const dashboardSlice = createSlice({
@@ -29,9 +31,15 @@ export const dashboardSlice = createSlice({
     },
     setDashboardTopper: (state, action) => {
       state.topper = action.payload;
+    },
+    setGlobalDateRange: (state, action) => {
+      state.globalDateRange = action.payload;
+    },
+    setFeeStatusFilter: (state, action) => {
+      state.feeStatusFilter = action.payload;
     }
   }
 });
 
-export const { setDashboardLoading, setDashboardStats, setDashboardTopper } = dashboardSlice.actions;
+export const { setDashboardLoading, setDashboardStats, setDashboardTopper, setGlobalDateRange, setFeeStatusFilter } = dashboardSlice.actions;
 export default dashboardSlice.reducer;

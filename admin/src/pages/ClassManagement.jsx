@@ -239,6 +239,7 @@ const ClassManagement = () => {
 
       <div className="glass-panel" style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden", padding: "1rem" }}>
         <div style={{ flexShrink: 0 }}>
+          <div style={{ flexShrink: 0 }}>
           <TableFilterHeader
           searchQuery={searchQuery}
           setSearchQuery={setSearchQuery}
@@ -250,6 +251,7 @@ const ClassManagement = () => {
           onExportExcel={() => {}}
           onExportPDF={() => {}}
         />
+        </div>
         </div>
 
         <div style={{ flex: 1, overflowY: "auto", overflowX: "auto" }}>
@@ -414,7 +416,8 @@ const ClassManagement = () => {
             </div>
             
             <div style={{ border: "1px solid var(--glass-border)", padding: "1rem", borderRadius: "8px", marginBottom: "1rem", background: "white" }}>
-              <TableFilterHeader
+              <div style={{ flexShrink: 0 }}>
+          <TableFilterHeader
                 searchQuery={studentSearch}
                 setSearchQuery={setStudentSearch}
                 searchPlaceholder="Search by name/email..."
@@ -425,6 +428,7 @@ const ClassManagement = () => {
                 onExportExcel={() => {}}
                 onExportPDF={() => {}}
               />
+        </div>
             </div>
 
             <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.5rem" }}>

@@ -169,18 +169,20 @@ const Ledger = () => {
         const res = await api.post("/finance_panel/logPayment", {
           data: {
             studentId: selectedStudent.id,
-            feeId: paymentForm.feeId,
-            amount: Number(paymentForm.amount),
             paymentMode: paymentForm.paymentMode,
             remarks: paymentForm.remarks,
-            title: feeDetails?.title
+            payments: [{
+                feeId: paymentForm.feeId,
+                amount: Number(paymentForm.amount),
+                title: feeDetails?.title
+            }]
           }
         });
       if (res.data.success) {
         toast.success("Payment recorded successfully");
         
         const completePayment = {
-            ...res.data.payment,
+            ...res.data.payments[0],
             fee: feeDetails,
             fee_title: feeDetails?.title
         };
@@ -249,7 +251,8 @@ const Ledger = () => {
       </div>
 
       <div className="glass-panel" style={{ padding: "1.5rem" }}>
-        <TableFilterHeader
+        <div style={{ flexShrink: 0 }}>
+          <TableFilterHeader
           searchQuery={studentSearch}
           setSearchQuery={setStudentSearch}
           searchPlaceholder="Search by name or admission no..."
@@ -278,6 +281,7 @@ const Ledger = () => {
           onExportExcel={handleExportExcel}
           onExportPDF={handleExportPDF}
         />
+        </div>
 
         <div style={{ display: "flex", justifyContent: "flex-end", marginTop: "0.5rem", gap: "0.5rem", flexWrap: "wrap", fontSize: "0.875rem" }}>
           <div style={{ background: "rgba(59, 130, 246, 0.1)", color: "#3b82f6", padding: "0.35rem 0.75rem", borderRadius: "6px", fontWeight: "600", display: "flex", alignItems: "center", gap: "0.25rem" }}>
@@ -415,10 +419,10 @@ const Ledger = () => {
                   <input type="text" className="input-glass" style={{ width: "100%" }} value={paymentForm.remarks} onChange={e => setPaymentForm({...paymentForm, remarks: e.target.value})} />
                 </div>
                 <div style={{ display: "flex", gap: "1rem", marginTop: "0.5rem" }}>
-                  <button type="button" onClick={() => setIsPaymentModalOpen(false)} className="btn-secondary" style={{ flex: 1, justifyContent: "center" }}>
+                  <button type="button" onClick={() => setIsPaymentModalOpen(false)} className="btn btn-ghost" style={{ flex: 1, justifyContent: "center", border: "1px solid var(--glass-border)" }}>
                     Cancel
                   </button>
-                  <button type="submit" disabled={isPaying} className="btn-primary" style={{ flex: 1, justifyContent: "center" }}>
+                  <button type="submit" disabled={isPaying} className="btn btn-primary" style={{ flex: 1, justifyContent: "center" }}>
                     {isPaying ? "Processing..." : "Submit Payment"}
                   </button>
                 </div>

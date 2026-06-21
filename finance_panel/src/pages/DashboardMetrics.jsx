@@ -310,11 +310,13 @@ const DashboardMetrics = () => {
       const res = await api.post("/finance_panel/logPayment", {
         data: {
           studentId: selectedStudent.id,
-          feeId: paymentForm.feeId,
-          amount: Number(paymentForm.amount),
           paymentMode: paymentForm.paymentMode,
           remarks: paymentForm.remarks,
-          title: feeTitle
+          payments: [{
+            feeId: paymentForm.feeId,
+            amount: Number(paymentForm.amount),
+            title: feeTitle
+          }]
         }
       });
       if (res.data.success) {
@@ -322,7 +324,7 @@ const DashboardMetrics = () => {
         setRefreshTrigger(prev => prev + 1);
         
         const feeDetails = studentLedger.fees.find(f => f.fee_id === paymentForm.feeId)?.fee;
-        const completePayment = { ...res.data.payment, fee: feeDetails };
+        const completePayment = { ...res.data.payments[0], fee: feeDetails };
         generateReceiptPDF(completePayment, selectedStudent);
 
         setPaymentForm({ feeId: "", amount: "", paymentMode: "Cash", remarks: "" });
@@ -376,7 +378,8 @@ const DashboardMetrics = () => {
       </div>
 
       <div className="glass-panel" style={{ padding: "1.5rem" }}>
-        <TableFilterHeader
+        <div style={{ flexShrink: 0 }}>
+          <TableFilterHeader
           searchQuery={searchTerm}
           setSearchQuery={setSearchTerm}
           searchPlaceholder="Search by student name or admission no..."
@@ -406,6 +409,7 @@ const DashboardMetrics = () => {
           selectedColumns={selectedColumns}
           setSelectedColumns={setSelectedColumns}
         />
+        </div>
 
         {(currentView === "collected" || currentView === "dues") && (
           <div style={{ display: "flex", justifyContent: "flex-end", marginTop: "0.5rem", gap: "0.5rem", flexWrap: "wrap", fontSize: "0.875rem" }}>
@@ -651,10 +655,10 @@ const DashboardMetrics = () => {
                   <input type="text" className="input-glass" style={{ width: "100%" }} value={paymentForm.remarks} onChange={e => setPaymentForm({...paymentForm, remarks: e.target.value})} />
                 </div>
                 <div style={{ display: "flex", gap: "1rem", marginTop: "0.5rem" }}>
-                  <button type="button" onClick={() => setIsPaymentModalOpen(false)} className="btn-secondary" style={{ flex: 1, justifyContent: "center" }}>
+                  <button type="button" onClick={() => setIsPaymentModalOpen(false)} className="btn btn-ghost" style={{ flex: 1, justifyContent: "center", border: "1px solid var(--glass-border)" }}>
                     Cancel
                   </button>
-                  <button type="submit" disabled={isPaying} className="btn-primary" style={{ flex: 1, justifyContent: "center" }}>
+                  <button type="submit" disabled={isPaying} className="btn btn-primary" style={{ flex: 1, justifyContent: "center" }}>
                     {isPaying ? "Processing..." : "Submit Payment"}
                   </button>
                 </div>

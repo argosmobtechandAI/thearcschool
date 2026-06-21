@@ -311,31 +311,39 @@ export const getTopper = async (req, res) => {
 
 export const createDateSheet = async (req, res) => {
   const { data } = req.body;
-  if (!data?.title || !data?.class || !data?.section || !data?.subjects || !data?.subjects.length) {
-    return res.status(400).json({ success: false, message: "Title, Class, Section, and at least one subject are required" });
+  if (!data?.title || !data?.class || !data?.subjects || !data?.subjects.length) {
+    return res.status(400).json({ success: false, message: "Title, Class, and at least one subject are required" });
   }
 
   try {
     const { data: classData, error: classError } = await supabase
       .from("class")
       .select("id")
-      .match({ name: data.class, section: data.section });
+      .eq("name", data.class);
 
     if (classError || !classData || classData.length === 0) {
       return res.status(404).json({ success: false, message: "Class not found" });
     }
-    const classId = classData[0].id;
+    
+    const classIds = classData.map(c => c.id);
 
-    const inserts = data.subjects.map(sub => ({
-      title: data.title,
-      class_id: classId,
-      subject: sub.subject,
-      date: sub.date,
-      time: sub.time,
-      duration: sub.duration ? parseInt(sub.duration) : null,
-      marks: sub.marks ? parseInt(sub.marks) : null,
-      invigilator_id: sub.invigilator_id || null
-    }));
+    const inserts = [];
+    classIds.forEach(classId => {
+      data.subjects.forEach(sub => {
+        const sectionConfig = data.sectionsData ? data.sectionsData[classId] : null;
+        inserts.push({
+          title: data.title,
+          class_id: classId,
+          subject: sub.subject,
+          date: sub.date,
+          time: sub.time,
+          duration: sub.duration ? parseInt(sub.duration) : null,
+          marks: sub.marks ? parseInt(sub.marks) : null,
+          invigilator_id: sectionConfig?.invigilator_id || sub.invigilator_id || null,
+          room_number: sectionConfig?.room_number || sub.room_number || null
+        });
+      });
+    });
 
     const { data: createdExams, error: insertError } = await supabase
       .from("exams")
@@ -344,7 +352,7 @@ export const createDateSheet = async (req, res) => {
 
     if (insertError) throw insertError;
 
-    const { data: classStudents } = await supabase.from("class_students").select("student_id").eq("class_id", classId);
+    const { data: classStudents } = await supabase.from("class_students").select("student_id").in("class_id", classIds);
     if (classStudents && classStudents.length > 0) {
       const studentIds = classStudents.map(cs => cs.student_id);
       const notificationInserts = studentIds.map(sid => ({
@@ -367,10 +375,23 @@ export const getDateSheetGrades = async (req, res) => {
   const { title, class_id } = req.params;
   
   try {
+    let classIds = [];
+    if (class_id.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)) {
+       classIds = [class_id];
+    } else {
+       const { data: classes } = await supabase.from("class").select("id").eq("name", class_id);
+       if (classes) classIds = classes.map(c => c.id);
+    }
+
+    if (classIds.length === 0) {
+      return res.status(404).json({ success: false, message: "Class not found." });
+    }
+
     const { data: exams, error: examsError } = await supabase
       .from("exams")
-      .select("id, subject, marks")
-      .match({ title: decodeURIComponent(title), class_id });
+      .select("id, subject, marks, class_id")
+      .match({ title: decodeURIComponent(title) })
+      .in("class_id", classIds);
 
     if (examsError) throw examsError;
     if (!exams || exams.length === 0) {
@@ -381,8 +402,8 @@ export const getDateSheetGrades = async (req, res) => {
 
     const { data: classStudents, error: studentsError } = await supabase
       .from("class_students")
-      .select("student_id, user(name, admission_number)")
-      .eq("class_id", class_id);
+      .select("student_id, class_id, user(name, admission_number)")
+      .in("class_id", classIds);
       
     if (studentsError) throw studentsError;
 
@@ -393,30 +414,95 @@ export const getDateSheetGrades = async (req, res) => {
 
     if (gradesError) throw gradesError;
 
+    // Filter to unique subjects across these exams for the table headers
+    const uniqueSubjects = [];
+    const seenSubjects = new Set();
+    exams.forEach(ex => {
+       if (!seenSubjects.has(ex.subject)) {
+           seenSubjects.add(ex.subject);
+           uniqueSubjects.push({ subject: ex.subject, maxMarks: ex.marks });
+       }
+    });
+
+    const { data: classData } = await supabase.from("class").select("id, section").in("id", classIds);
+
     const results = classStudents.map(cs => {
       const studentGrades = {};
-      exams.forEach(ex => {
+      const studentExams = exams.filter(e => e.class_id === cs.class_id);
+
+      studentExams.forEach(ex => {
         const gradeRecord = grades?.find(g => g.student_id === cs.student_id && g.exam_id === ex.id);
         studentGrades[ex.subject] = {
+          exam_id: ex.id,
           marksObtained: gradeRecord ? gradeRecord.marks : null,
           maxMarks: ex.marks
         };
       });
 
+      const sectionInfo = classData?.find(c => c.id === cs.class_id);
+
       return {
         student_id: cs.student_id,
         name: cs.user?.name,
         admission_number: cs.user?.admission_number,
+        section: sectionInfo ? sectionInfo.section : "",
         grades: studentGrades
       };
     });
 
+    // Sort by section then by name
+    results.sort((a, b) => {
+      if (a.section !== b.section) return String(a.section).localeCompare(String(b.section));
+      return String(a.name).localeCompare(String(b.name));
+    });
+
     return res.status(200).json({
       success: true,
-      subjects: exams.map(e => ({ id: e.id, subject: e.subject, maxMarks: e.marks })),
+      subjects: uniqueSubjects,
       results
     });
   } catch (e) {
     return res.status(500).json({ success: false, message: `Error Occurred: ${e.message}` });
+  }
+};
+
+export const bulkUpdateGrades = async (req, res) => {
+  const { grades } = req.body;
+  if (!grades || !Array.isArray(grades) || grades.length === 0) {
+    return res.status(400).json({ success: false, message: "Valid grades array is required" });
+  }
+
+  try {
+    // Collect exam IDs and student IDs
+    const examIds = [...new Set(grades.map(g => g.exam_id))];
+    const studentIds = [...new Set(grades.map(g => g.student_id))];
+
+    // Fetch existing grades to see if we should update or insert
+    const { data: existingGrades, error: fetchError } = await supabase
+      .from("grades")
+      .select("id, exam_id, student_id")
+      .in("exam_id", examIds)
+      .in("student_id", studentIds);
+
+    if (fetchError) throw fetchError;
+
+    const upsertData = grades.map(g => {
+      const existing = existingGrades?.find(eg => eg.exam_id === g.exam_id && eg.student_id === g.student_id);
+      return {
+        ...(existing ? { id: existing.id } : {}), // If existing, include ID to trigger update
+        student_id: g.student_id,
+        exam_id: g.exam_id,
+        marks: g.marks !== "" && g.marks !== null ? Number(g.marks) : null
+      };
+    });
+
+    const { error: upsertError } = await supabase.from("grades").upsert(upsertData);
+
+    if (upsertError) throw upsertError;
+
+    return res.status(200).json({ success: true, message: "Grades saved successfully" });
+  } catch (e) {
+    console.error("bulkUpdateGrades error:", e);
+    return res.status(500).json({ success: false, message: `Failed to save grades: ${e.message}` });
   }
 };

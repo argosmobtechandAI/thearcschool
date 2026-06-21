@@ -110,6 +110,11 @@ export const fetchInfo = createAsyncThunk('data/fetchInfo', async () => {
     return response.data;
 });
 
+export const fetchSubjectTeachers = createAsyncThunk('data/fetchSubjectTeachers', async () => {
+    const response = await api.get("/admin_panel/subjectTeachers");
+    return response.data.data || [];
+});
+
 const initialState = {
   users: [],
   classes: [],
@@ -117,6 +122,7 @@ const initialState = {
   exams: [],
   courses: [],
   subjects: [],
+  subjectTeachers: [],
   rooms: [],
   newUsers: [],
   timeTables: [],
@@ -133,6 +139,7 @@ const initialState = {
   loadingExams: false,
   loadingCourses: false,
   loadingSubjects: false,
+  loadingSubjectTeachers: false,
   loadingRooms: false,
   loadingNewUsers: false,
   error: null,
@@ -272,6 +279,18 @@ export const dataSlice = createSlice({
       })
       .addCase(fetchInfo.rejected, (state, action) => {
           state.loading = false;
+          state.error = action.error.message;
+      })
+      // Subject Teachers
+      .addCase(fetchSubjectTeachers.pending, (state) => {
+          state.loadingSubjectTeachers = true;
+      })
+      .addCase(fetchSubjectTeachers.fulfilled, (state, action) => {
+          state.loadingSubjectTeachers = false;
+          state.subjectTeachers = action.payload;
+      })
+      .addCase(fetchSubjectTeachers.rejected, (state, action) => {
+          state.loadingSubjectTeachers = false;
           state.error = action.error.message;
       });
   },

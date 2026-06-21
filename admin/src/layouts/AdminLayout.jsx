@@ -81,10 +81,10 @@ const AdminLayout = () => {
               <NavLink to="/admissions" style={navLinkStyle}><UserCheck size={16} /> Admissions Pipeline</NavLink>
               <NavLink to="/classes" style={navLinkStyle}><BookOpen size={16} /> Classes</NavLink>
               <NavLink to="/subjects" style={navLinkStyle}><BookOpen size={16} /> Subjects</NavLink>
+              <NavLink to="/subject-teachers" style={navLinkStyle}><Users size={16} /> Subject Teachers</NavLink>
               <NavLink to="/timetable" style={navLinkStyle}><Clock size={16} /> Timetable</NavLink>
               <NavLink to="/attendance" style={navLinkStyle}><UserCheck size={16} /> Attendance</NavLink>
               <NavLink to="/exams" style={navLinkStyle}><ClipboardCheck size={16} /> Exams & Grading</NavLink>
-              <NavLink to="/salary" style={navLinkStyle}><DollarSign size={16} /> Salary</NavLink>
               <NavLink to="/communication/inbox" style={navLinkStyle}><MessageSquare size={16} /> Communication</NavLink>
               <NavLink to="/notification" style={navLinkStyle}><Bell size={16} /> Notifications</NavLink>
               <NavLink to="/school-info" style={navLinkStyle}><Info size={16} /> School Info</NavLink>
@@ -96,9 +96,9 @@ const AdminLayout = () => {
               <NavGroup title="Management" />
               {user?.type === "admin" && (
                 <>
-                  <NavLink to="/events" style={navLinkStyle}><Calendar size={16} /> Events & Calendar</NavLink>
-                  <NavLink to="/holidays" style={navLinkStyle}><Calendar size={16} /> Holidays</NavLink>
+                  <NavLink to="/annual-planner" style={navLinkStyle}><Calendar size={16} /> Annual Planner</NavLink>
                   <NavLink to="/rooms" style={navLinkStyle}><MapPin size={16} /> Rooms Management</NavLink>
+                  <NavLink to="/staff-roles" style={navLinkStyle}><UserCheck size={16} /> Staff Roles</NavLink>
                 </>
               )}
               <NavLink to="/fees" style={navLinkStyle}><IndianRupee size={16} /> Fees</NavLink>

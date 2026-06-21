@@ -26,6 +26,21 @@ const SubjectManagement = () => {
     );
   }, [subjects, searchQuery]);
 
+  // Group classes by their base name (ignoring section)
+  const uniqueClassNames = useMemo(() => {
+    if (!classes) return [];
+    const names = new Set();
+    classes.forEach(c => {
+      const name = c.className || c.name;
+      if (name) names.add(name);
+    });
+    return Array.from(names).sort((a, b) => String(a).localeCompare(String(b), undefined, {numeric: true}));
+  }, [classes]);
+
+  const getIdsForClassName = (name) => {
+    return classes?.filter(c => (c.className === name || c.name === name)).map(c => c.id) || [];
+  };
+
   const handleOpenModal = (subject = null) => {
     if (subject) {
       setEditingId(subject.id);
@@ -82,7 +97,8 @@ const SubjectManagement = () => {
         </button>
       </div>
 
-      <TableFilterHeader>
+      <div style={{ flexShrink: 0 }}>
+          <TableFilterHeader>
         <div style={{ display: "flex", gap: "1rem", flex: 1 }}>
           <div style={{ position: "relative", flex: 1, maxWidth: "400px" }}>
             <Search size={18} style={{ position: "absolute", left: "1rem", top: "50%", transform: "translateY(-50%)", color: "var(--text-secondary)" }} />
@@ -97,6 +113,7 @@ const SubjectManagement = () => {
           </div>
         </div>
       </TableFilterHeader>
+        </div>
 
       <div className="glass-panel" style={{ padding: "1.5rem" }}>
         {loadingSubjects ? (
@@ -122,15 +139,19 @@ const SubjectManagement = () => {
                     <td style={{ padding: "1rem" }}>
                       <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
                         {subject.classIds?.length > 0 ? (
-                          subject.classIds.map((cId) => {
-                            const clsInfo = classes?.find(c => c.id === cId);
-                            const cName = clsInfo ? `${clsInfo.className || clsInfo.name} - ${clsInfo.section}` : "Unknown Class";
-                            return (
-                              <span key={cId} style={{ background: "var(--accent-light)", color: "var(--accent-primary)", padding: "0.2rem 0.6rem", borderRadius: "20px", fontSize: "0.75rem", fontWeight: "600" }}>
-                                {cName}
-                              </span>
-                            );
-                          })
+                          // Display unique class names instead of individual sections
+                          Array.from(new Set(
+                            subject.classIds.map(cId => {
+                              const clsInfo = classes?.find(c => c.id === cId);
+                              return clsInfo ? (clsInfo.className || clsInfo.name) : null;
+                            }).filter(Boolean)
+                          ))
+                          .sort((a, b) => String(a).localeCompare(String(b), undefined, {numeric: true}))
+                          .map((className) => (
+                            <span key={className} style={{ background: "var(--accent-light)", color: "var(--accent-primary)", padding: "0.2rem 0.6rem", borderRadius: "20px", fontSize: "0.75rem", fontWeight: "600" }}>
+                              Class {className}
+                            </span>
+                          ))
                         ) : (
                           <span style={{ color: "var(--text-secondary)", fontSize: "0.85rem", fontStyle: "italic" }}>Not assigned to any classes</span>
                         )}
@@ -175,22 +196,31 @@ const SubjectManagement = () => {
               <div style={{ marginBottom: "1.5rem" }}>
                 <label style={{ display: "block", marginBottom: "0.5rem", fontSize: "0.875rem", fontWeight: "600" }}>Assign to Classes</label>
                 <div style={{ maxHeight: "150px", overflowY: "auto", border: "1px solid var(--glass-border)", borderRadius: "8px", padding: "0.5rem", background: "rgba(255,255,255,0.5)" }}>
-                  {classes?.length > 0 ? classes.map(c => (
-                    <label key={c.id} style={{ display: "flex", alignItems: "center", gap: "0.5rem", padding: "0.4rem 0.5rem", cursor: "pointer", borderRadius: "4px" }} className="table-row-hover">
-                      <input
-                        type="checkbox"
-                        checked={formData.classIds.includes(c.id)}
-                        onChange={(e) => {
-                          if (e.target.checked) {
-                            setFormData({ ...formData, classIds: [...formData.classIds, c.id] });
-                          } else {
-                            setFormData({ ...formData, classIds: formData.classIds.filter(id => id !== c.id) });
-                          }
-                        }}
-                      />
-                      <span style={{ fontSize: "0.875rem" }}>{c.className || c.name} - {c.section}</span>
-                    </label>
-                  )) : (
+                  {uniqueClassNames.length > 0 ? uniqueClassNames.map(className => {
+                    const idsForClass = getIdsForClassName(className);
+                    // Check if all section IDs for this class are in formData.classIds
+                    const isChecked = idsForClass.every(id => formData.classIds.includes(id)) && idsForClass.length > 0;
+                    
+                    return (
+                      <label key={className} style={{ display: "flex", alignItems: "center", gap: "0.5rem", padding: "0.4rem 0.5rem", cursor: "pointer", borderRadius: "4px" }} className="table-row-hover">
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              // Add all sections of this class
+                              const newIds = new Set([...formData.classIds, ...idsForClass]);
+                              setFormData({ ...formData, classIds: Array.from(newIds) });
+                            } else {
+                              // Remove all sections of this class
+                              setFormData({ ...formData, classIds: formData.classIds.filter(id => !idsForClass.includes(id)) });
+                            }
+                          }}
+                        />
+                        <span style={{ fontSize: "0.875rem" }}>Class {className}</span>
+                      </label>
+                    );
+                  }) : (
                     <div style={{ padding: "0.5rem", fontSize: "0.875rem", color: "var(--text-secondary)" }}>No classes available</div>
                   )}
                 </div>

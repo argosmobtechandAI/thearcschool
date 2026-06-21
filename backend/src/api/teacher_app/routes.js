@@ -8,7 +8,7 @@ import { createCourse, deletecourse, getcourse, submitAnswer, updatecourse } fro
 import { updateAttendance, bulkUpdateAttendance, getAttendance } from "../shared/attendance/controller.js";
 import { getTeacherTimetable } from "../shared/timetable/controller.js";
 
-import { getAllEvents } from "../shared/events/controller.js";
+import { getPlannerEvents } from "../admin_panel/planner/controller.js";
 import communicationRouter from "../shared/communication/routes.js";
 
 const teacherRouter = Router();
@@ -39,7 +39,7 @@ teacherRouter.get("/attendance", getAttendance);
 teacherRouter.get("/timetable", getTeacherTimetable);
 
 // Events & Info (Read-only)
-teacherRouter.get("/events", getAllEvents);
+teacherRouter.get("/events", getPlannerEvents);
 
 // Chat
 teacherRouter.use("/communication", communicationRouter);

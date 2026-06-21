@@ -57,12 +57,19 @@ const StudentLedgerModal = ({ isOpen, onClose, student }) => {
                   <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
                     {(studentLedger?.fees || []).filter(f => f.status !== "paid").map(f => (
                       <div key={f.id} style={{ padding: "1rem", background: "rgba(0,0,0,0.02)", borderRadius: "8px", border: "1px solid var(--glass-border)", borderLeft: "4px solid #ef4444" }}>
-                        <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.5rem" }}>
-                          <span style={{ fontWeight: "600" }}>{f.fee?.title || "Unknown Fee"}</span>
-                          <span style={{ fontWeight: "700", color: "#ef4444" }}>₹{Number(f.fee?.amount || 0) - Number(f.total_paid_amount || 0)} due</span>
+                        <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.5rem", alignItems: "flex-start" }}>
+                          <div>
+                            <div style={{ fontWeight: "600", marginBottom: "0.25rem" }}>{f.fee?.title || "Unknown Fee"}</div>
+                            {f.fee?.due_date && <div style={{ fontSize: "0.75rem", color: "var(--text-secondary)" }}>Due Date: <span style={{ fontWeight: "500", color: "var(--text-primary)" }}>{new Date(f.fee.due_date).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}</span></div>}
+                          </div>
+                          <span style={{ fontWeight: "700", color: "#ef4444", whiteSpace: "nowrap" }}>₹{Number(f.fee?.amount || 0) - Number(f.total_paid_amount || 0)} due</span>
                         </div>
                         <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.875rem", color: "var(--text-secondary)" }}>
-                          <span>Total: ₹{f.fee?.amount}</span>
+                          <span>Base Fee: ₹{Number(f.fee?.amount || 0) - Number(f.fee?.penalty || 0)}</span>
+                          {f.fee?.penalty ? <span style={{color: "#ef4444"}}>Late Fee: +₹{f.fee.penalty}</span> : null}
+                        </div>
+                        <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.875rem", color: "var(--text-secondary)", marginTop: "0.25rem", borderTop: f.fee?.penalty ? "1px dashed rgba(0,0,0,0.1)" : "none", paddingTop: f.fee?.penalty ? "0.25rem" : "0" }}>
+                          <span style={{ fontWeight: f.fee?.penalty ? "600" : "normal" }}>Total: ₹{f.fee?.amount}</span>
                           <span>Paid: ₹{f.total_paid_amount || 0}</span>
                         </div>
                       </div>

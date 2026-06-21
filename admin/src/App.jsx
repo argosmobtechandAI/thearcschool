@@ -17,20 +17,20 @@ import FeeManagement from "./pages/FeeManagement";
 import Exams from "./pages/Exams";
 import ExamResults from "./pages/ExamResults";
 import TimeTable from "./pages/TimeTable";
-import Events from './pages/Events';
-import SalaryManagement from './pages/SalaryManagement';
+import AnnualPlanner from "./pages/AnnualPlanner";
 import Communication from './pages/Communication';
 import Notification from './pages/Notification';
 import SchoolInfo from './pages/SchoolInfo';
 import Complaints from './pages/Complaints';
 import SubjectManagement from './pages/SubjectManagement';
+import SubjectTeachers from './pages/SubjectTeachers';
 import RoomManagement from './pages/RoomManagement';
 import CounselorProfile from './pages/CounselorProfile';
 import FinanceProfile from './pages/FinanceProfile';
-import Holidays from './pages/Holidays';
 import StudentProfile from './pages/StudentProfile';
 import TeacherProfile from './pages/TeacherProfile';
 import ClassProfile from './pages/ClassProfile';
+import StaffRoles from './pages/StaffRoles';
 
 const ProtectedRoute = ({ children, allowedRoles }) => {
   const { isAuthenticated, user } = useSelector((state) => state.auth);
@@ -73,16 +73,16 @@ function App() {
           <Route path="classes" element={<ProtectedRoute allowedRoles={["admin"]}><ClassManagement /></ProtectedRoute>} />
           <Route path="classes/:id" element={<ProtectedRoute allowedRoles={["admin"]}><ClassProfile /></ProtectedRoute>} />
           <Route path="subjects" element={<ProtectedRoute allowedRoles={["admin"]}><SubjectManagement /></ProtectedRoute>} />
+          <Route path="subject-teachers" element={<ProtectedRoute allowedRoles={["admin"]}><SubjectTeachers /></ProtectedRoute>} />
           <Route path="rooms" element={<ProtectedRoute allowedRoles={["admin"]}><RoomManagement /></ProtectedRoute>} />
           <Route path="exams" element={<ProtectedRoute allowedRoles={["admin"]}><Exams /></ProtectedRoute>} />
           <Route path="exams/results/:title/:class_id" element={<ProtectedRoute allowedRoles={["admin"]}><ExamResults /></ProtectedRoute>} />
           <Route path="timetable" element={<ProtectedRoute allowedRoles={["admin"]}><TimeTable /></ProtectedRoute>} />
-          <Route path="events" element={<ProtectedRoute allowedRoles={["admin"]}><Events /></ProtectedRoute>} />
-          <Route path="holidays" element={<ProtectedRoute allowedRoles={["admin"]}><Holidays /></ProtectedRoute>} />
-          <Route path="salary" element={<ProtectedRoute allowedRoles={["admin"]}><SalaryManagement /></ProtectedRoute>} />
+          <Route path="annual-planner" element={<ProtectedRoute allowedRoles={["admin"]}><AnnualPlanner /></ProtectedRoute>} />
           <Route path="notification" element={<ProtectedRoute allowedRoles={["admin"]}><Notification /></ProtectedRoute>} />
           <Route path="school-info" element={<ProtectedRoute allowedRoles={["admin"]}><SchoolInfo /></ProtectedRoute>} />
           <Route path="complaints" element={<ProtectedRoute allowedRoles={["admin"]}><Complaints /></ProtectedRoute>} />
+          <Route path="staff-roles" element={<ProtectedRoute allowedRoles={["admin"]}><StaffRoles /></ProtectedRoute>} />
           
           {/* Shared Admin / Teachers / etc (if applicable, but mainly admin for these) */}
           <Route path="attendance" element={<ProtectedRoute allowedRoles={["admin"]}><Attendance /></ProtectedRoute>} />

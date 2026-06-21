@@ -2,6 +2,7 @@ import { supabase } from "../../config/supabaseClient.js";
 
 export const getDashboardStats = async (req, res) => {
   try {
+    await autoMaterializeTransportFees();
     const { startDate, endDate } = req.query;
 
     const { count: totalStudents, error: countError } = await supabase
@@ -22,14 +23,14 @@ export const getDashboardStats = async (req, res) => {
 
     const { data: allStudents, error: studentsError } = await supabase
       .from("user")
-      .select("id, fee_exempted, bus_fee")
+      .select("id, fee_exempted, bus_fee, created_at")
       .eq("type", "student")
       .eq("status", "active");
 
     // 1. Fetch legacy ad-hoc fees
     const { data: feesData } = await supabase
       .from("student_fees")
-      .select("student_id, amount, amount_paid");
+      .select("student_id, total_paid_amount, fee(amount, title, due_date)");
 
     // 2. Fetch class mappings
     const { data: classMappings } = await supabase
@@ -77,36 +78,53 @@ export const getDashboardStats = async (req, res) => {
     
     if (allStudents) {
       // Fetch all ledger payments
-      const { data: paymentsData } = await supabase.from("payments_ledger").select("student_id, amount_paid");
+      const { data: paymentsData } = await supabase.from("payments_ledger").select("student_id, amount_paid, created_at, remarks");
+      const { data: settingsData } = await supabase.from("school_settings").select("late_fee_penalty").limit(1).single();
+      const lateFeePenaltyAmount = settingsData?.late_fee_penalty !== undefined && settingsData?.late_fee_penalty !== null ? Number(settingsData.late_fee_penalty) : 10;
 
-      allStudents.forEach(s => {
+      const { calculateTotalVirtualDueForStudent } = await import("./virtualFeeCalculator.js");
+
+      for (const s of allStudents) {
         let totalVirtualDue = 0;
+        const sPayments = (paymentsData || []).filter(p => p.student_id === s.id);
         
         if (!s.fee_exempted) {
           const sClassName = studentClassMap[s.id];
-          const sStructures = (structures || []).filter(st => st.class_name === sClassName || !st.class_name);
-
-          sStructures.forEach(struct => {
-            totalVirtualDue += (struct.amount * monthsPassed);
-          });
-
-          if (s.bus_fee && s.bus_fee > 0) {
-            totalVirtualDue += (s.bus_fee * monthsPassed);
-          }
+          totalVirtualDue = calculateTotalVirtualDueForStudent(s, sClassName, structures, sPayments, sessionStartYear, monthsPassed, lateFeePenaltyAmount);
         }
 
         const sFees = (feesData || []).filter(f => f.student_id === s.id);
-        const totalAdHocDue = sFees.reduce((acc, f) => acc + Number(f.amount || 0), 0);
+        let totalAdHocDue = 0;
+        sFees.forEach(f => {
+          let amount = Number(f.fee?.amount || 0);
+          const feeTitle = f.fee?.title || "";
+          const dueDateObj = f.fee?.due_date ? new Date(f.fee.due_date) : null;
+          
+          const relatedPayments = sPayments.filter(p => p.remarks && p.remarks.includes(feeTitle));
+          const feeTotalPaid = relatedPayments.reduce((acc, p) => acc + Number(p.amount_paid || 0), 0);
+          
+          if (dueDateObj && feeTotalPaid < amount) {
+            let penaltyEndDate = today;
+            if (relatedPayments.length > 0) {
+              const sortedPayments = [...relatedPayments].sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+              penaltyEndDate = new Date(sortedPayments[0].created_at);
+            }
+            if (penaltyEndDate > dueDateObj) {
+               const daysLate = Math.floor((penaltyEndDate - dueDateObj) / (1000 * 60 * 60 * 24));
+               if (daysLate > 0) amount += daysLate * lateFeePenaltyAmount;
+            }
+          }
+          totalAdHocDue += amount;
+        });
         
-        const sPayments = (paymentsData || []).filter(p => p.student_id === s.id);
         const totalPaidLedger = sPayments.reduce((acc, p) => acc + Number(p.amount_paid || 0), 0);
-        const totalPaidLegacy = sFees.reduce((acc, f) => acc + Number(f.amount_paid || 0), 0);
+        const totalPaidLegacy = sFees.reduce((acc, f) => acc + Number(f.total_paid_amount || 0), 0);
         
         const totalDue = totalVirtualDue + totalAdHocDue;
         const totalPaid = totalPaidLedger + totalPaidLegacy;
         
         balance += Math.max(0, totalDue - totalPaid);
-      });
+      }
     }
 
     // Fetch Total Collected from transactions within date range
@@ -156,10 +174,14 @@ export const getDashboardStats = async (req, res) => {
 };
 
 import { calculateVirtualDues } from "./virtualFeeCalculator.js";
+import { autoMaterializeTransportFees } from "./transportFeeMaterializer.js";
 
 export const getStudentBalances = async (req, res) => {
   try {
-    const { students } = req.body;
+    // Auto-materialize transport fees before generating balances
+    await autoMaterializeTransportFees();
+
+    const { students, startDate, endDate } = req.body;
     if (!students || !Array.isArray(students)) {
       return res.status(400).json({ success: false, message: "Students array is required" });
     }
@@ -168,7 +190,7 @@ export const getStudentBalances = async (req, res) => {
     // 1. Fetch legacy ad-hoc fees
     const { data: feesData } = await supabase
       .from("student_fees")
-      .select("student_id, amount, amount_paid");
+      .select("student_id, total_paid_amount, fee(amount, title, due_date)");
 
     // 2. Fetch class mappings to match with fee_structures
     const { data: classMappings } = await supabase
@@ -200,16 +222,28 @@ export const getStudentBalances = async (req, res) => {
       .select("*")
       .eq("academic_year", academicYear);
 
-    // 4. Fetch all payments from payments_ledger
-    const { data: paymentsData } = await supabase
+    // 4. Fetch all payments from payments_ledger filtered by dates
+    let paymentsQuery = supabase
       .from("payments_ledger")
-      .select("student_id, amount_paid");
+      .select("student_id, amount_paid, created_at, remarks");
+      
+    if (startDate) paymentsQuery = paymentsQuery.gte("created_at", startDate);
+    if (endDate) {
+      const endOfDay = new Date(endDate);
+      endOfDay.setHours(23, 59, 59, 999);
+      paymentsQuery = paymentsQuery.lte("created_at", endOfDay.toISOString());
+    }
+    
+    const { data: paymentsData } = await paymentsQuery;
 
-    // 5. Calculate months passed in academic session
+    const { data: settingsData } = await supabase.from("school_settings").select("late_fee_penalty").limit(1).single();
+    const lateFeePenaltyAmount = settingsData?.late_fee_penalty !== undefined && settingsData?.late_fee_penalty !== null ? Number(settingsData.late_fee_penalty) : 10;
+
+    // 5. Calculate months passed in academic session based on endDate if available
     const sessionStartYear = parseInt(academicYear.split("-")[0]);
-    const today = new Date();
-    const currentMonth = today.getMonth();
-    const currentYear = today.getFullYear();
+    const referenceDate = endDate ? new Date(endDate) : new Date();
+    const currentMonth = referenceDate.getMonth();
+    const currentYear = referenceDate.getFullYear();
     
     let monthsPassed = 0;
     if (currentYear === sessionStartYear && currentMonth >= 3) {
@@ -219,40 +253,67 @@ export const getStudentBalances = async (req, res) => {
     } else if (currentYear > sessionStartYear) {
       monthsPassed = 12; // Whole year passed
     }
+    
+    // If startDate is set and is later than April, we should theoretically subtract the start months,
+    // but typically schools want to see outstanding balances. However, to respect the "Period Dues"
+    // we'll calculate dues purely generated between start and end.
+    let startMonthsPassed = 0;
+    if (startDate) {
+        const sDate = new Date(startDate);
+        const sMonth = sDate.getMonth();
+        const sYear = sDate.getFullYear();
+        if (sYear === sessionStartYear && sMonth >= 3) startMonthsPassed = sMonth - 3;
+        else if (sYear === sessionStartYear + 1 && sMonth < 3) startMonthsPassed = 9 + sMonth;
+        else if (sYear > sessionStartYear) startMonthsPassed = 12;
+    }
+    if (startMonthsPassed < 0) startMonthsPassed = 0;
     if (monthsPassed > 12) monthsPassed = 12;
     if (monthsPassed < 0) monthsPassed = 0;
 
     // 6. Aggregate balances
-    const balances = students.map(s => {
+    const balances = await Promise.all(students.map(async (s) => {
       let totalVirtualDue = 0;
+      
+      const sPayments = (paymentsData || []).filter(p => p.student_id === s.id);
       
       if (!s.fee_exempted) {
         const sClassName = studentClassMap[s.id];
-        // Filter structures that apply to this student's class (or all classes if class_name is null)
-        const sStructures = (structures || []).filter(st => st.class_name === sClassName || !st.class_name);
-
-          sStructures.forEach(struct => {
-            totalVirtualDue += (struct.amount * monthsPassed);
-          });
-
-        // Add monthly transport fee from student profile
-        if (s.bus_fee && s.bus_fee > 0) {
-          totalVirtualDue += (s.bus_fee * monthsPassed);
-        }
+        const { calculateTotalVirtualDueForStudent } = await import("./virtualFeeCalculator.js");
+        totalVirtualDue = calculateTotalVirtualDueForStudent(s, sClassName, structures, sPayments, sessionStartYear, monthsPassed, lateFeePenaltyAmount, startMonthsPassed);
       }
 
       // Legacy specific student ad-hoc fees
       const sFees = (feesData || []).filter(f => f.student_id === s.id);
-      const totalAdHocDue = sFees.reduce((acc, f) => acc + Number(f.amount || 0), 0);
+      let totalAdHocDue = 0;
+      sFees.forEach(f => {
+        let amount = Number(f.fee?.amount || 0);
+        const feeTitle = f.fee?.title || "";
+        const dueDateObj = f.fee?.due_date ? new Date(f.fee.due_date) : null;
+        
+        const relatedPayments = sPayments.filter(p => p.remarks && p.remarks.includes(feeTitle));
+        const feeTotalPaid = relatedPayments.reduce((acc, p) => acc + Number(p.amount_paid || 0), 0);
+        
+        if (dueDateObj && feeTotalPaid < amount) {
+          let penaltyEndDate = referenceDate;
+          if (relatedPayments.length > 0) {
+            const sortedPayments = [...relatedPayments].sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+            penaltyEndDate = new Date(sortedPayments[0].created_at);
+          }
+          if (penaltyEndDate > dueDateObj) {
+             const daysLate = Math.floor((penaltyEndDate - dueDateObj) / (1000 * 60 * 60 * 24));
+             if (daysLate > 0) amount += daysLate * lateFeePenaltyAmount;
+          }
+        }
+        totalAdHocDue += amount;
+      });
       
       // Calculate total paid
-      const sPayments = (paymentsData || []).filter(p => p.student_id === s.id);
       const totalPaidLedger = sPayments.reduce((acc, p) => acc + Number(p.amount_paid || 0), 0);
-      const totalPaidLegacy = sFees.reduce((acc, f) => acc + Number(f.amount_paid || 0), 0);
+      const totalPaidLegacy = sFees.reduce((acc, f) => acc + Number(f.total_paid_amount || 0), 0);
       
       const totalPaid = totalPaidLedger + totalPaidLegacy;
       const totalDue = totalVirtualDue + totalAdHocDue;
-      const balance = Math.max(0, totalDue - totalPaid);
+      const balance = totalDue - totalPaid;
 
       return {
         student_id: s.id,
@@ -260,7 +321,7 @@ export const getStudentBalances = async (req, res) => {
         totalPaid,
         balance
       };
-    });
+    }));
 
     return res.status(200).json({ success: true, data: balances });
   } catch (error) {
@@ -286,23 +347,14 @@ export const deleteFeeStructureController = async (req, res) => {
 
 export const getStudentLedger = async (req, res) => {
   try {
+    await autoMaterializeTransportFees();
     const { studentId } = req.params;
 
     // 1. Calculate Virtual Dues & fetch Payments
     const { virtualDues, payments } = await calculateVirtualDues(studentId);
 
     // 2. Map payments to dues using fee title in remarks
-    virtualDues.forEach(due => {
-      const relatedPayments = payments.filter(p => p.remarks && p.remarks.includes(due.fee.title));
-      const totalPaid = relatedPayments.reduce((acc, p) => acc + Number(p.amount_paid || 0), 0);
-      
-      due.total_paid_amount = totalPaid;
-      if (totalPaid >= due.fee.amount) {
-        due.status = "paid";
-      } else {
-        due.status = "pending";
-      }
-    });
+    // (This is now handled automatically inside calculateVirtualDues)
 
     return res.status(200).json({
       success: true,
@@ -321,23 +373,25 @@ export const getStudentLedger = async (req, res) => {
 
 export const logPayment = async (req, res) => {
   try {
-    const { studentId, feeId, amount, paymentMode, remarks, title } = req.body.data;
+    const { studentId, paymentMode, remarks, payments } = req.body.data;
     const collectedBy = req.user.id;
 
-    // We no longer have physical student_fees to update.
-    // We just log a payment pointing to this virtual fee ID in remarks.
-    const { data: insertedPayment, error: insertError } = await supabase
+    if (!payments || !Array.isArray(payments) || payments.length === 0) {
+        return res.status(400).json({ success: false, message: "No payments provided" });
+    }
+
+    const inserts = payments.map(p => ({
+        student_id: studentId,
+        fee_id: null,
+        amount_paid: p.amount,
+        payment_mode: paymentMode,
+        remarks: `Fee Payment: ${p.title || p.feeId} ${remarks ? `(${remarks})` : ''}`,
+        collected_by: collectedBy
+    }));
+
+    const { data: insertedPayments, error: insertError } = await supabase
       .from("payments_ledger")
-      .insert([
-        {
-          student_id: studentId,
-          fee_id: null,
-          amount_paid: amount,
-          payment_mode: paymentMode,
-          remarks: `Fee Payment: ${title || feeId} ${remarks ? `(${remarks})` : ''}`,
-          collected_by: collectedBy
-        },
-      ])
+      .insert(inserts)
       .select();
 
     if (insertError) throw insertError;
@@ -345,7 +399,7 @@ export const logPayment = async (req, res) => {
     return res.status(200).json({
       success: true,
       message: "Payment logged successfully",
-      payment: insertedPayment[0],
+      payments: insertedPayments,
     });
   } catch (error) {
     return res.status(500).json({

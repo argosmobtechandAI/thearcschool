@@ -89,9 +89,12 @@ const DateRangePicker = ({
       if (range === 'custom') return;
       const dates = getRangeDates(range);
       if (dates) {
-        if (typeof onRangeChange === 'function') onRangeChange(dates);
-        if (typeof setStartDate === 'function') setStartDate(dates.start);
-        if (typeof setEndDate === 'function') setEndDate(dates.end);
+        if (typeof onRangeChange === 'function') {
+          onRangeChange(dates);
+        } else {
+          if (typeof setStartDate === 'function') setStartDate(dates.start);
+          if (typeof setEndDate === 'function') setEndDate(dates.end);
+        }
       }
     };
 
@@ -99,9 +102,12 @@ const DateRangePicker = ({
     if (!actualStartDate && !actualEndDate && selectedRange !== 'custom') {
       const dates = getRangeDates(initialPreset || defaultRange);
       if (dates) {
-        if (typeof onRangeChange === 'function') onRangeChange(dates);
-        if (typeof setStartDate === 'function') setStartDate(dates.start);
-        if (typeof setEndDate === 'function') setEndDate(dates.end);
+        if (typeof onRangeChange === 'function') {
+          onRangeChange(dates);
+        } else {
+          if (typeof setStartDate === 'function') setStartDate(dates.start);
+          if (typeof setEndDate === 'function') setEndDate(dates.end);
+        }
         setSelectedRange(initialPreset || defaultRange);
       }
     } else if (actualStartDate || actualEndDate) {
@@ -133,9 +139,10 @@ const DateRangePicker = ({
     if (typeof onRangeChange === 'function') {
       if (type === 'start') onRangeChange({ start: val, end: actualEndDate });
       else onRangeChange({ start: actualStartDate, end: val });
+    } else {
+      if (type === 'start' && typeof setStartDate === 'function') setStartDate(val);
+      if (type === 'end' && typeof setEndDate === 'function') setEndDate(val);
     }
-    if (type === 'start' && typeof setStartDate === 'function') setStartDate(val);
-    if (type === 'end' && typeof setEndDate === 'function') setEndDate(val);
   };
 
   return (

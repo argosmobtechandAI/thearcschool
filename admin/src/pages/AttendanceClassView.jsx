@@ -2,11 +2,12 @@ import { useEffect, useState, useMemo } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { useParams, useNavigate } from "react-router-dom";
 import { fetchUsers, fetchClasses } from "../features/dataSlice";
-import { ChevronLeft, CheckCircle } from "lucide-react";
+import { ChevronLeft, CheckCircle, FileSpreadsheet, Download } from "lucide-react";
 import { toast } from "react-toastify";
 import api from "../services/api";
 import DateRangePicker, { formatDate } from "../components/DateRangePicker";
 import AttendanceMatrixTable from "../components/AttendanceMatrixTable";
+import { exportToExcel, exportToPDF } from "../utils/exportUtils";
 
 const AttendanceClassView = () => {
   const { classId } = useParams();
@@ -28,7 +29,10 @@ const AttendanceClassView = () => {
   const [selectedDate, setSelectedDate] = useState(formatDate(new Date()));
 
   useEffect(() => {
-    api.get('/holidays').then(res => setPublicHolidays(res.data.data || [])).catch(console.error);
+    api.get('/admin_panel/planner').then(res => {
+      const holidays = (res.data.data || []).filter(h => h.category === 'Holiday').map(h => ({ ...h, date: h.start_date }));
+      setPublicHolidays(holidays);
+    }).catch(console.error);
   }, []);
 
   useEffect(() => {
@@ -142,6 +146,42 @@ const AttendanceClassView = () => {
     }
   };
 
+  const handleExportExcel = () => {
+    if (viewMode === "daily") {
+      const data = classStudents.map(s => ({ "Student Name": s.name, "Status": s.status.charAt(0).toUpperCase() + s.status.slice(1) }));
+      exportToExcel(data, `Attendance_${activeClass.className}_${activeClass.section}_${selectedDate}`);
+    } else {
+      const data = classStudents.map(s => {
+        const row = { "Student Name": s.name };
+        gridDays.forEach(d => {
+          const record = s.records?.find(r => r.date === d.fullDateString);
+          row[`${d.dateNumber} ${d.monthName}`] = record ? record.status.charAt(0).toUpperCase() : "-";
+        });
+        return row;
+      });
+      exportToExcel(data, `Attendance_Matrix_${activeClass.className}_${activeClass.section}`);
+    }
+  };
+
+  const handleExportPDF = () => {
+    if (viewMode === "daily") {
+      const columns = ["Student Name", "Status"];
+      const data = classStudents.map(s => [s.name, s.status.charAt(0).toUpperCase() + s.status.slice(1)]);
+      exportToPDF(columns, data, `Attendance_${activeClass.className}_${activeClass.section}_${selectedDate}`, `Attendance - Class ${activeClass.className} ${activeClass.section} (${selectedDate})`);
+    } else {
+      const columns = ["Student Name", ...gridDays.map(d => `${d.dateNumber} ${d.monthName}`)];
+      const data = classStudents.map(s => {
+        const row = [s.name];
+        gridDays.forEach(d => {
+          const record = s.records?.find(r => r.date === d.fullDateString);
+          row.push(record ? record.status.charAt(0).toUpperCase() : "-");
+        });
+        return row;
+      });
+      exportToPDF(columns, data, `Attendance_Matrix_${activeClass.className}_${activeClass.section}`, `Attendance Matrix - Class ${activeClass.className} ${activeClass.section}`);
+    }
+  };
+
   if (!activeClass) {
     return <div style={{ padding: "2rem" }}>Loading class data...</div>;
   }
@@ -168,6 +208,14 @@ const AttendanceClassView = () => {
             style={{ padding: "6px 12px", borderRadius: "6px", background: viewMode === "matrix" ? "white" : "transparent", boxShadow: viewMode === "matrix" ? "0 2px 4px rgba(0,0,0,0.1)" : "none", border: "none", fontWeight: "600", cursor: "pointer", color: viewMode === "matrix" ? "#3b82f6" : "var(--text-secondary)", transition: "all 0.2s" }}
           >
             Matrix View
+          </button>
+        </div>
+        <div style={{ display: "flex", gap: "0.5rem", marginLeft: "1rem" }}>
+          <button onClick={handleExportExcel} className="btn-ghost" style={{ padding: "8px", display: "flex", alignItems: "center", gap: "0.5rem" }} title="Export Excel">
+            <FileSpreadsheet size={18} />
+          </button>
+          <button onClick={handleExportPDF} className="btn-ghost" style={{ padding: "8px", display: "flex", alignItems: "center", gap: "0.5rem" }} title="Export PDF">
+            <Download size={18} />
           </button>
         </div>
       </div>
@@ -204,7 +252,7 @@ const AttendanceClassView = () => {
         )}
       </div>
 
-      <div className="glass-panel">
+      <div className="glass-panel" style={{ flex: 1, display: "flex", flexDirection: "column", minHeight: 0 }}>
         <div style={{ overflowX: "auto" }}>
           {viewMode === "daily" ? (
             <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left" }}>

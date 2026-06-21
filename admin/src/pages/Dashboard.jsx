@@ -3,7 +3,7 @@ import { useSelector, useDispatch } from "react-redux";
 import { Users, GraduationCap, Calendar, CreditCard, BookOpen, Clock, UserCheck, Building } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Cell, RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis } from "recharts";
 import api from "../services/api";
-import { setDashboardLoading, setDashboardStats, setDashboardTopper } from "../features/dashboardSlice";
+import { setDashboardLoading, setDashboardStats, setDashboardTopper, setFeeStatusFilter } from "../features/dashboardSlice";
 import DateRangePicker, { formatDate } from "../components/DateRangePicker";
 import { useNavigate } from "react-router";
 
@@ -18,7 +18,7 @@ const StatCard = ({ title, value, icon: Icon, color, onClick }) => (
     <div style={{ width: "48px", height: "48px", borderRadius: "12px", background: `rgba(${color}, 0.15)`, color: `rgb(${color})`, display: "flex", alignItems: "center", justifyContent: "center" }}>
       <Icon size={24} />
     </div>
-    <div>
+    <div style={{ display: "flex", flexDirection: "column" }}>
       <p style={{ color: "var(--text-secondary)", fontSize: "0.875rem", fontWeight: "600", marginBottom: "0.25rem", textTransform: "uppercase", letterSpacing: "0.5px" }}>{title}</p>
       <h3 style={{ fontSize: "1.75rem", fontWeight: "800", color: "var(--text-primary)" }}>{value}</h3>
     </div>
@@ -29,13 +29,13 @@ const Dashboard = () => {
   const navigate = useNavigate();
   const dispatch = useDispatch();
   
-  const [startDate, setStartDate] = useState("");
-  const [endDate, setEndDate] = useState("");
   const [admissionData, setAdmissionData] = useState([]);
   
   const { user } = useSelector((state) => state.auth);
   // Pulling state directly from the simple Redux slice
-  const { stats, topper, loading } = useSelector((state) => state.dashboard);
+  const { stats, topper, loading, globalDateRange } = useSelector((state) => state.dashboard);
+  const startDate = globalDateRange?.start || "";
+  const endDate = globalDateRange?.end || "";
 
   useEffect(() => {
     const fetchDashboardData = async () => {
@@ -56,16 +56,16 @@ const Dashboard = () => {
           api.get("/admin_panel/users").catch(() => ({ data: { users: [] } })),
           api.get("/admin_panel/class/getClass").catch(() => ({ data: { classes: [] } })),
           api.get("/admission_panel/getAllNewUser").catch(() => ({ data: { data: [] } })),
-          api.get("/finance_panel/getFees").catch(() => ({ data: { fees: [] } })),
-          api.get("/admin_panel/events/getAllEvents").catch(() => ({ data: { events: [] } })),
+          api.get("/finance_panel/dashboardStats").catch(() => ({ data: { stats: {} } })),
+          api.get("/admin_panel/planner").catch(() => ({ data: { data: [] } })),
           api.get("/user/attendance", { params: { startDate: today, endDate: today } }).catch(() => ({ data: { records: [] } })),
           api.get("/rooms/getRooms").catch(() => ({ data: { rooms: [] } }))
         ]);
 
         const users = userData?.users || [];
         const classes = classData?.classes || [];
-        const fees = feeData?.fees || [];
-        const events = eventData?.events || eventData?.data || [];
+        const feeStats = feeData?.stats || {};
+        const events = eventData?.data || [];
         const attendanceRecords = attendanceData?.records || [];
         const rooms = roomData?.rooms || [];
         const allAdmissions = newUserData?.data || [];
@@ -85,10 +85,10 @@ const Dashboard = () => {
           totalParents: users.filter(u => u.type === 'parent').length,
           totalCounselors,
           totalProspects,
-          pendingFees: fees.filter(f => f.status === 'Pending').reduce((acc, f) => acc + (Number(f.amount) || 0), 0),
-          collectedFees: fees.filter(f => f.status === 'Paid').reduce((acc, f) => acc + (Number(f.amount) || 0), 0),
+          pendingFees: feeStats.balance || 0,
+          collectedFees: feeStats.totalPaid || 0,
           activeClasses: classes.length,
-          eventsToday: events.filter(e => e.date === today).length,
+          eventsToday: events.filter(e => e.start_date === today).length,
           presentToday: presentToday,
           totalRooms: rooms.length
         }));
@@ -144,8 +144,9 @@ const Dashboard = () => {
         <DateRangePicker 
           startDate={startDate}
           endDate={endDate}
-          setStartDate={setStartDate}
-          setEndDate={setEndDate}
+          setStartDate={(s) => dispatch({ type: 'dashboard/setGlobalDateRange', payload: { start: s, end: endDate } })}
+          setEndDate={(e) => dispatch({ type: 'dashboard/setGlobalDateRange', payload: { start: startDate, end: e } })}
+          onRangeChange={(range) => dispatch({ type: 'dashboard/setGlobalDateRange', payload: range })}
           defaultRange="mtd"
         />
       </div>
@@ -173,7 +174,10 @@ const Dashboard = () => {
           </h3>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: "1rem", marginBottom: "2rem" }}>
             <StatCard title="Collected Fees" value={loading ? "..." : `₹${stats.collectedFees}`} icon={CreditCard} color="16, 185, 129" onClick={() => navigate("/fees")} />
-            <StatCard title="Pending Fees" value={loading ? "..." : `₹${stats.pendingFees}`} icon={Clock} color="245, 158, 11" onClick={() => navigate("/fees")} />
+            <StatCard title="Pending Fees" value={loading ? "..." : `₹${stats.pendingFees}`} icon={Clock} color="245, 158, 11" onClick={() => {
+              dispatch(setFeeStatusFilter("Defaulters"));
+              navigate("/fees");
+            }} />
             {user?.type === "admin" && (
               <>
                 <StatCard title="Active Classes" value={loading ? "..." : stats.activeClasses} icon={GraduationCap} color="14, 165, 233" onClick={() => navigate("/classes")} />

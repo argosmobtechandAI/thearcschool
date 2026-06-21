@@ -1,8 +1,9 @@
 import { useEffect, useState, useMemo } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { useParams, useNavigate } from "react-router-dom";
-import { fetchUsers, fetchClasses, fetchNewUsers } from "../features/dataSlice";
-import { Search, Plus, Edit, Trash2, Upload, FileSpreadsheet, FileText, ChevronUp, ChevronDown, ChevronsUpDown, Eye } from "lucide-react";
+import { fetchUsers, fetchClasses, fetchNewUsers, fetchSubjects, fetchSubjectTeachers } from "../features/dataSlice";
+import CustomSelect from "../components/CustomSelect";
+import { Search, Plus, Edit, Trash2, Upload, FileSpreadsheet, FileText, ChevronUp, ChevronDown, ChevronsUpDown, Eye, BookOpen } from "lucide-react";
 import { toast } from "react-toastify";
 import api from "../services/api";
 import { exportToExcel, exportToPDF } from "../utils/exportUtils";
@@ -14,7 +15,7 @@ const UserManagement = () => {
   const { type } = useParams(); // 'student', 'teacher', 'principal'
   const navigate = useNavigate();
   const dispatch = useDispatch();
-  const { users, classes, newUsers, loadingUsers } = useSelector((state) => state.data);
+  const { users, classes, newUsers, loadingUsers, subjects, subjectTeachers } = useSelector((state) => state.data);
 
   const [searchQuery, setSearchQuery] = useState("");
   const [classFilter, setClassFilter] = useState("");
@@ -59,7 +60,6 @@ const UserManagement = () => {
     house: "",
     father_name: "",
     mother_name: "",
-    monthly_fee: "",
     bus_fee: "",
     fee_exempted: false,
     admission_date: "",
@@ -78,6 +78,8 @@ const UserManagement = () => {
     can_view_revenue: false,
   });
 
+
+
   const students = useMemo(() => users.filter(u => u.type === 'student'), [users]);
 
   useEffect(() => {
@@ -86,6 +88,10 @@ const UserManagement = () => {
     if (type === 'admission') {
       dispatch(fetchNewUsers());
     }
+    if (type === 'teacher') {
+      dispatch(fetchSubjects());
+      dispatch(fetchSubjectTeachers());
+    }
   }, [dispatch, type]);
 
   // When URL changes, reset form type and default columns
@@ -93,7 +99,8 @@ const UserManagement = () => {
     setFormData((prev) => ({ ...prev, type: type }));
     const defaults = ["name", "email", "phone", "associations"];
     if (type === "student") defaults.unshift("admission_number");
-    if (type === "teacher") defaults.push("doj", "father_spouse_name");
+    if (type === "teacher") defaults.push("subjects", "doj", "father_spouse_name");
+    
     setSelectedColumns(defaults);
   }, [type]);
 
@@ -157,7 +164,7 @@ const UserManagement = () => {
         }
         return "";
       },
-      total_fee: (u) => Number(u.monthly_fee || 0) + Number(u.bus_fee || 0)
+      fee_exempted: (u) => u.fee_exempted ? "Yes" : "No",
     };
   }, [classes, type, newUsers]);
 
@@ -247,9 +254,7 @@ const UserManagement = () => {
         { key: "mother_name", label: "Mother's Name" },
         { key: "alternate_number", label: "Alternate Number" },
         { key: "address", label: "Address" },
-        { key: "monthly_fee", label: "Monthly Fee" },
         { key: "bus_fee", label: "Bus Fee" },
-        { key: "total_fee", label: "Total Fee" },
         { key: "fee_exempted", label: "Fee Exempted" },
         { key: "form_submitted", label: "Form Submitted" },
         { key: "tc_received", label: "TC Received" },
@@ -261,6 +266,7 @@ const UserManagement = () => {
     if (type === "teacher") {
       return [
         ...base,
+        { key: "subjects", label: "Subjects" },
         { key: "dob", label: "Date of Birth" },
         { key: "doj", label: "Date of Joining" },
         { key: "father_spouse_name", label: "Father/Spouse Name" },
@@ -296,7 +302,6 @@ const UserManagement = () => {
         house: user.house || "",
         father_name: user.father_name || "",
         mother_name: user.mother_name || "",
-        monthly_fee: user.monthly_fee || "",
         bus_fee: user.bus_fee || "",
         fee_exempted: user.fee_exempted || false,
         admission_date: user.admission_date || "",
@@ -316,17 +321,27 @@ const UserManagement = () => {
         slc_document_url: user.slc_document_url || "",
         character_certificate_document_url: user.character_certificate_document_url || "",
         can_view_revenue: user.can_view_revenue || false,
+        subjectAssignments: (() => {
+           const ast = subjectTeachers?.filter(st => String(st.teacher_id) === String(user.id)) || [];
+           const grouped = {};
+           ast.forEach(st => {
+              if (!grouped[st.subject_id]) grouped[st.subject_id] = [];
+              grouped[st.subject_id].push(st.class_id);
+           });
+           return Object.keys(grouped).map(sid => ({ subjectId: sid, classIds: grouped[sid] }));
+        })(),
       });
     } else {
       setEditingUser(null);
       setEditingUser(null);
       setFormData({ 
         name: "", email: "", password: "password@1", phone: "", alternate_number: "", type: type, connections: [], classId: "", classes: [],
-        admission_number: "", house: "", father_name: "", mother_name: "", monthly_fee: "", bus_fee: "", fee_exempted: false,
+        admission_number: "", house: "", father_name: "", mother_name: "", bus_fee: "", fee_exempted: false,
         admission_date: "", form_submitted: false, address: "", dob: "", doj: "", father_spouse_name: "", leave_school: false, tc_received: false, tc_date: "",
         slc_received: false, slc_date: "", character_certificate_received: false, character_certificate_date: "",
         tc_document_url: "", slc_document_url: "", character_certificate_document_url: "",
         can_view_revenue: false,
+        subjectAssignments: [],
       });
     }
     setIsModalOpen(true);
@@ -358,11 +373,45 @@ const UserManagement = () => {
       if (editingUser) {
         const payload = { ...formData, id: editingUser };
         if (!payload.password) delete payload.password; // Don't send empty password
+        delete payload.subjectAssignments; // Strip from user payload
         await api.put(`/admin_panel/users/${editingUser}`, { data: payload });
+        
+        // Sync subject assignments
+        if (formData.type === 'teacher' && formData.subjectAssignments) {
+          const existingAssignments = subjectTeachers?.filter(st => String(st.teacher_id) === String(editingUser)) || [];
+          const newFlatAssignments = [];
+          formData.subjectAssignments.forEach(group => {
+            if (group.subjectId && group.classIds && group.classIds.length > 0) {
+              group.classIds.forEach(cid => {
+                newFlatAssignments.push({ subjectId: group.subjectId, classId: cid });
+              });
+            }
+          });
+          
+          for (let ext of existingAssignments) {
+            const stillExists = newFlatAssignments.find(sa => sa.subjectId === ext.subject_id && sa.classId === ext.class_id);
+            if (!stillExists) {
+              await api.post(`/admin_panel/subjectTeachers/assign`, { data: { subjectId: ext.subject_id, classId: ext.class_id, teacherId: null } });
+            }
+          }
+          
+          for (let newAsgn of newFlatAssignments) {
+            const alreadyExists = existingAssignments.find(ext => ext.subject_id === newAsgn.subjectId && ext.class_id === newAsgn.classId);
+            if (!alreadyExists) {
+              await api.post(`/admin_panel/subjectTeachers/assign`, { data: { subjectId: newAsgn.subjectId, classId: newAsgn.classId, teacherId: editingUser } });
+            }
+          }
+          dispatch(fetchSubjectTeachers());
+        }
+        
         toast.success("User updated successfully");
       } else {
-        await api.post("/admin_panel/users", { data: formData });
+        const payload = { ...formData };
+        delete payload.subjectAssignments;
+        await api.post("/admin_panel/users", { data: payload });
         toast.success("User created successfully");
+        // Note: For new users, we'd need the created ID to assign subjects.
+        // Currently subjects are only assigned when editing.
       }
       setIsModalOpen(false);
       dispatch(fetchUsers());
@@ -451,7 +500,6 @@ const UserManagement = () => {
             phone: String(row["MOB"] || ""),
             alternate_number: String(row["ALTERNATE NUMBER"] || ""),
             dob: String(row["DOB"] || ""),
-            monthly_fee: Number(row["MONTHLY FEE"]) || 0,
             bus_fee: Number(row["BUS"]) || 0,
             admission_date: String(row["DATE OF ADMISSION"] || ""),
             form_submitted: String(row["FORM SUBMITTED"]).trim().toUpperCase() === "SUBMITTED" || String(row["FORM SUBMITTED"]).trim().toLowerCase() === "true",
@@ -516,7 +564,6 @@ const UserManagement = () => {
         "MOB": "9876543210",
         "ALTERNATE NUMBER": "9876543211",
         "DOB": "2015-05-20",
-        "MONTHLY FEE": "1500",
         "BUS": "500",
         "DATE OF ADMISSION": "2020-04-01",
         "FORM SUBMITTED": "SUBMITTED",
@@ -590,9 +637,7 @@ const UserManagement = () => {
         addIfSelected("father_name", u.father_name || "N/A");
         addIfSelected("mother_name", u.mother_name || "N/A");
         addIfSelected("address", u.address || "N/A");
-        addIfSelected("monthly_fee", u.monthly_fee || 0);
         addIfSelected("bus_fee", u.bus_fee || 0);
-        addIfSelected("total_fee", (Number(u.monthly_fee || 0) + Number(u.bus_fee || 0)));
         addIfSelected("fee_exempted", u.fee_exempted ? "Yes" : "No");
         addIfSelected("form_submitted", u.form_submitted ? "Yes" : "No");
         addIfSelected("tc_received", u.tc_received ? `Yes (${u.tc_date || ''})` : "No");
@@ -629,9 +674,7 @@ const UserManagement = () => {
         addIfSelected("father_name", u.father_name || "N/A");
         addIfSelected("mother_name", u.mother_name || "N/A");
         addIfSelected("address", u.address || "N/A");
-        addIfSelected("monthly_fee", u.monthly_fee || 0);
-        addIfSelected("bus_fee", u.bus_fee || 0);
-        addIfSelected("total_fee", (Number(u.monthly_fee || 0) + Number(u.bus_fee || 0)).toString());
+        addIfSelected("bus_fee", (u.bus_fee || 0).toString());
         addIfSelected("form_submitted", u.form_submitted ? "Yes" : "No");
         addIfSelected("tc_received", u.tc_received ? `Yes (${u.tc_date || ''})` : "No");
         addIfSelected("slc_received", u.slc_received ? `Yes (${u.slc_date || ''})` : "No");
@@ -658,13 +701,58 @@ const UserManagement = () => {
       case "associations": 
         if (type === "student" && user.classes?.length > 0) {
           return <span style={{ background: "rgba(59, 130, 246, 0.15)", color: "#3b82f6", fontWeight: "600", padding: "4px 8px", borderRadius: "8px", fontSize: "12px" }}>{getClassName(user.classes[0])}</span>;
-        } else if (type === "teacher" && user.classes?.length > 0) {
-          return <span style={{ background: "rgba(16, 185, 129, 0.15)", color: "#10b981", fontWeight: "600", padding: "4px 8px", borderRadius: "8px", fontSize: "12px" }}>{user.classes.length} Classes</span>;
+        } else if (type === "teacher") {
+          // Collect all classes the teacher is involved with (CT + Subject)
+          const ctClasses = user.classes || [];
+          const subjectClasses = subjectTeachers?.filter(st => String(st.teacher_id) === String(user.id)).map(st => st.class_id) || [];
+          
+          const uniqueClassIds = [...new Set([...ctClasses, ...subjectClasses])];
+          
+          if (uniqueClassIds.length === 0) return "N/A";
+          
+          return (
+            <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', maxWidth: '250px' }}>
+              {uniqueClassIds.map(cid => {
+                const isCT = ctClasses.includes(cid);
+                const cName = getClassName(cid);
+                return (
+                  <span key={cid} style={{ 
+                    background: isCT ? "rgba(16, 185, 129, 0.15)" : "rgba(59, 130, 246, 0.15)", 
+                    color: isCT ? "#10b981" : "#3b82f6", 
+                    fontWeight: "600", padding: "4px 8px", borderRadius: "8px", fontSize: "12px", whiteSpace: "nowrap" 
+                  }}>
+                    {cName} {isCT && "(CT)"}
+                  </span>
+                );
+              })}
+            </div>
+          );
         } else if (type === "parent" && user.connections?.length > 0) {
           return <span style={{ background: "rgba(168, 85, 247, 0.15)", color: "#a855f7", fontWeight: "600", padding: "4px 8px", borderRadius: "8px", fontSize: "12px" }}>{user.connections.length} Students</span>;
         } else if (type === "admission") {
           const pipelineCount = newUsers?.filter(nu => String(nu.assigned_to) === String(user.id)).length || 0;
           return <span style={{ background: "rgba(234, 88, 12, 0.15)", color: "#ea580c", fontWeight: "600", padding: "4px 8px", borderRadius: "8px", fontSize: "12px" }}>{pipelineCount} Pipeline</span>;
+        }
+        return "N/A";
+      case "subjects":
+        if (type === "teacher") {
+          const assignedSubjects = subjectTeachers?.filter(st => String(st.teacher_id) === String(user.id)) || [];
+          if (assignedSubjects.length === 0) return "N/A";
+          
+          const uniqueSubjectIds = [...new Set(assignedSubjects.map(st => st.subject_id))];
+          
+          return (
+            <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', maxWidth: '250px' }}>
+              {uniqueSubjectIds.map(subjectId => {
+                const sub = subjects?.find(s => s.id === subjectId);
+                return (
+                  <span key={subjectId} style={{ background: "rgba(139, 92, 246, 0.15)", color: "#8b5cf6", fontWeight: "600", padding: "4px 8px", borderRadius: "8px", fontSize: "12px", whiteSpace: "nowrap" }}>
+                    {sub?.name || 'Unknown'}
+                  </span>
+                );
+              })}
+            </div>
+          );
         }
         return "N/A";
       case "admission_number": return user.admission_number || "-";
@@ -673,9 +761,7 @@ const UserManagement = () => {
       case "father_name": return user.father_name || "N/A";
       case "mother_name": return user.mother_name || "N/A";
       case "address": return user.address || "N/A";
-      case "monthly_fee": return user.monthly_fee || "0";
       case "bus_fee": return user.bus_fee || "0";
-      case "total_fee": return (Number(user.monthly_fee || 0) + Number(user.bus_fee || 0)) || "0";
       case "fee_exempted": return user.fee_exempted ? <span style={{ color: "#10b981", fontWeight: "600" }}>Yes</span> : "No";
       case "form_submitted": return user.form_submitted ? "Yes" : "No";
       case "leave_school": return user.leave_school ? "Yes" : "No";
@@ -690,7 +776,7 @@ const UserManagement = () => {
   };
 
   return (
-    <div>
+    <div style={{ display: "flex", flexDirection: "column", height: "calc(100vh - 3rem)", overflow: "hidden" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem" }}>
         <div>
           <h1 style={{ fontSize: "2rem", fontWeight: "700", textTransform: "capitalize" }}>{type} Management</h1>
@@ -713,8 +799,9 @@ const UserManagement = () => {
         </div>
       </div>
 
-      <div className="glass-panel" style={{ padding: "1rem" }}>
-        <TableFilterHeader
+      <div className="glass-panel" style={{ flex: 1, display: "flex", flexDirection: "column", minHeight: 0, padding: "1rem" }}>
+        <div style={{ flexShrink: 0 }}>
+          <TableFilterHeader
           searchQuery={searchQuery}
           setSearchQuery={setSearchQuery}
           searchPlaceholder={`Search ${type}s...`}
@@ -725,7 +812,8 @@ const UserManagement = () => {
           onExportExcel={handleExportExcel}
           onExportPDF={handleExportPDF}
         />
-        <div style={{ overflowX: "auto", overflowY: "auto", maxHeight: "calc(100vh - 280px)" }}>
+        </div>
+        <div style={{ flex: 1, overflowX: "auto", overflowY: "auto", minHeight: 0 }}>
           <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left", position: "relative" }}>
             <thead>
               <tr>
@@ -976,6 +1064,15 @@ const UserManagement = () => {
                   <label style={{ display: "block", marginBottom: "0.5rem", fontSize: "0.875rem" }}>Alternate Number</label>
                   <input className="input-glass" value={formData.alternate_number} onChange={(e) => setFormData({ ...formData, alternate_number: e.target.value })} />
                 </div>
+                <div>
+                  <label style={{ display: "block", marginBottom: "0.5rem", fontSize: "0.875rem" }}>Gender</label>
+                  <select className="input-glass" value={formData.gender || ""} onChange={(e) => setFormData({ ...formData, gender: e.target.value })}>
+                    <option value="">Select Gender</option>
+                    <option value="Male">Male</option>
+                    <option value="Female">Female</option>
+                    <option value="Other">Other</option>
+                  </select>
+                </div>
                 {type === 'student' && (
                   <div>
                     <label style={{ display: "block", marginBottom: "0.5rem", fontSize: "0.875rem" }}>Class</label>
@@ -1024,6 +1121,72 @@ const UserManagement = () => {
                       {formData.classes.length} Selected
                     </span>
                   </button>
+                </div>
+              )}
+
+              {type === 'teacher' && (
+                <div style={{ marginTop: "1rem", borderTop: "1px solid rgba(255,255,255,0.1)", paddingTop: "1rem" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem" }}>
+                    <h3 style={{ fontSize: "1.1rem", fontWeight: "600", color: "var(--text-primary)" }}>Subject Assignments</h3>
+                    <button 
+                      type="button"
+                      onClick={() => setFormData({ ...formData, subjectAssignments: [...(formData.subjectAssignments || []), { subjectId: "", classIds: [] }] })}
+                      className="btn-ghost"
+                      style={{ fontSize: "0.75rem", padding: "0.25rem 0.5rem", color: "#3b82f6", background: "rgba(59, 130, 246, 0.1)", borderRadius: "4px" }}
+                    >
+                      + Add Subject
+                    </button>
+                  </div>
+                  
+                  <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+                    {(formData.subjectAssignments || []).map((assignment, idx) => (
+                      <div key={idx} style={{ display: "grid", gridTemplateColumns: "1fr 1fr auto", gap: "0.5rem", alignItems: "center", background: "rgba(255,255,255,0.02)", padding: "0.5rem", borderRadius: "8px", border: "1px solid var(--glass-border)", position: "relative", zIndex: 100 - idx }}>
+                        <div style={{ position: "relative" }}>
+                          <CustomSelect 
+                            options={subjects?.map(s => ({ value: s.id, label: s.name })) || []}
+                            value={assignment.subjectId}
+                            onChange={(val) => {
+                              const newAssignments = [...formData.subjectAssignments];
+                              newAssignments[idx].subjectId = val;
+                              setFormData({ ...formData, subjectAssignments: newAssignments });
+                            }}
+                            placeholder="Select Subject..."
+                          />
+                        </div>
+                        
+                        <div style={{ position: "relative" }}>
+                          <CustomSelect 
+                            options={classes?.map(c => ({ value: c.id, label: `${c.className || c.name} ${c.section ? '- ' + c.section : ''}`.trim() })) || []}
+                            value={assignment.classIds}
+                            isMulti={true}
+                            onChange={(val) => {
+                              const newAssignments = [...formData.subjectAssignments];
+                              newAssignments[idx].classIds = val;
+                              setFormData({ ...formData, subjectAssignments: newAssignments });
+                            }}
+                            placeholder="Select Classes..."
+                          />
+                        </div>
+                        
+                        <button 
+                          type="button"
+                          onClick={() => {
+                            const newAssignments = formData.subjectAssignments.filter((_, i) => i !== idx);
+                            setFormData({ ...formData, subjectAssignments: newAssignments });
+                          }}
+                          className="btn-ghost hover-bg"
+                          style={{ color: "#ef4444", padding: "0.25rem", borderRadius: "4px" }}
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
+                    ))}
+                    {(formData.subjectAssignments?.length === 0) && (
+                      <div style={{ textAlign: "center", padding: "1rem", color: "var(--text-secondary)", fontSize: "0.875rem", fontStyle: "italic", background: "rgba(0,0,0,0.02)", borderRadius: "8px" }}>
+                        No subjects assigned yet.
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
 
@@ -1097,18 +1260,15 @@ const UserManagement = () => {
                   </div>
 
                   <h3 style={{ fontSize: "1.1rem", fontWeight: "600", color: "var(--text-primary)", marginTop: "0.5rem" }}>Fees Setup</h3>
+                  <p style={{ fontSize: "0.8rem", color: "var(--text-secondary)", marginBottom: "0.5rem" }}>Monthly, Annual, and One-Time fees are automatically calculated based on the assigned Class Fee Structure.</p>
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
                     <div>
-                      <label style={{ display: "block", marginBottom: "0.5rem", fontSize: "0.875rem" }}>Monthly Fee (₹)</label>
-                      <input type="number" className="input-glass" value={formData.monthly_fee} onChange={(e) => setFormData({ ...formData, monthly_fee: e.target.value })} />
-                    </div>
-                    <div>
-                      <label style={{ display: "block", marginBottom: "0.5rem", fontSize: "0.875rem" }}>Bus Fee (₹)</label>
+                      <label style={{ display: "block", marginBottom: "0.5rem", fontSize: "0.875rem" }}>Bus Fee (₹) / month</label>
                       <input type="number" className="input-glass" value={formData.bus_fee} onChange={(e) => setFormData({ ...formData, bus_fee: e.target.value })} />
                     </div>
                     <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginTop: "1.5rem" }}>
                       <input type="checkbox" id="fee_exempted" checked={formData.fee_exempted} onChange={(e) => setFormData({ ...formData, fee_exempted: e.target.checked })} />
-                      <label htmlFor="fee_exempted" style={{ fontSize: "0.875rem", cursor: "pointer" }}>Fee Exempted</label>
+                      <label htmlFor="fee_exempted" style={{ fontSize: "0.875rem", cursor: "pointer" }}>Fee Exempted (Full Waiver)</label>
                     </div>
                   </div>
 

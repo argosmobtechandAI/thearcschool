@@ -220,7 +220,8 @@ const CounselorProfile = () => {
           </div>
 
           <div className="glass-panel" style={{ padding: "1rem" }}>
-            <TableFilterHeader
+            <div style={{ flexShrink: 0 }}>
+          <TableFilterHeader
               searchQuery={search}
               setSearchQuery={setSearch}
               searchPlaceholder="Search assigned prospects..."
@@ -251,6 +252,7 @@ const CounselorProfile = () => {
                 }
               ]}
             />
+        </div>
             
             <div style={{ overflowX: "auto" }}>
               <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left" }}>

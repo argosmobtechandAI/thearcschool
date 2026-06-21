@@ -26,6 +26,7 @@ const FeeStructures = () => {
   const [customCategory, setCustomCategory] = useState("");
   const [customClass, setCustomClass] = useState("");
   const [customAmount, setCustomAmount] = useState("");
+  const [customFrequency, setCustomFrequency] = useState("monthly");
   const [isAddingCustomFee, setIsAddingCustomFee] = useState(false);
   
   const availableClasses = feeStructures ? [...new Set(feeStructures.map(f => f.class_name).filter(Boolean))].sort() : [];
@@ -87,8 +88,9 @@ const FeeStructures = () => {
     }
     setIsAddingCustomFee(true);
     try {
+      const finalCategory = customCategory.trim().replace(/\s+/g, '_') + '_' + customFrequency;
       await dispatch(addFeeStructure({
-        fee_category: customCategory,
+        fee_category: finalCategory,
         class_name: customClass || null,
         amount: Number(customAmount),
         academic_year: academicYear
@@ -98,6 +100,7 @@ const FeeStructures = () => {
       setCustomCategory("");
       setCustomClass("");
       setCustomAmount("");
+      setCustomFrequency("monthly");
     } catch (err) {
       toast.error(err.message || "Failed to add custom fee");
     } finally {
@@ -252,6 +255,20 @@ const FeeStructures = () => {
                 >
                   <option value="">All Classes (School-wide)</option>
                   {uniqueClassNames.map(name => <option key={name} value={name}>{name}</option>)}
+                </select>
+              </div>
+
+              <div style={{ marginBottom: "1rem" }}>
+                <label style={{ display: "block", fontSize: "0.875rem", marginBottom: "0.5rem", color: "var(--text-secondary)" }}>Frequency</label>
+                <select 
+                  className="input-glass" 
+                  value={customFrequency} 
+                  onChange={(e) => setCustomFrequency(e.target.value)} 
+                  style={{ width: "100%", padding: "0.5rem" }} 
+                >
+                  <option value="monthly">Monthly</option>
+                  <option value="annual">Annual / Yearly</option>
+                  <option value="one_time">One-time</option>
                 </select>
               </div>
 

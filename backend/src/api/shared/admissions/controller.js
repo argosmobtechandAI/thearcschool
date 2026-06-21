@@ -29,6 +29,7 @@ export const createNewUser = async (req, res) => {
           gender: data.gender,
           documents: data.documents || [],
           assigned_to: assignedTo,
+          class_id: data.class_id || null,
         },
       ])
       .select();
@@ -113,6 +114,7 @@ export const updateNewUser = async (req, res) => {
         gender: data.gender,
         documents: data.documents,
         assigned_to: data.assigned_to || null,
+        class_id: data.class_id || null,
       })
       .eq("id", id)
       .select();
@@ -213,6 +215,17 @@ export const approveNewUser = async (req, res) => {
       if (authError) throw authError;
 
       // The PostgreSQL trigger handles creating the public.user row.
+      
+      // Assign the student to the selected class
+      if (userReq[0].class_id) {
+        const { error: classAssignError } = await supabase
+          .from("class_students")
+          .insert([{ student_id: authData.user.id, class_id: userReq[0].class_id }]);
+        
+        if (classAssignError) {
+          console.error("Failed to assign class to new student:", classAssignError);
+        }
+      }
 
       const { data: updatedUser, error: updateError } = await supabase
         .from("newUsers")

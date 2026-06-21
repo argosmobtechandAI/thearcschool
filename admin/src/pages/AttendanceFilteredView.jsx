@@ -141,7 +141,7 @@ const AttendanceFilteredView = () => {
         </div>
       </div>
 
-      <div className="glass-panel">
+      <div className="glass-panel" style={{ flex: 1, display: "flex", flexDirection: "column", minHeight: 0 }}>
         <div style={{ overflowX: "auto" }}>
           <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left" }}>
             <thead>

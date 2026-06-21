@@ -12,6 +12,7 @@ const TableFilterHeader = ({
   selectedColumns,
   setSelectedColumns,
   children,
+  hideSearch = false
 }) => {
   const [showColumnsDropdown, setShowColumnsDropdown] = useState(false);
   const [internalSelectedKeys, setInternalSelectedKeys] = useState([]);
@@ -55,18 +56,18 @@ const TableFilterHeader = ({
       flexWrap: "wrap", 
       justifyContent: "space-between", 
       alignItems: "center", 
-      gap: "1rem",
-      marginBottom: "1.5rem",
+      gap: "0.5rem",
+      marginBottom: "0.5rem",
       background: "rgba(255, 255, 255, 0.02)",
       border: "1px solid var(--glass-border)",
       borderRadius: "12px",
-      padding: "1rem"
+      padding: "0.5rem 1rem"
     }}>
       
       {/* Left side: Search & Filters */}
       <div style={{ display: "flex", flexWrap: "wrap", gap: "1rem", flex: 1, alignItems: "center" }}>
         {/* Search Input */}
-        {setSearchQuery && (
+        {!hideSearch && setSearchQuery && (
           <div style={{ position: "relative", minWidth: "250px", maxWidth: "400px", flex: 1 }}>
             <Search size={18} style={{ position: "absolute", left: "1rem", top: "50%", transform: "translateY(-50%)", color: "var(--text-secondary)" }} />
             <input

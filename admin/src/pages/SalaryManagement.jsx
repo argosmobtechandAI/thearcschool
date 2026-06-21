@@ -202,7 +202,8 @@ const SalaryManagement = () => {
             {/* Main Content */}
             <div className="bg-white/80 backdrop-blur-md rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
                 <div className="p-4 bg-white border-b border-slate-200">
-                    <TableFilterHeader
+                    <div style={{ flexShrink: 0 }}>
+          <TableFilterHeader
                         searchQuery={searchQuery}
                         setSearchQuery={setSearchQuery}
                         searchPlaceholder="Search by name or ID..."
@@ -235,6 +236,7 @@ const SalaryManagement = () => {
                     >
                         <DateRangePicker onRangeChange={setDateRange} />
                     </TableFilterHeader>
+        </div>
                 </div>
 
                 <div className="overflow-x-auto">

@@ -168,7 +168,8 @@ const FinanceProfile = () => {
       <div className="glass-panel" style={{ padding: "1.5rem" }}>
         <h3 style={{ fontSize: "1.25rem", fontWeight: "600", marginBottom: "1rem" }}>Collection Ledger</h3>
         
-        <TableFilterHeader
+        <div style={{ flexShrink: 0 }}>
+          <TableFilterHeader
           searchQuery={searchQuery}
           setSearchQuery={setSearchQuery}
           searchPlaceholder="Search student or fee type..."
@@ -179,6 +180,7 @@ const FinanceProfile = () => {
           onExportExcel={handleExportExcel}
           onExportPDF={handleExportPDF}
         />
+        </div>
 
         <div style={{ overflowX: "auto", marginTop: "1rem" }}>
           <table style={{ width: "100%", borderCollapse: "collapse", whiteSpace: "nowrap" }}>

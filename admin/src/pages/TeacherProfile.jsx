@@ -1,15 +1,15 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
-import { fetchUsers } from "../features/dataSlice";
-import { ArrowLeft, User, Phone, Mail, Calendar, BookOpen, Clock, Activity, Briefcase } from "lucide-react";
+import { fetchUsers, fetchSubjects, fetchSubjectTeachers } from "../features/dataSlice";
+import { ArrowLeft, User, Users, Phone, Mail, Calendar, BookOpen, Clock, Activity, Briefcase } from "lucide-react";
 
 const TeacherProfile = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const dispatch = useDispatch();
   
-  const { users, classes, loadingUsers } = useSelector((state) => state.data);
+  const { users, classes, loadingUsers, subjects, subjectTeachers } = useSelector((state) => state.data);
   const teacher = useMemo(() => {
     return users.find(u => String(u.id) === String(id) && u.type === 'teacher') || null;
   }, [users, id]);
@@ -18,12 +18,38 @@ const TeacherProfile = () => {
 
   useEffect(() => {
     if (users.length === 0) dispatch(fetchUsers());
+    dispatch(fetchSubjects());
+    dispatch(fetchSubjectTeachers());
   }, [dispatch, users.length]);
 
   const teacherClasses = useMemo(() => {
     if (!teacher || !teacher.classes) return [];
     return classes.filter(c => teacher.classes.includes(c.id));
   }, [teacher, classes]);
+
+  const teacherSubjects = useMemo(() => {
+    if (!teacher) return [];
+    const assigned = subjectTeachers.filter(st => String(st.teacher_id) === String(teacher.id));
+    
+    const grouped = {};
+    assigned.forEach(st => {
+      if (!grouped[st.subject_id]) grouped[st.subject_id] = [];
+      grouped[st.subject_id].push(st.class_id);
+    });
+
+    return Object.keys(grouped).map(subjectId => {
+      const subject = subjects.find(s => s.id === subjectId);
+      const classNames = grouped[subjectId].map(cid => {
+        const c = classes.find(cls => cls.id === cid);
+        return c ? `${c.className || c.name} ${c.section || ''}`.trim() : 'Unknown';
+      });
+      return {
+        subject_id: subjectId,
+        subjectName: subject?.name || 'Unknown',
+        classNames: classNames.join(", ")
+      };
+    });
+  }, [teacher, subjectTeachers, subjects, classes]);
 
   if (loadingUsers) {
     return <div style={{ padding: "2rem", textAlign: "center", color: "var(--text-secondary)" }}>Loading profile...</div>;
@@ -134,23 +160,48 @@ const TeacherProfile = () => {
             )}
 
             {activeTab === "academic" && (
-              <div className="glass-panel" style={{ padding: "1.5rem" }}>
-                <h3 style={{ fontSize: "1.125rem", fontWeight: "600", marginBottom: "1.5rem", borderBottom: "1px solid var(--glass-border)", paddingBottom: "0.5rem" }}>Assigned Classes</h3>
-                {teacherClasses.length === 0 ? (
-                  <div style={{ textAlign: "center", padding: "3rem", color: "var(--text-secondary)" }}>
-                    <BookOpen size={48} style={{ opacity: 0.2, margin: "0 auto 1rem" }} />
-                    <p>No classes assigned to this teacher yet.</p>
-                  </div>
-                ) : (
-                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))", gap: "1rem" }}>
-                    {teacherClasses.map((c, idx) => (
-                      <div key={idx} style={{ padding: "1rem", background: "rgba(16, 185, 129, 0.1)", borderRadius: "8px", border: "1px solid rgba(16, 185, 129, 0.3)" }}>
-                        <div style={{ fontWeight: "600", color: "#10b981", fontSize: "1.125rem", marginBottom: "0.25rem" }}>{c.name} - {c.section}</div>
-                        <div style={{ color: "var(--text-secondary)", fontSize: "0.875rem" }}>Class ID: {c.id}</div>
-                      </div>
-                    ))}
-                  </div>
-                )}
+              <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
+                <div className="glass-panel" style={{ padding: "1.5rem" }}>
+                  <h3 style={{ fontSize: "1.125rem", fontWeight: "600", marginBottom: "1.5rem", borderBottom: "1px solid var(--glass-border)", paddingBottom: "0.5rem" }}>Class Teacher For</h3>
+                  {teacherClasses.length === 0 ? (
+                    <div style={{ textAlign: "center", padding: "2rem", color: "var(--text-secondary)" }}>
+                      <p>No classes assigned as Class Teacher.</p>
+                    </div>
+                  ) : (
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))", gap: "1rem" }}>
+                      {teacherClasses.map((c, idx) => (
+                        <div key={idx} style={{ padding: "1rem", background: "rgba(16, 185, 129, 0.1)", borderRadius: "8px", border: "1px solid rgba(16, 185, 129, 0.3)" }}>
+                          <div style={{ fontWeight: "600", color: "#10b981", fontSize: "1.125rem", marginBottom: "0.25rem" }}>{c.name} - {c.section}</div>
+                          <div style={{ color: "var(--text-secondary)", fontSize: "0.875rem", display: "flex", alignItems: "center", gap: "6px" }}>
+                            <Users size={14} />
+                            <span>Students: {c.student?.length || 0}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <div className="glass-panel" style={{ padding: "1.5rem" }}>
+                  <h3 style={{ fontSize: "1.125rem", fontWeight: "600", marginBottom: "1.5rem", borderBottom: "1px solid var(--glass-border)", paddingBottom: "0.5rem" }}>Assigned Subjects</h3>
+                  {teacherSubjects.length === 0 ? (
+                    <div style={{ textAlign: "center", padding: "2rem", color: "var(--text-secondary)" }}>
+                      <p>No subjects assigned to this teacher yet.</p>
+                    </div>
+                  ) : (
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))", gap: "1rem" }}>
+                      {teacherSubjects.map((st, idx) => (
+                        <div key={idx} style={{ padding: "1rem", background: "rgba(139, 92, 246, 0.1)", borderRadius: "8px", border: "1px solid rgba(139, 92, 246, 0.3)" }}>
+                          <div style={{ fontWeight: "600", color: "#8b5cf6", fontSize: "1.125rem", marginBottom: "0.25rem" }}>{st.subjectName}</div>
+                          <div style={{ color: "var(--text-secondary)", fontSize: "0.875rem", display: "flex", alignItems: "center", gap: "6px" }}>
+                            <Users size={14} />
+                            <span>Classes: {st.classNames}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
             )}
 

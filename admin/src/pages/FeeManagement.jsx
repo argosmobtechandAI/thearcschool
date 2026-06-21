@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useMemo } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { fetchUsers, fetchClasses, fetchFees } from "../features/dataSlice";
+import { setFeeStatusFilter } from "../features/dashboardSlice";
 import TableFilterHeader from "../components/TableFilterHeader";
 import { useSortableData } from "../hooks/useSortableData";
 import { exportToExcel, exportToPDF } from "../utils/exportUtils";
@@ -14,9 +15,13 @@ const FeeManagement = () => {
   const dispatch = useDispatch();
 
   const { users, classes, loadingUsers, loadingClasses } = useSelector((state) => state.data);
+  const { globalDateRange, feeStatusFilter } = useSelector((state) => state.dashboard) || {};
 
   const [currentView, setCurrentView] = useState("students"); // 'students', 'collected', 'structures'
-  const [dateRange, setDateRange] = useState({ start: "", end: "" });
+  const [dateRange, setDateRange] = useState({ 
+    start: globalDateRange?.start || "", 
+    end: globalDateRange?.end || "" 
+  });
   const { start: startDate, end: endDate } = dateRange;
 
   const [searchTerm, setSearchTerm] = useState("");
@@ -34,6 +39,8 @@ const FeeManagement = () => {
   const [balancesMap, setBalancesMap] = useState({});
   const [selectedClassFilter, setSelectedClassFilter] = useState("");
   const [selectedPaymentMode, setSelectedPaymentMode] = useState("");
+  const selectedStatusFilter = feeStatusFilter || "All";
+  const setSelectedStatusFilter = (val) => dispatch(setFeeStatusFilter(val));
   const [currentPage, setCurrentPage] = useState(1);
   const ITEMS_PER_PAGE = 100;
 
@@ -69,7 +76,12 @@ const FeeManagement = () => {
 
   useEffect(() => {
     if (students.length > 0) {
-      api.post("/finance_panel/studentBalances", { students: students.map(s => ({ id: s.id, type: s.type, fee_exempted: s.fee_exempted, classes: s.classes, bus_fee: s.bus_fee })) })
+      const payload = { 
+        students: students.map(s => ({ id: s.id, type: s.type, fee_exempted: s.fee_exempted, classes: s.classes, bus_fee: s.bus_fee })),
+        startDate,
+        endDate
+      };
+      api.post("/finance_panel/studentBalances", payload)
         .then(res => {
           if (res.data.success) {
             const bMap = {};
@@ -79,7 +91,7 @@ const FeeManagement = () => {
         })
         .catch(console.error);
     }
-  }, [students]);
+  }, [students, startDate, endDate]);
 
   useEffect(() => {
     if (currentView === "collected") {
@@ -161,12 +173,18 @@ const FeeManagement = () => {
       return processedData.filter(f => formatCategory(f.fee_category).toLowerCase().includes(searchTerm.toLowerCase()));
     }
 
-    return processedData.filter(item => 
-      ((item.name?.toLowerCase() || "").includes(searchTerm.toLowerCase()) || 
-      (item.admission_number?.toLowerCase() || "").includes(searchTerm.toLowerCase())) &&
-      (!selectedClassFilter || item.baseClassName === selectedClassFilter)
-    );
-  }, [processedData, searchTerm, selectedClassFilter, currentView]);
+    return processedData.filter(item => {
+      const matchesSearch = (item.name?.toLowerCase() || "").includes(searchTerm.toLowerCase()) || 
+        (item.admission_number?.toLowerCase() || "").includes(searchTerm.toLowerCase());
+      const matchesClass = !selectedClassFilter || item.baseClassName === selectedClassFilter;
+      
+      let matchesStatus = true;
+      if (selectedStatusFilter === "Defaulters") matchesStatus = item.balance > 0;
+      else if (selectedStatusFilter === "Cleared") matchesStatus = item.balance <= 0;
+      
+      return matchesSearch && matchesClass && matchesStatus;
+    });
+  }, [processedData, searchTerm, selectedClassFilter, selectedStatusFilter, currentView]);
 
   const filteredPayments = useMemo(() => {
     return paymentsData.map(item => {
@@ -372,6 +390,7 @@ const FeeManagement = () => {
         </div>
       ) : (
         <div className="glass-panel" style={{ padding: "1.5rem" }}>
+          <div style={{ flexShrink: 0 }}>
           <TableFilterHeader
             searchQuery={searchTerm}
             setSearchQuery={setSearchTerm}
@@ -394,6 +413,16 @@ const FeeManagement = () => {
                 value: selectedClassFilter,
                 onChange: setSelectedClassFilter,
                 options: Array.from(new Set(classes.map(c => c.name))).filter(Boolean).map(name => ({ label: name, value: name }))
+              },
+              {
+                label: "Payment Status",
+                value: selectedStatusFilter,
+                onChange: setSelectedStatusFilter,
+                options: [
+                  { label: "All", value: "All" },
+                  { label: "Defaulters", value: "Defaulters" },
+                  { label: "Cleared", value: "Cleared" }
+                ]
               }
             ]}
             exportColumns={exportColumnsList}
@@ -402,16 +431,26 @@ const FeeManagement = () => {
             selectedColumns={selectedColumns}
             setSelectedColumns={setSelectedColumns}
           >
-            {currentView === "collected" && (
+            {(currentView === "collected" || currentView === "students") && (
               <DateRangePicker 
                 startDate={startDate}
                 endDate={endDate}
-                onRangeChange={(range) => setDateRange(range)}
-                setStartDate={(s) => setDateRange(prev => ({ ...prev, start: s }))}
-                setEndDate={(e) => setDateRange(prev => ({ ...prev, end: e }))}
+                onRangeChange={(range) => {
+                  setDateRange(range);
+                  dispatch({ type: 'dashboard/setGlobalDateRange', payload: range });
+                }}
+                setStartDate={(s) => {
+                  setDateRange(prev => ({ ...prev, start: s }));
+                  dispatch({ type: 'dashboard/setGlobalDateRange', payload: { start: s, end: endDate } });
+                }}
+                setEndDate={(e) => {
+                  setDateRange(prev => ({ ...prev, end: e }));
+                  dispatch({ type: 'dashboard/setGlobalDateRange', payload: { start: startDate, end: e } });
+                }}
               />
             )}
           </TableFilterHeader>
+        </div>
 
           <div style={{ display: "flex", justifyContent: "flex-end", marginTop: "0.5rem", gap: "0.5rem", flexWrap: "wrap", fontSize: "0.875rem" }}>
             {currentView === "collected" && (

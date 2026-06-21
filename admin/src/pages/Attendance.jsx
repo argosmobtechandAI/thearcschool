@@ -51,7 +51,10 @@ const Attendance = () => {
 
   useEffect(() => {
     fetchAttendance();
-    api.get('/holidays').then(res => setPublicHolidays(res.data.data || [])).catch(console.error);
+    api.get('/admin_panel/planner').then(res => {
+      const holidays = (res.data.data || []).filter(h => h.category === 'Holiday').map(h => ({ ...h, date: h.start_date }));
+      setPublicHolidays(holidays);
+    }).catch(console.error);
   }, []);
 
   useEffect(() => {

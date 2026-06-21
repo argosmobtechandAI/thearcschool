@@ -101,3 +101,18 @@
   border-radius: 50%;
   background-color: #ef4444;
 }
+
+.rbc-event-label {
+  display: none !important;
+}
+
+.rbc-event-content {
+  height: 100%;
+}
+
+.rbc-event {
+  padding: 0;
+  border: none;
+  background: transparent;
+}
+

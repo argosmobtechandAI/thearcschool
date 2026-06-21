@@ -2,9 +2,10 @@ import { useEffect, useState, useMemo } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { useParams, useNavigate } from "react-router-dom";
 import { fetchUsers } from "../features/dataSlice";
-import { ChevronLeft, Calendar } from "lucide-react";
+import { ChevronLeft, Calendar, FileSpreadsheet, Download } from "lucide-react";
 import { toast } from "react-toastify";
 import api from "../services/api";
+import { exportToExcel, exportToPDF } from "../utils/exportUtils";
 
 const AttendanceStudentView = () => {
   const { studentId } = useParams();
@@ -24,7 +25,10 @@ const AttendanceStudentView = () => {
 
   useEffect(() => {
     if (users.length === 0) dispatch(fetchUsers());
-    api.get('/holidays').then(res => setPublicHolidays(res.data.data || [])).catch(console.error);
+    api.get('/admin_panel/planner').then(res => {
+      const holidays = (res.data.data || []).filter(h => h.category === 'Holiday').map(h => ({ ...h, date: h.start_date }));
+      setPublicHolidays(holidays);
+    }).catch(console.error);
   }, [dispatch, users.length]);
 
   const fetchAttendance = async () => {
@@ -91,6 +95,37 @@ const AttendanceStudentView = () => {
     }
   };
 
+  const handleExportExcel = () => {
+    const data = gridDays.map(d => {
+      const record = attendanceRecords.find(a => a.date === d.fullDateString);
+      let status = "-";
+      if (d.isWeekend) status = "Weekend";
+      else if (d.isPublicHoliday) status = "Holiday";
+      else if (record) status = record.status.charAt(0).toUpperCase() + record.status.slice(1);
+      
+      return {
+        Date: d.fullDateString,
+        Day: d.dayName,
+        Status: status
+      };
+    });
+    exportToExcel(data, `Attendance_${activeStudent.name}_${gridMonth}`);
+  };
+
+  const handleExportPDF = () => {
+    const columns = ["Date", "Day", "Status"];
+    const data = gridDays.map(d => {
+      const record = attendanceRecords.find(a => a.date === d.fullDateString);
+      let status = "-";
+      if (d.isWeekend) status = "Weekend";
+      else if (d.isPublicHoliday) status = "Holiday";
+      else if (record) status = record.status.charAt(0).toUpperCase() + record.status.slice(1);
+      
+      return [d.fullDateString, d.dayName, status];
+    });
+    exportToPDF(columns, data, `Attendance_${activeStudent.name}_${gridMonth}`, `Attendance History - ${activeStudent.name} (${gridMonth})`);
+  };
+
   if (!activeStudent) {
     return <div style={{ padding: "2rem" }}>Loading student data...</div>;
   }
@@ -141,6 +176,15 @@ const AttendanceStudentView = () => {
           <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
             <span style={{ fontSize: "1.5rem", fontWeight: "700", color: "#ef4444" }}>{absentCount}</span>
             <span style={{ fontSize: "0.75rem", color: "var(--text-secondary)", textTransform: "uppercase" }}>Absent</span>
+          </div>
+
+          <div style={{ display: "flex", gap: "0.5rem", marginLeft: "1rem", borderLeft: "1px solid rgba(0,0,0,0.1)", paddingLeft: "1rem", alignItems: "center" }}>
+            <button onClick={handleExportExcel} className="btn-ghost" style={{ padding: "8px", display: "flex", alignItems: "center", gap: "0.5rem" }} title="Export Excel">
+              <FileSpreadsheet size={18} />
+            </button>
+            <button onClick={handleExportPDF} className="btn-ghost" style={{ padding: "8px", display: "flex", alignItems: "center", gap: "0.5rem" }} title="Export PDF">
+              <Download size={18} />
+            </button>
           </div>
         </div>
       </div>

@@ -26,16 +26,16 @@ export const getAllInfo = async (req, res) => {
 
 // ---------------- SETTINGS (Social Links) ----------------
 export const updateSettings = async (req, res) => {
-  const { instagram_url, whatsapp_url, linkedin_url, twitter_url } = req.body;
+  const { instagram_url, whatsapp_url, linkedin_url, twitter_url, late_fee_penalty } = req.body;
   try {
     // Check if settings exist
     const { data: existing } = await supabase.from("school_settings").select("id").limit(1).single();
     
     let result;
     if (existing?.id) {
-      result = await supabase.from("school_settings").update({ instagram_url, whatsapp_url, linkedin_url, twitter_url, updated_at: new Date() }).eq("id", existing.id).select();
+      result = await supabase.from("school_settings").update({ instagram_url, whatsapp_url, linkedin_url, twitter_url, late_fee_penalty, updated_at: new Date() }).eq("id", existing.id).select();
     } else {
-      result = await supabase.from("school_settings").insert([{ instagram_url, whatsapp_url, linkedin_url, twitter_url }]).select();
+      result = await supabase.from("school_settings").insert([{ instagram_url, whatsapp_url, linkedin_url, twitter_url, late_fee_penalty }]).select();
     }
 
     if (result.error) throw result.error;

@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useMemo } from "react";
+import { createPortal } from "react-dom";
 import { useDispatch, useSelector } from "react-redux";
 import { fetchTimeTables, fetchClasses, fetchUsers, fetchSubjects, fetchRooms } from "../features/dataSlice";
 import { toast } from "react-toastify";
@@ -133,6 +134,19 @@ const CustomToolbar = (toolbar) => {
 };
 
 const CustomEvent = ({ event }) => {
+  if (event.resource?.isPlannerEvent) {
+    let bgColor = "rgba(59, 130, 246, 0.8)"; // Event
+    if (event.resource.category === 'Holiday') bgColor = "rgba(16, 185, 129, 0.8)"; 
+    else if (event.resource.category === 'Exam') bgColor = "rgba(239, 68, 68, 0.8)"; 
+    else if (event.resource.category === 'PTM') bgColor = "rgba(245, 158, 11, 0.8)"; 
+    
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', fontWeight: 'bold', backgroundColor: bgColor, color: 'white', borderRadius: '4px', padding: '2px 4px', fontSize: '0.8rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+        {event.title}
+      </div>
+    );
+  }
+
   if (event.resource?.isMark) {
     return (
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', fontWeight: 'bold' }}>
@@ -178,6 +192,17 @@ export default function TimeTable() {
   const [dateRange, setDateRange] = useState(getThisWeek());
   const [calendarDate, setCalendarDate] = useState(new Date());
   const [calendarView, setCalendarView] = useState(Views.WEEK);
+  const [agendaLength, setAgendaLength] = useState(7);
+
+  const handleViewChange = (newView) => {
+    if (newView === 'agenda') {
+      if (calendarView === 'month') setAgendaLength(30);
+      else if (calendarView === 'week') setAgendaLength(7);
+      else if (calendarView === 'day') setAgendaLength(1);
+    }
+    setCalendarView(newView);
+  };
+
   const [openModal, setOpenModal] = useState(false);
   const [openEditModal, setOpenEditModal] = useState(false);
   const [openAddSingleModal, setOpenAddSingleModal] = useState(false);
@@ -185,7 +210,7 @@ export default function TimeTable() {
   const [duplicateConfig, setDuplicateConfig] = useState({ sourceDate: "", targetStartDate: "", targetEndDate: "", copyMode: "exact" });
   const [loading, setLoading] = useState(false);
   const [editingPeriodId, setEditingPeriodId] = useState(null);
-  const [publicHolidays, setPublicHolidays] = useState([]);
+  const [plannerEvents, setPlannerEvents] = useState([]);
 
   const [newTimeTable, setNewTimeTable] = useState({ date: "", timeTables: [] });
   const [timeSubject, setTimeSubject] = useState({ date: "", subject: "", initialTime: "", finalTime: "", teacher: "", isBreak: false, roomNumber: "" });
@@ -197,7 +222,9 @@ export default function TimeTable() {
     dispatch(fetchSubjects());
     dispatch(fetchRooms());
     
-    api.get('/holidays').then(res => setPublicHolidays(res.data.data || [])).catch(console.error);
+    api.get('/admin_panel/planner').then(res => {
+      setPlannerEvents(res.data.data || []);
+    }).catch(console.error);
   }, [dispatch]);
 
   useEffect(() => {
@@ -531,7 +558,7 @@ export default function TimeTable() {
   const getDayMarkType = (date) => {
     const d = new Date(date);
     if (d.getDay() === 0) return "Week Off";
-    if (publicHolidays.some(h => h.date === date)) return "Public Holiday";
+    if (plannerEvents.some(h => h.start_date === date && h.category === 'Holiday')) return "Public Holiday";
     
     const period = activeTimeTable?.dates?.[date]?.find(p => p.subject === "Holiday" || p.subject === "Week Off");
     return period ? period.subject : null;
@@ -539,6 +566,29 @@ export default function TimeTable() {
 
   const calendarEvents = useMemo(() => {
     const events = [];
+
+    if (plannerEvents && activeClassData) {
+      plannerEvents.forEach(pe => {
+        const targets = Array.isArray(pe.target_classes) ? pe.target_classes : [];
+        const isTarget = targets.includes("All") || targets.some(t => {
+           const lower = t.toLowerCase();
+           return activeClassData.name?.toLowerCase().includes(lower) || 
+                  `${activeClassData.name} ${activeClassData.section}`.toLowerCase().includes(lower);
+        });
+        
+        if (isTarget) {
+          events.push({
+            id: `planner-${pe.id}`,
+            title: pe.title,
+            start: new Date(pe.start_date + "T00:00:00"),
+            end: new Date((pe.end_date || pe.start_date) + "T23:59:59"),
+            allDay: true,
+            resource: { isPlannerEvent: true, ...pe }
+          });
+        }
+      });
+    }
+
     if (!activeTimeTable) return events;
 
     if (activeTimeTable.dates) {
@@ -560,7 +610,7 @@ export default function TimeTable() {
       });
     }
     return events;
-  }, [activeTimeTable, publicHolidays, visibleDates]);
+  }, [activeTimeTable, plannerEvents, activeClassData]);
 
   const { minTime, maxTime } = useMemo(() => {
     let minH = 8;
@@ -919,7 +969,8 @@ export default function TimeTable() {
               date={calendarDate}
               view={calendarView}
               onNavigate={(newDate) => setCalendarDate(newDate)}
-              onView={(newView) => setCalendarView(newView)}
+              onView={handleViewChange}
+              length={agendaLength}
               min={minTime}
               max={maxTime}
               views={[Views.MONTH, Views.WEEK, Views.DAY, Views.AGENDA]}
@@ -949,9 +1000,9 @@ export default function TimeTable() {
         </div>
       )}
 
-      {openModal && (
-        <div className="animate-fade-in" style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)", display: "flex", alignItems: "flex-start", justifyContent: "center", zIndex: 50, overflowY: "auto", padding: "4rem 1rem" }} onClick={() => setOpenModal(false)}>
-          <div className="glass-panel modal-content" style={{ width: "100%", maxWidth: "600px", padding: "2rem", margin: "auto", position: "relative" }} onClick={(e) => e.stopPropagation()}>
+      {openModal && createPortal(
+        <div className="animate-fade-in" style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 50, padding: "1rem" }} onClick={() => setOpenModal(false)}>
+          <div className="glass-panel modal-content" style={{ width: "100%", maxWidth: "600px", padding: "2rem", position: "relative", maxHeight: "90vh", overflowY: "auto" }} onClick={(e) => e.stopPropagation()}>
             <h2 style={{ fontSize: "1.5rem", fontWeight: "700", marginBottom: "1.5rem" }}>
               Create Timetable
             </h2>
@@ -1063,12 +1114,13 @@ export default function TimeTable() {
               <button type="button" onClick={handleSubmit} disabled={loading} className="btn btn-primary">{loading ? "Saving..." : "Save Timetable"}</button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
-      {openEditModal && (
-        <div className="animate-fade-in" style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)", display: "flex", alignItems: "flex-start", justifyContent: "center", zIndex: 50, overflowY: "auto", padding: "4rem 1rem" }} onClick={() => setOpenEditModal(false)}>
-          <div className="glass-panel modal-content" style={{ width: "100%", maxWidth: "600px", padding: "2rem", margin: "auto", position: "relative" }} onClick={(e) => e.stopPropagation()}>
+      {openEditModal && createPortal(
+        <div className="animate-fade-in" style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 50, padding: "1rem" }} onClick={() => setOpenEditModal(false)}>
+          <div className="glass-panel modal-content" style={{ width: "100%", maxWidth: "600px", padding: "2rem", position: "relative", maxHeight: "90vh", overflowY: "auto" }} onClick={(e) => e.stopPropagation()}>
             <h2 style={{ fontSize: "1.5rem", fontWeight: "700", marginBottom: "1.5rem" }}>
               Edit Period
             </h2>
@@ -1152,12 +1204,13 @@ export default function TimeTable() {
               </div>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
-      {openAddSingleModal && (
-        <div className="animate-fade-in" style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 50 }} onClick={() => setOpenAddSingleModal(false)}>
-          <div className="glass-panel modal-content" style={{ width: "100%", maxWidth: "600px", padding: "2rem", maxHeight: "90vh", overflowY: "auto" }} onClick={(e) => e.stopPropagation()}>
+      {openAddSingleModal && createPortal(
+        <div className="animate-fade-in" style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 50, padding: "1rem" }} onClick={() => setOpenAddSingleModal(false)}>
+          <div className="glass-panel modal-content" style={{ width: "100%", maxWidth: "600px", padding: "2rem", maxHeight: "90vh", overflowY: "auto", position: "relative" }} onClick={(e) => e.stopPropagation()}>
             <h2 style={{ fontSize: "1.5rem", fontWeight: "700", marginBottom: "0.5rem" }}>
               Add Period
             </h2>
@@ -1234,12 +1287,13 @@ export default function TimeTable() {
               <button type="button" onClick={handleSaveSinglePeriod} disabled={loading} className="btn btn-primary">{loading ? "Saving..." : "Add Period"}</button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
-      {openDuplicateModal && (
-        <div className="animate-fade-in" style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 50 }} onClick={() => setOpenDuplicateModal(false)}>
-          <div className="glass-panel modal-content" style={{ width: "100%", maxWidth: "500px", padding: "2rem", maxHeight: "90vh", overflowY: "auto" }} onClick={(e) => e.stopPropagation()}>
+      {openDuplicateModal && createPortal(
+        <div className="animate-fade-in" style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 50, padding: "1rem" }} onClick={() => setOpenDuplicateModal(false)}>
+          <div className="glass-panel modal-content" style={{ width: "100%", maxWidth: "500px", padding: "2rem", maxHeight: "90vh", overflowY: "auto", position: "relative" }} onClick={(e) => e.stopPropagation()}>
             <h2 style={{ fontSize: "1.25rem", fontWeight: "700", marginBottom: "1.5rem" }}>Duplicate Schedule</h2>
             <div style={{ display: "grid", gap: "1rem" }}>
               <div>
@@ -1267,7 +1321,8 @@ export default function TimeTable() {
               <button type="button" onClick={handleDuplicateDay} disabled={loading} className="btn btn-primary">{loading ? "Duplicating..." : "Duplicate"}</button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

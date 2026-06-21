@@ -86,7 +86,8 @@ const RoomManagement = () => {
         </button>
       </div>
 
-      <TableFilterHeader>
+      <div style={{ flexShrink: 0 }}>
+          <TableFilterHeader>
         <div style={{ display: "flex", gap: "1rem", flex: 1 }}>
           <div style={{ position: "relative", flex: 1, maxWidth: "400px" }}>
             <Search size={18} style={{ position: "absolute", left: "1rem", top: "50%", transform: "translateY(-50%)", color: "var(--text-secondary)" }} />
@@ -101,6 +102,7 @@ const RoomManagement = () => {
           </div>
         </div>
       </TableFilterHeader>
+        </div>
 
       <div className="glass-panel" style={{ padding: "1.5rem" }}>
         {loadingRooms ? (

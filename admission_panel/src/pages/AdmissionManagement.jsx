@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { useSearchParams } from "react-router-dom";
-import { fetchNewUsers, fetchUsers } from "../features/dataSlice";
+import { fetchNewUsers, fetchUsers, fetchClasses } from "../features/dataSlice";
 import { toast } from "react-toastify";
 import api, { uploadFile } from "../services/api";
 import { FileText, CheckCircle, XCircle, Plus, Edit, Trash2, FileSpreadsheet, ChevronUp, ChevronDown, ChevronsUpDown } from "lucide-react";
@@ -12,7 +12,7 @@ import { useSortableData } from "../hooks/useSortableData";
 
 const AdmissionManagement = () => {
   const dispatch = useDispatch();
-  const { newUsers, loadingNewUsers, users } = useSelector((state) => state.data);
+  const { newUsers, loadingNewUsers, users, classes } = useSelector((state) => state.data);
   const { user: currentUser } = useSelector((state) => state.auth);
 
   const [searchParams, setSearchParams] = useSearchParams();
@@ -57,7 +57,7 @@ const AdmissionManagement = () => {
   }, [searchParams]);
 
   const [selectedColumns, setSelectedColumns] = useState([
-    "sno", "name", "email", "parent", "status", "assigned_to", "documents"
+    "sno", "name", "email", "parent", "class_id", "status", "assigned_to", "documents"
   ]);
 
   const [formData, setFormData] = useState({
@@ -70,7 +70,7 @@ const AdmissionManagement = () => {
     dob: "",
     gender: "",
     documents: [],
-    monthly_fee: "",
+    class_id: "",
     bus_fee: "",
     assigned_to: "",
   });
@@ -84,6 +84,7 @@ const AdmissionManagement = () => {
   useEffect(() => {
     dispatch(fetchNewUsers());
     dispatch(fetchUsers());
+    dispatch(fetchClasses());
   }, [dispatch]);
 
   const handleFileUpload = async (fileUpload) => {
@@ -148,7 +149,7 @@ const AdmissionManagement = () => {
         type: "student",
         documents: { pan: "", aadhar: "" },
         phone: String(user.phone),
-        monthly_fee: user.monthly_fee || 0,
+        class_id: user.class_id || null,
         bus_fee: user.bus_fee || 0,
         address: "",
         links: { fb: "", insta: "", linkdIn: "", twitter: "" },
@@ -178,7 +179,7 @@ const AdmissionManagement = () => {
 
   const closeModal = () => {
     setEditingId(null);
-    setFormData({ name: "", email: "", parent: "", parentEmail: "", phone: "", status: "Pending", dob: "", gender: "", documents: [], monthly_fee: "", bus_fee: "", assigned_to: "" });
+    setFormData({ name: "", email: "", parent: "", parentEmail: "", phone: "", status: "Pending", dob: "", gender: "", documents: [], class_id: "", bus_fee: "", assigned_to: "" });
     setSelectedFiles({ aadhar: null, pan: null, birthCertificate: null });
     setOpenModal(false);
   };
@@ -202,7 +203,7 @@ const AdmissionManagement = () => {
       dob: user.dob,
       gender: user.gender,
       documents: user.documents || [],
-      monthly_fee: user.monthly_fee || "",
+      class_id: user.class_id || "",
       bus_fee: user.bus_fee || "",
       assigned_to: user.assigned_to || "",
     });
@@ -246,6 +247,7 @@ const AdmissionManagement = () => {
     { key: "parent", label: "Parent Name" },
     { key: "parentEmail", label: "Parent Email" },
     { key: "phone", label: "Phone" },
+    { key: "class_id", label: "Class" },
     { key: "status", label: "Status" },
     { key: "documents", label: "Documents" },
     { key: "assigned_to", label: "Assigned Counselor" },
@@ -269,6 +271,7 @@ const AdmissionManagement = () => {
       addIfSelected("parent", u.parent);
       addIfSelected("parentEmail", u.parentEmail);
       addIfSelected("phone", u.phone);
+      addIfSelected("class_id", classes?.find(c => c.id === u.class_id)?.name || "N/A");
       addIfSelected("status", u.status);
       addIfSelected("documents", Array.isArray(u.documents) ? u.documents.map(d => d.type).join(", ") : "N/A");
       addIfSelected("dob", u.dob);
@@ -295,6 +298,7 @@ const AdmissionManagement = () => {
       addIfSelected("parent", u.parent);
       addIfSelected("parentEmail", u.parentEmail);
       addIfSelected("phone", u.phone);
+      addIfSelected("class_id", classes?.find(c => c.id === u.class_id)?.name || "N/A");
       addIfSelected("status", u.status);
       addIfSelected("documents", Array.isArray(u.documents) ? u.documents.map(d => d.type).join(", ") : "N/A");
       addIfSelected("dob", u.dob);
@@ -313,6 +317,7 @@ const AdmissionManagement = () => {
       case "parent": return user.parent || "N/A";
       case "parentEmail": return user.parentEmail || "N/A";
       case "phone": return user.phone || "N/A";
+      case "class_id": return classes?.find(c => c.id === user.class_id)?.name || "N/A";
       case "status": return (
         <span
           style={{
@@ -366,7 +371,8 @@ const AdmissionManagement = () => {
       </div>
 
       <div className="glass-panel" style={{ padding: "1rem" }}>
-        <TableFilterHeader
+        <div style={{ flexShrink: 0 }}>
+          <TableFilterHeader
           searchQuery={search}
           setSearchQuery={setSearch}
           searchPlaceholder="Search applications..."
@@ -406,6 +412,7 @@ const AdmissionManagement = () => {
             defaultRange="mtd" 
           />
         </TableFilterHeader>
+        </div>
 
         <div style={{ overflowX: "auto" }}>
           <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left" }}>
@@ -474,7 +481,7 @@ const AdmissionManagement = () => {
 
       {openModal && (
         <div className="animate-fade-in" style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 50 }} onClick={closeModal}>
-          <div className="glass-panel modal-content" style={{ width: "100%", maxWidth: "600px", padding: "2rem", maxHeight: "90vh", overflowY: "auto" }} onClick={(e) => e.stopPropagation()}>
+          <div className="glass-panel modal-content" style={{ width: "100%", maxWidth: "600px", padding: "2rem", maxHeight: "90vh", overflowY: "auto", overflowX: "hidden" }} onClick={(e) => e.stopPropagation()}>
             <h2 style={{ fontSize: "1.5rem", fontWeight: "700", marginBottom: "1.5rem" }}>
               {editingId ? "Update Application" : "New Application"}
             </h2>
@@ -509,8 +516,13 @@ const AdmissionManagement = () => {
                   </select>
                 </div>
                 <div>
-                  <label style={{ display: "block", marginBottom: "0.5rem", fontSize: "0.875rem" }}>Monthly Fee</label>
-                  <input type="number" className="input-glass" value={formData.monthly_fee} onChange={(e) => setFormData({ ...formData, monthly_fee: e.target.value })} />
+                  <label style={{ display: "block", marginBottom: "0.5rem", fontSize: "0.875rem" }}>Class</label>
+                  <select className="input-glass" value={formData.class_id} onChange={(e) => setFormData({ ...formData, class_id: e.target.value })}>
+                    <option value="">Select Class</option>
+                    {(classes ? classes.filter((v, i, a) => a.findIndex(t => (t.name === v.name)) === i) : []).map(c => (
+                      <option key={c.id} value={c.id}>{c.name}</option>
+                    ))}
+                  </select>
                 </div>
                 <div>
                   <label style={{ display: "block", marginBottom: "0.5rem", fontSize: "0.875rem" }}>Bus Fee</label>
@@ -520,18 +532,18 @@ const AdmissionManagement = () => {
 
               <div style={{ marginTop: "1rem", borderTop: "1px solid var(--glass-border)", paddingTop: "1rem" }}>
                 <h3 style={{ marginBottom: "1rem", fontSize: "1rem", fontWeight: "600" }}>Upload Documents</h3>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "1rem" }}>
-                  <div>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: "1rem" }}>
+                  <div style={{ overflow: "hidden" }}>
                     <label style={{ display: "block", marginBottom: "0.5rem", fontSize: "0.75rem" }}>Aadhar Card</label>
-                    <input type="file" style={{ fontSize: "0.75rem" }} onChange={(e) => setSelectedFiles({ ...selectedFiles, aadhar: e.target.files[0] })} />
+                    <input type="file" style={{ fontSize: "0.75rem", maxWidth: "100%" }} onChange={(e) => setSelectedFiles({ ...selectedFiles, aadhar: e.target.files[0] })} />
                   </div>
-                  <div>
+                  <div style={{ overflow: "hidden" }}>
                     <label style={{ display: "block", marginBottom: "0.5rem", fontSize: "0.75rem" }}>PAN Card</label>
-                    <input type="file" style={{ fontSize: "0.75rem" }} onChange={(e) => setSelectedFiles({ ...selectedFiles, pan: e.target.files[0] })} />
+                    <input type="file" style={{ fontSize: "0.75rem", maxWidth: "100%" }} onChange={(e) => setSelectedFiles({ ...selectedFiles, pan: e.target.files[0] })} />
                   </div>
-                  <div>
+                  <div style={{ overflow: "hidden" }}>
                     <label style={{ display: "block", marginBottom: "0.5rem", fontSize: "0.75rem" }}>Birth Certificate</label>
-                    <input type="file" style={{ fontSize: "0.75rem" }} onChange={(e) => setSelectedFiles({ ...selectedFiles, birthCertificate: e.target.files[0] })} />
+                    <input type="file" style={{ fontSize: "0.75rem", maxWidth: "100%" }} onChange={(e) => setSelectedFiles({ ...selectedFiles, birthCertificate: e.target.files[0] })} />
                   </div>
                 </div>
               </div>

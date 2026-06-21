@@ -189,11 +189,13 @@ const ClassProfile = () => {
 
             {activeTab === "students" && (
               <div className="glass-panel" style={{ padding: "1.5rem" }}>
-                <TableFilterHeader
+                <div style={{ flexShrink: 0 }}>
+          <TableFilterHeader
                   searchQuery={studentSearch}
                   setSearchQuery={setStudentSearch}
                   searchPlaceholder="Search students by name or admission no..."
                 />
+        </div>
                 
                 {filteredStudents.length === 0 ? (
                   <div style={{ textAlign: "center", padding: "3rem", color: "var(--text-secondary)" }}>
@@ -238,11 +240,13 @@ const ClassProfile = () => {
 
             {activeTab === "teachers" && (
               <div className="glass-panel" style={{ padding: "1.5rem" }}>
-                <TableFilterHeader
+                <div style={{ flexShrink: 0 }}>
+          <TableFilterHeader
                   searchQuery={teacherSearch}
                   setSearchQuery={setTeacherSearch}
                   searchPlaceholder="Search teachers by name or email..."
                 />
+        </div>
                 
                 {filteredTeachers.length === 0 ? (
                   <div style={{ textAlign: "center", padding: "3rem", color: "var(--text-secondary)" }}>

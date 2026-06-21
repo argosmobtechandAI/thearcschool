@@ -1,27 +1,41 @@
 import React, { useEffect, useState, useMemo } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { useNavigate } from "react-router-dom";
-import { fetchExams, fetchCourses, fetchClasses, fetchUsers } from "../features/dataSlice";
+import { fetchExams, fetchCourses, fetchClasses, fetchUsers, fetchSubjects, fetchRooms } from "../features/dataSlice";
 import { toast } from "react-toastify";
 import api, { uploadFile } from "../services/api";
 import { BookOpen, Calendar, Trash2, Edit, Plus, FileSpreadsheet } from "lucide-react";
 import TableFilterHeader from "../components/TableFilterHeader";
 import DateRangePicker from "../components/DateRangePicker";
+import ClockTimePicker from "../components/ClockTimePicker";
+import DateSheetCalendar from "../components/DateSheetCalendar";
+import { jsPDF } from "jspdf";
+import autoTable from "jspdf-autotable";
+import { letterheadBase64 } from "../utils/letterhead";
+import * as XLSX from "xlsx";
 
 const coursesTypes = ["exam", "Material", "Assignment"];
 
 const Exams = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
-  const { exams, courses, classes, users } = useSelector((state) => state.data);
+  const { exams, courses, classes, users, subjects, rooms } = useSelector((state) => state.data);
 
   const [courseType, setCourseType] = useState("exam");
   const [mode, setMode] = useState("view");
   const [searchQuery, setSearchQuery] = useState("");
   const [dateRange, setDateRange] = useState({ start: "", end: "" });
   const [classFilter, setClassFilter] = useState("");
+  const [sectionFilter, setSectionFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [viewMode, setViewMode] = useState("Calendar");
+  
+  // Date Sheet Custom Titles State
+  const [customTitles, setCustomTitles] = useState([]);
+  const [selectedTitle, setSelectedTitle] = useState("");
+  const [isNewTitleModalOpen, setIsNewTitleModalOpen] = useState(false);
+  const [newTitleInput, setNewTitleInput] = useState("");
   
   // For assignments and materials
   const [editingItem, setEditingItem] = useState(null);
@@ -48,6 +62,8 @@ const Exams = () => {
     dispatch(fetchCourses());
     dispatch(fetchClasses());
     dispatch(fetchUsers());
+    dispatch(fetchSubjects());
+    dispatch(fetchRooms());
   }, [dispatch]);
 
   const materials = useMemo(() => {
@@ -61,7 +77,7 @@ const Exams = () => {
     return list.filter(item => {
       const matchesSearch = item.title?.toLowerCase().includes(searchQuery.toLowerCase()) || 
                             item.subject?.toLowerCase().includes(searchQuery.toLowerCase());
-      const matchesClass = !classFilter || item.class === classFilter;
+      const matchesClass = (!classFilter || item.class === classFilter) && (!sectionFilter || item.section === sectionFilter);
       
       let matchesDate = true;
       if (dateRange.start || dateRange.end) {
@@ -82,27 +98,160 @@ const Exams = () => {
 
       return matchesSearch && matchesClass && matchesDate;
     });
-  }, [courseType, courses, exams, searchQuery, dateRange, classFilter]);
+  }, [courseType, courses, exams, searchQuery, dateRange, classFilter, sectionFilter]);
 
   // Group exams into Date Sheets
   const groupedDateSheets = useMemo(() => {
     if (courseType !== "exam") return [];
+    
+    // Sort logic ...
     const groups = {};
     materials.forEach(ex => {
-      const key = `${ex.title}_${ex.class_id}`;
+      const key = `${ex.title}_${ex.class}`;
       if (!groups[key]) {
         groups[key] = {
           title: ex.title,
-          class_id: ex.class_id,
           className: ex.class,
-          section: ex.section,
           subjects: []
         };
       }
-      groups[key].subjects.push(ex);
+      const subExists = groups[key].subjects.find(s => s.subject === ex.subject && s.date === ex.date);
+      if (!subExists) {
+        groups[key].subjects.push(ex);
+      }
     });
     return Object.values(groups);
   }, [materials, courseType]);
+
+  const handleExportPDF = () => {
+    if (courseType !== "exam") return;
+    if (!classFilter || !selectedTitle) {
+      toast.warn("Please select a Class and Title to export the Date Sheet.");
+      return;
+    }
+
+    const doc = new jsPDF();
+    const pageWidth = doc.internal.pageSize.getWidth();
+    doc.addImage(letterheadBase64, 'PNG', 0, 0, pageWidth, 40);
+
+    doc.setFontSize(16);
+    doc.text(`Date Sheet: ${selectedTitle} - Class ${classFilter}${sectionFilter ? ` (Section ${sectionFilter})` : ''}`, 14, 50);
+
+    const filtered = exams.filter(e => e.class === classFilter && e.title === selectedTitle);
+    const grouped = {};
+    filtered.forEach(ex => {
+      const key = `${ex.subject}-${ex.date}-${ex.time}`;
+      if (!grouped[key]) grouped[key] = { ...ex, sectionsData: {} };
+      grouped[key].sectionsData[ex.class_id] = {
+        invigilator_id: ex.invigilator_id,
+        room_number: ex.room_number
+      };
+    });
+
+    const rows = Object.values(grouped).sort((a,b) => new Date(a.date) - new Date(b.date)).map(ex => {
+      let invigilatorName = "Multiple";
+      let roomNum = "Multiple";
+      
+      if (sectionFilter) {
+        const classObj = classes?.find(c => c.className === classFilter && c.section === sectionFilter);
+        if (classObj && ex.sectionsData[classObj.id]) {
+            const tId = ex.sectionsData[classObj.id].invigilator_id;
+            invigilatorName = users?.find(u => u.id === tId)?.name || "N/A";
+            roomNum = ex.sectionsData[classObj.id].room_number || "N/A";
+        } else {
+            invigilatorName = "N/A";
+            roomNum = "N/A";
+        }
+      } else {
+         const tIds = [...new Set(Object.values(ex.sectionsData).map(d => d.invigilator_id).filter(Boolean))];
+         const rNums = [...new Set(Object.values(ex.sectionsData).map(d => d.room_number).filter(Boolean))];
+         
+         if (tIds.length === 1) invigilatorName = users?.find(u => u.id === tIds[0])?.name || "N/A";
+         else if (tIds.length === 0) invigilatorName = "N/A";
+         
+         if (rNums.length === 1) roomNum = rNums[0];
+         else if (rNums.length === 0) roomNum = "N/A";
+      }
+
+      return [
+        ex.date,
+        ex.time,
+        ex.subject,
+        ex.duration ? `${ex.duration} mins` : "N/A",
+        ex.marks || "N/A",
+        invigilatorName,
+        roomNum
+      ];
+    });
+
+    autoTable(doc, {
+      startY: 55,
+      head: [['Date', 'Time', 'Subject', 'Duration', 'Marks', 'Invigilator', 'Room']],
+      body: rows,
+    });
+
+    doc.save(`${selectedTitle}_Class_${classFilter}.pdf`);
+  };
+
+  const handleExportExcel = () => {
+    if (courseType !== "exam") return;
+    if (!classFilter || !selectedTitle) {
+      toast.warn("Please select a Class and Title to export the Date Sheet.");
+      return;
+    }
+
+    const filtered = exams.filter(e => e.class === classFilter && e.title === selectedTitle);
+    const grouped = {};
+    filtered.forEach(ex => {
+      const key = `${ex.subject}-${ex.date}-${ex.time}`;
+      if (!grouped[key]) grouped[key] = { ...ex, sectionsData: {} };
+      grouped[key].sectionsData[ex.class_id] = {
+        invigilator_id: ex.invigilator_id,
+        room_number: ex.room_number
+      };
+    });
+
+    const rows = Object.values(grouped).sort((a,b) => new Date(a.date) - new Date(b.date)).map(ex => {
+      let invigilatorName = "Multiple";
+      let roomNum = "Multiple";
+      
+      if (sectionFilter) {
+        const classObj = classes?.find(c => c.className === classFilter && c.section === sectionFilter);
+        if (classObj && ex.sectionsData[classObj.id]) {
+            const tId = ex.sectionsData[classObj.id].invigilator_id;
+            invigilatorName = users?.find(u => u.id === tId)?.name || "N/A";
+            roomNum = ex.sectionsData[classObj.id].room_number || "N/A";
+        } else {
+            invigilatorName = "N/A";
+            roomNum = "N/A";
+        }
+      } else {
+         const tIds = [...new Set(Object.values(ex.sectionsData).map(d => d.invigilator_id).filter(Boolean))];
+         const rNums = [...new Set(Object.values(ex.sectionsData).map(d => d.room_number).filter(Boolean))];
+         
+         if (tIds.length === 1) invigilatorName = users?.find(u => u.id === tIds[0])?.name || "N/A";
+         else if (tIds.length === 0) invigilatorName = "N/A";
+         
+         if (rNums.length === 1) roomNum = rNums[0];
+         else if (rNums.length === 0) roomNum = "N/A";
+      }
+
+      return {
+        Date: ex.date,
+        Time: ex.time,
+        Subject: ex.subject,
+        Duration: ex.duration ? `${ex.duration} mins` : "N/A",
+        Marks: ex.marks || "N/A",
+        Invigilator: invigilatorName,
+        Room: roomNum
+      };
+    });
+
+    const worksheet = XLSX.utils.json_to_sheet(rows);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Date Sheet");
+    XLSX.writeFile(workbook, `${selectedTitle}_Class_${classFilter}.xlsx`);
+  };
 
   const handleFileUpload = async () => {
     if (!fileUpload) return null;
@@ -170,10 +319,10 @@ const Exams = () => {
     }
   };
 
-  const handleDeleteDateSheet = async (title, class_id) => {
+  const handleDeleteDateSheet = async (title, className) => {
     if (window.confirm(`Are you sure you want to delete the entire Date Sheet "${title}"?`)) {
       try {
-        const subjectsToDelete = exams.filter(e => e.title === title && e.class_id === class_id);
+        const subjectsToDelete = exams.filter(e => e.title === title && e.class === className);
         for (let sub of subjectsToDelete) {
           await api.delete(`/admin_panel/exams/deleteExams/${sub.id}`);
         }
@@ -199,8 +348,11 @@ const Exams = () => {
 
   const handleOpenModal = (item = null) => {
     if (courseType === "exam") {
-      setDateSheetData({ title: "", class: "", section: "", subjects: [] });
-      setDateSheetSubject({ subject: "", date: "", time: "", duration: "", marks: "", invigilator_id: "" });
+      if (!classFilter) {
+        return toast.warn("Please select a Class from the top filter first.");
+      }
+      setIsNewTitleModalOpen(true);
+      return;
     } else {
       if (item) {
         setEditingItem(item.id);
@@ -231,10 +383,10 @@ const Exams = () => {
 
   return (
     <div>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "2rem" }}>
-        <div>
-          <h1 style={{ fontSize: "2rem", fontWeight: "700" }}>Academic Oversight</h1>
-          <p style={{ color: "var(--text-secondary)" }}>Monitor course performance and schedules</p>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.5rem" }}>
+        <div style={{ display: "flex", alignItems: "baseline", gap: "1rem" }}>
+          <h1 style={{ fontSize: "1.5rem", fontWeight: "700", margin: 0 }}>Academic Oversight</h1>
+          <p style={{ color: "var(--text-secondary)", margin: 0, fontSize: "0.875rem" }}>Monitor course performance and schedules</p>
         </div>
         <div style={{ display: "flex", gap: "1rem", alignItems: "center" }}>
           <div className="glass-panel" style={{ padding: "0.5rem", display: "flex", gap: "0.5rem" }}>
@@ -252,33 +404,83 @@ const Exams = () => {
         </div>
       </div>
 
-      <div className="glass-panel" style={{ padding: "1.5rem" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.5rem" }}>
-          <h2 style={{ fontSize: "1.25rem", fontWeight: "600", textTransform: "capitalize" }}>{courseType === "exam" ? "Date Sheets" : courseType} List</h2>
-          <button onClick={() => handleOpenModal()} className="btn btn-primary">
-            <Calendar size={16} /> Create {courseType === "exam" ? "Date Sheet" : courseType}
+      <div className="glass-panel" style={{ padding: "0.5rem 1rem" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.5rem" }}>
+          <h2 style={{ fontSize: "1.1rem", fontWeight: "600", textTransform: "capitalize", margin: 0 }}>{courseType === "exam" ? "Date Sheets" : courseType} List</h2>
+          <button onClick={() => handleOpenModal()} className="btn btn-primary" style={{ padding: "0.25rem 0.75rem", fontSize: "0.875rem", minHeight: "auto" }}>
+            <Calendar size={14} style={{ marginRight: "4px" }} /> Create {courseType === "exam" ? "Date Sheet" : courseType}
           </button>
         </div>
 
-        <TableFilterHeader
-          searchQuery={searchQuery}
-          setSearchQuery={setSearchQuery}
-          searchPlaceholder={`Search ${courseType}...`}
-          filters={[
-            {
-              label: "All Classes",
-              value: classFilter,
-              onChange: setClassFilter,
-              options: [...new Set(classes?.map(c => c.className))].map(className => ({ value: className, label: className }))
-            }
-          ]}
-        >
-          <DateRangePicker onRangeChange={setDateRange} />
-        </TableFilterHeader>
+        <div style={{ flexShrink: 0 }}>
+          <TableFilterHeader
+            searchQuery={searchQuery}
+            setSearchQuery={setSearchQuery}
+            searchPlaceholder={`Search ${courseType}...`}
+            filters={[
+              {
+                label: "All Classes",
+                value: classFilter,
+                onChange: (val) => { setClassFilter(val); setSectionFilter(""); },
+                options: [...new Set(classes?.map(c => c.className))].map(className => ({ value: className, label: className }))
+              },
+              ...(classFilter ? [{
+                label: "All Sections",
+                value: sectionFilter,
+                onChange: setSectionFilter,
+                options: classes?.filter(c => c.className === classFilter).map(c => ({ value: c.section, label: c.section })) || []
+              }] : []),
+              {
+                label: "Status",
+                value: statusFilter,
+                onChange: setStatusFilter,
+                options: [
+                  { value: "Upcoming", label: "Upcoming" },
+                  { value: "Completed", label: "Completed" }
+                ]
+              }
+            ]}
+            onExportPDF={courseType === "exam" ? handleExportPDF : null}
+            onExportExcel={courseType === "exam" ? handleExportExcel : null}
+            hideSearch={courseType === "exam"}
+          >
+            {courseType !== "exam" && <DateRangePicker onRangeChange={setDateRange} />}
+          </TableFilterHeader>
+        </div>
+
+        {courseType === "exam" && (
+          <div style={{ display: "flex", gap: "1rem", marginTop: "1rem" }}>
+            <button 
+              onClick={() => setViewMode("Calendar")}
+              className={`btn ${viewMode === "Calendar" ? "btn-primary" : "btn-ghost"}`}
+            >
+              Calendar View
+            </button>
+            <button 
+              onClick={() => setViewMode("Tabular")}
+              className={`btn ${viewMode === "Tabular" ? "btn-primary" : "btn-ghost"}`}
+            >
+              Tabular View
+            </button>
+          </div>
+        )}
 
         {courseType === "exam" ? (
           <div className="animate-fade-in" style={{ display: "flex", flexDirection: "column", gap: "1rem", marginTop: "1rem" }}>
-            {groupedDateSheets.length === 0 ? (
+            {viewMode === "Calendar" ? (
+              <DateSheetCalendar 
+                exams={exams} 
+                classes={classes} 
+                users={users} 
+                subjects={subjects} 
+                rooms={rooms}
+                classFilter={classFilter} 
+                sectionFilter={sectionFilter}
+                customTitles={customTitles}
+                selectedTitle={selectedTitle}
+                setSelectedTitle={setSelectedTitle}
+              />
+            ) : groupedDateSheets.length === 0 ? (
               <div style={{ padding: "2rem", textAlign: "center", color: "var(--text-secondary)" }}>
                 No Date Sheets found.
               </div>
@@ -286,19 +488,24 @@ const Exams = () => {
               groupedDateSheets.map((ds, idx) => (
                 <div key={idx} className="glass-card" style={{ padding: "1.5rem" }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "1rem" }}>
-                    <div>
-                      <h3 style={{ fontSize: "1.25rem", fontWeight: "600", color: "var(--text-primary)" }}>{ds.title}</h3>
-                      <p style={{ fontSize: "0.875rem", color: "var(--text-secondary)" }}>Class {ds.className} - {ds.section} • {ds.subjects.length} Subjects</p>
+                    <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
+                      <div style={{ padding: "0.75rem", background: "rgba(0,0,0,0.08)", borderRadius: "12px", color: "#60a5fa" }}>
+                        <Calendar size={24} />
+                      </div>
+                      <div>
+                        <h3 style={{ fontSize: "1.25rem", fontWeight: "700" }}>{ds.title}</h3>
+                        <p style={{ color: "var(--text-secondary)" }}>Class: {ds.className}</p>
+                      </div>
                     </div>
-                    <div style={{ display: "flex", gap: "1rem" }}>
+                    <div style={{ display: "flex", gap: "0.5rem" }}>
                       <button 
-                        onClick={() => navigate(`/exams/results/${encodeURIComponent(ds.title)}/${ds.class_id}`)}
-                        className="btn btn-ghost" 
-                        style={{ background: "rgba(96, 165, 250, 0.1)", color: "#2563eb", padding: "0.5rem 1rem" }}
+                        onClick={() => navigate(`/exams/results/${encodeURIComponent(ds.title)}/${ds.className}`)}
+                        className="btn-ghost" 
+                        style={{ display: "flex", alignItems: "center", padding: "0.5rem 1rem", color: "#3b82f6", borderRadius: "8px" }}
                       >
                         <FileSpreadsheet size={16} style={{ marginRight: "0.5rem" }}/> View Results
                       </button>
-                      <button onClick={() => handleDeleteDateSheet(ds.title, ds.class_id)} className="btn-ghost" style={{ padding: "0.5rem", color: "#ef4444", borderRadius: "8px" }}>
+                      <button onClick={() => handleDeleteDateSheet(ds.title, ds.className)} className="btn-ghost" style={{ padding: "0.5rem", color: "#ef4444", borderRadius: "8px" }}>
                         <Trash2 size={18} />
                       </button>
                     </div>
@@ -374,15 +581,14 @@ const Exams = () => {
                     <input required className="input-glass" placeholder="e.g. Term 1 Finals" value={dateSheetData.title} onChange={(e) => setDateSheetData({ ...dateSheetData, title: e.target.value })} />
                   </div>
                   <div>
-                    <label style={{ display: "block", marginBottom: "0.5rem", fontSize: "0.875rem" }}>Class & Section</label>
-                    <select className="input-glass" required value={`${dateSheetData.class}-${dateSheetData.section}`} onChange={(e) => {
-                      const [cls, sec] = e.target.value.split("-");
-                      setDateSheetData({ ...dateSheetData, class: cls, section: sec });
+                    <label style={{ display: "block", marginBottom: "0.5rem", fontSize: "0.875rem" }}>Class</label>
+                    <select className="input-glass" required value={dateSheetData.class} onChange={(e) => {
+                      setDateSheetData({ ...dateSheetData, class: e.target.value, section: "" });
                       setDateSheetSubject({ ...dateSheetSubject, subject: "" });
                     }}>
-                      <option value="-">Select Class-Section</option>
-                      {classes?.map((c) => (
-                        <option key={c.id} value={`${c.className}-${c.section}`}>{c.className} - {c.section}</option>
+                      <option value="">Select Class</option>
+                      {Array.from(new Set(classes?.map(c => c.className || c.name))).filter(Boolean).sort((a,b) => String(a).localeCompare(String(b), undefined, {numeric: true})).map((cName) => (
+                        <option key={cName} value={cName}>{cName}</option>
                       ))}
                     </select>
                   </div>
@@ -395,9 +601,13 @@ const Exams = () => {
                       <label style={{ display: "block", marginBottom: "0.5rem", fontSize: "0.75rem" }}>Subject</label>
                       <select className="input-glass" value={dateSheetSubject.subject} onChange={(e) => setDateSheetSubject({ ...dateSheetSubject, subject: e.target.value })}>
                         <option value="">Select Subject</option>
-                        {classes?.find(c => c.className === dateSheetData.class && c.section === dateSheetData.section)?.teachersSubject?.map((ts, i) => (
-                          <option key={i} value={ts.subject}>{ts.subject}</option>
-                        ))}
+                        {(() => {
+                          const selectedClassIds = classes?.filter(c => (c.className || c.name) === dateSheetData.class).map(c => c.id) || [];
+                          const availableSubjects = subjects?.filter(sub => sub.classIds?.some(id => selectedClassIds.includes(id))) || [];
+                          return availableSubjects.map((sub, i) => (
+                            <option key={i} value={sub.name}>{sub.name}</option>
+                          ));
+                        })()}
                       </select>
                     </div>
                     <div>
@@ -406,7 +616,10 @@ const Exams = () => {
                     </div>
                     <div>
                       <label style={{ display: "block", marginBottom: "0.5rem", fontSize: "0.75rem" }}>Time</label>
-                      <input type="time" className="input-glass" value={dateSheetSubject.time} onChange={(e) => setDateSheetSubject({ ...dateSheetSubject, time: e.target.value })} />
+                      <ClockTimePicker 
+                        value={dateSheetSubject.time} 
+                        onChange={(val) => setDateSheetSubject({ ...dateSheetSubject, time: val })} 
+                      />
                     </div>
                     <div>
                       <label style={{ display: "block", marginBottom: "0.5rem", fontSize: "0.75rem" }}>Duration (mins)</label>
@@ -525,6 +738,42 @@ const Exams = () => {
                 </div>
               </form>
             )}
+          </div>
+        </div>
+      )}
+
+      {isNewTitleModalOpen && (
+        <div className="animate-fade-in" style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 60 }} onClick={() => setIsNewTitleModalOpen(false)}>
+          <div className="glass-panel modal-content" style={{ width: "100%", maxWidth: "400px", padding: "2rem" }} onClick={(e) => e.stopPropagation()}>
+            <h2 style={{ fontSize: "1.25rem", fontWeight: "700", marginBottom: "1.5rem" }}>Create New Date Sheet</h2>
+            <div style={{ marginBottom: "1.5rem" }}>
+              <label style={{ display: "block", marginBottom: "0.5rem", fontSize: "0.875rem", fontWeight: "500" }}>Title (e.g. Term 1)</label>
+              <input 
+                type="text" 
+                className="input-glass" 
+                value={newTitleInput} 
+                onChange={e => setNewTitleInput(e.target.value)} 
+                placeholder="Enter title..." 
+                autoFocus
+              />
+            </div>
+            <div style={{ display: "flex", gap: "1rem", justifyContent: "flex-end" }}>
+              <button onClick={() => setIsNewTitleModalOpen(false)} className="btn btn-ghost">Cancel</button>
+              <button 
+                onClick={() => {
+                  if (newTitleInput.trim()) {
+                    setCustomTitles(prev => [...prev, newTitleInput.trim()]);
+                    setSelectedTitle(newTitleInput.trim());
+                    setNewTitleInput("");
+                    setIsNewTitleModalOpen(false);
+                    setViewMode("Calendar");
+                  }
+                }} 
+                className="btn btn-primary"
+              >
+                Create
+              </button>
+            </div>
           </div>
         </div>
       )}

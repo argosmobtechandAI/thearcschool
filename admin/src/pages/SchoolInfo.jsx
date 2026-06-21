@@ -16,7 +16,7 @@ const SchoolInfo = () => {
 
     const [modal, setModal] = useState(null);
     const [editId, setEditId] = useState(null); 
-    const [social, setNewSocial] = useState({ instagram_url: "", whatsapp_url: "", linkedin_url: "", twitter_url: "" });
+    const [social, setNewSocial] = useState({ instagram_url: "", whatsapp_url: "", linkedin_url: "", twitter_url: "", late_fee_penalty: 10 });
     const [champ, setNewChamp] = useState({ student_id: "", game_name: "", achievement_level: "", marks_score: "" });
     const [searchQuery, setSearchQuery] = useState("");
 
@@ -126,13 +126,13 @@ const SchoolInfo = () => {
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.5rem" }}>
                         <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
                             <div style={{ padding: "0.5rem", background: "rgba(236, 72, 153, 0.1)", color: "#ec4899", borderRadius: "12px" }}><Link2 size={20} /></div>
-                            <h2 style={{ fontSize: "1.25rem", fontWeight: "700", color: "var(--text-primary)" }}>Social Media</h2>
+                            <h2 style={{ fontSize: "1.25rem", fontWeight: "700", color: "var(--text-primary)" }}>General Settings</h2>
                         </div>
                         <button onClick={() => { 
                             setModal("social"); 
-                            setNewSocial(infoSettings || { instagram_url: "", whatsapp_url: "", linkedin_url: "", twitter_url: "" }); 
+                            setNewSocial(infoSettings || { instagram_url: "", whatsapp_url: "", linkedin_url: "", twitter_url: "", late_fee_penalty: 10 }); 
                         }} className="btn btn-primary" style={{ display: "flex", alignItems: "center", gap: "0.5rem", fontSize: "0.875rem", padding: "0.5rem 1rem" }}>
-                            <Edit size={16} /> Edit Links
+                            <Edit size={16} /> Edit Settings
                         </button>
                     </div>
                     <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
@@ -257,15 +257,20 @@ const SchoolInfo = () => {
                         {/* Header */}
                         <div style={{ padding: "1.5rem", borderBottom: "1px solid var(--glass-border)", display: "flex", justifyContent: "space-between", alignItems: "center", background: "var(--bg-primary)" }}>
                             <h3 style={{ fontSize: "1.125rem", fontWeight: "700", color: "var(--text-primary)" }}>
-                                {modal === 'social' ? 'Social Media Links' : 'Champion Student'}
+                                {modal === 'social' ? 'General Settings' : 'Champion Student'}
                             </h3>
                             <button onClick={() => { setModal(null); }} style={{ background: "transparent", border: "none", fontSize: "1.25rem", cursor: "pointer", color: "var(--text-secondary)" }}>✕</button>
                         </div>
 
                         <div style={{ padding: "1.5rem", display: "flex", flexDirection: "column", gap: "1rem" }}>
-                            {/* SOCIAL MODAL */}
+                            {/* SOCIAL & SETTINGS MODAL */}
                             {modal === "social" && (
                                 <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+                                    <div>
+                                        <label style={{ fontSize: "0.875rem", fontWeight: "700", color: "var(--text-primary)", marginBottom: "0.5rem", display: "block" }}>Late Fee Penalty (₹ per day)</label>
+                                        <input type="number" min="0" placeholder="e.g. 10" value={social?.late_fee_penalty || 0} onChange={(e) => setNewSocial({ ...social, late_fee_penalty: Number(e.target.value) })} style={{ width: "100%", border: "1px solid var(--glass-border)", borderRadius: "8px", padding: "0.75rem", outline: "none", fontSize: "0.875rem", background: "var(--bg-primary)", color: "var(--text-primary)" }} />
+                                    </div>
+                                    <hr style={{ border: "none", borderTop: "1px solid var(--glass-border)", margin: "0.5rem 0" }} />
                                     {[{ name: "Instagram", variable: "instagram_url", color: "#ec4899" }, { name: "Whatsapp", variable: "whatsapp_url", color: "#22c55e" }, { name: "Linkedin", variable: "linkedin_url", color: "#3b82f6" }, { name: "Twitter", variable: "twitter_url", color: "#0ea5e9" }].map((item) => (
                                         <div key={item.variable}>
                                             <label style={{ fontSize: "0.875rem", fontWeight: "700", color: item.color, marginBottom: "0.5rem", display: "block" }}>{item.name}</label>

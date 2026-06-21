@@ -5,7 +5,6 @@ import userRoutes from "./shared/users/routes.js";
 import uploadRouter from "./shared/upload/routes.js";
 import roomRouter from "./shared/rooms/routes.js";
 import communicationRouter from "./shared/communication/routes.js";
-import holidaysRouter from "./shared/holidays/routes.js";
 
 // Admin Web Panel Domains
 import adminPanelRouter from "./admin_panel/routes.js";
@@ -30,10 +29,11 @@ router.use("/teacher_app", teacherAppRouter);
 router.use("/principal_app", principalAppRouter);
 
 // Shared Global APIs
+import courseRouter from "./course/routes.js";
+router.use("/course", courseRouter);
 router.use("/user", userRoutes);
 router.use("/communication", communicationRouter);
 router.use("/upload", uploadRouter);
 router.use("/rooms", roomRouter);
-router.use("/holidays", holidaysRouter);
 
 export default router;
