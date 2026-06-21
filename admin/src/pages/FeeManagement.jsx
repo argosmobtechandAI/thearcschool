@@ -26,7 +26,7 @@ const FeeManagement = () => {
 
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedColumns, setSelectedColumns] = useState([
-    "sno", "name", "admission_number", "class_name", "total_due", "total_paid", "balance", "actions"
+    "sno", "name", "admission_number", "doj", "class_name", "total_due", "total_paid", "balance", "actions"
   ]);
 
   const [selectedStudent, setSelectedStudent] = useState(null);
@@ -38,9 +38,10 @@ const FeeManagement = () => {
   const [loadingStructures, setLoadingStructures] = useState(false);
   const [balancesMap, setBalancesMap] = useState({});
   const [selectedClassFilter, setSelectedClassFilter] = useState("");
-  const [selectedPaymentMode, setSelectedPaymentMode] = useState("");
+  const [selectedSectionFilter, setSelectedSectionFilter] = useState("");
   const selectedStatusFilter = feeStatusFilter || "All";
   const setSelectedStatusFilter = (val) => dispatch(setFeeStatusFilter(val));
+  const [selectedPaymentMode, setSelectedPaymentMode] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const ITEMS_PER_PAGE = 100;
 
@@ -97,7 +98,7 @@ const FeeManagement = () => {
     if (currentView === "collected") {
       setSelectedColumns(["sno", "date", "studentName", "admissionNumber", "class_name", "feeTitle", "amount", "mode"]);
     } else if (currentView === "students") {
-      setSelectedColumns(["sno", "name", "admission_number", "class_name", "total_due", "total_paid", "balance", "actions"]);
+      setSelectedColumns(["sno", "name", "admission_number", "doj", "class_name", "total_due", "total_paid", "balance", "actions"]);
     } else if (currentView === "structures") {
       setSelectedColumns(["category", "class", "amount"]);
     }
@@ -154,9 +155,11 @@ const FeeManagement = () => {
         ...s,
         className,
         baseClassName,
+        section: s.classes && s.classes.length > 0 && classes.find(c => c.id === s.classes[0])?.section ? classes.find(c => c.id === s.classes[0]).section : "",
         totalDue: b.totalDue,
         totalPaid: b.totalPaid,
-        balance: s.fee_exempted ? 0 : b.balance
+        balance: s.fee_exempted ? 0 : b.balance,
+        doj: s.admission_date ? new Date(s.admission_date).toLocaleDateString() : (s.created_at ? new Date(s.created_at).toLocaleDateString() : "N/A")
       };
     });
 
@@ -177,14 +180,15 @@ const FeeManagement = () => {
       const matchesSearch = (item.name?.toLowerCase() || "").includes(searchTerm.toLowerCase()) || 
         (item.admission_number?.toLowerCase() || "").includes(searchTerm.toLowerCase());
       const matchesClass = !selectedClassFilter || item.baseClassName === selectedClassFilter;
+      const matchesSection = !selectedSectionFilter || item.section === selectedSectionFilter;
       
       let matchesStatus = true;
       if (selectedStatusFilter === "Defaulters") matchesStatus = item.balance > 0;
       else if (selectedStatusFilter === "Cleared") matchesStatus = item.balance <= 0;
       
-      return matchesSearch && matchesClass && matchesStatus;
+      return matchesSearch && matchesClass && matchesSection && matchesStatus;
     });
-  }, [processedData, searchTerm, selectedClassFilter, selectedStatusFilter, currentView]);
+  }, [processedData, searchTerm, selectedClassFilter, selectedSectionFilter, selectedStatusFilter, currentView]);
 
   const filteredPayments = useMemo(() => {
     return paymentsData.map(item => {
@@ -207,9 +211,10 @@ const FeeManagement = () => {
              (item.remarks?.toLowerCase() || "").includes(searchTerm.toLowerCase());
       const matchesMode = !selectedPaymentMode || item.payment_mode === selectedPaymentMode;
       const matchesClass = !selectedClassFilter || item.baseClassName === selectedClassFilter;
-      return matchesSearch && matchesMode && matchesClass;
+      const matchesSection = !selectedSectionFilter || item.section === selectedSectionFilter;
+      return matchesSearch && matchesMode && matchesClass && matchesSection;
     });
-  }, [paymentsData, searchTerm, selectedPaymentMode, users, classes, selectedClassFilter]);
+  }, [paymentsData, searchTerm, selectedPaymentMode, users, classes, selectedClassFilter, selectedSectionFilter]);
 
   const { items: sortedData, requestSort, sortConfig } = useSortableData(
     currentView === "collected" ? filteredPayments : filteredData
@@ -243,6 +248,7 @@ const FeeManagement = () => {
     { key: "sno", label: "S.No" },
     { key: "name", label: "Name" },
     { key: "admission_number", label: "Admission No" },
+    { key: "doj", label: "Date of Joining" },
     { key: "class_name", label: "Class" },
     { key: "total_due", label: "Total Due" },
     { key: "total_paid", label: "Total Paid" },
@@ -415,6 +421,12 @@ const FeeManagement = () => {
                 options: Array.from(new Set(classes.map(c => c.name))).filter(Boolean).map(name => ({ label: name, value: name }))
               },
               {
+                label: "All Sections",
+                value: selectedSectionFilter,
+                onChange: setSelectedSectionFilter,
+                options: Array.from(new Set(classes.map(c => c.section))).filter(Boolean).map(sec => ({ label: sec, value: sec }))
+              },
+              {
                 label: "Payment Status",
                 value: selectedStatusFilter,
                 onChange: setSelectedStatusFilter,
@@ -492,6 +504,7 @@ const FeeManagement = () => {
                     {selectedColumns.includes("sno") && <th style={{ padding: "0.5rem 1rem", textAlign: "left", fontSize: "0.75rem", fontWeight: "600", color: "var(--text-secondary)" }}>S.NO</th>}
                     {selectedColumns.includes("name") && <th style={{ padding: "0.5rem 1rem", textAlign: "left", fontSize: "0.75rem", fontWeight: "600", color: "var(--text-secondary)", cursor: "pointer", userSelect: "none" }} onClick={() => requestSort("name")}>STUDENT{renderSortIndicator("name")}</th>}
                     {selectedColumns.includes("admission_number") && <th style={{ padding: "0.5rem 1rem", textAlign: "left", fontSize: "0.75rem", fontWeight: "600", color: "var(--text-secondary)", cursor: "pointer", userSelect: "none" }} onClick={() => requestSort("admission_number")}>ADM NO{renderSortIndicator("admission_number")}</th>}
+                    {selectedColumns.includes("doj") && <th style={{ padding: "0.5rem 1rem", textAlign: "left", fontSize: "0.75rem", fontWeight: "600", color: "var(--text-secondary)", cursor: "pointer", userSelect: "none" }} onClick={() => requestSort("doj")}>DATE OF JOINING{renderSortIndicator("doj")}</th>}
                     {selectedColumns.includes("class_name") && <th style={{ padding: "0.5rem 1rem", textAlign: "left", fontSize: "0.75rem", fontWeight: "600", color: "var(--text-secondary)", cursor: "pointer", userSelect: "none" }} onClick={() => requestSort("className")}>CLASS{renderSortIndicator("className")}</th>}
                     {selectedColumns.includes("total_due") && <th style={{ padding: "0.5rem 1rem", textAlign: "left", fontSize: "0.75rem", fontWeight: "600", color: "var(--text-secondary)", cursor: "pointer", userSelect: "none" }} onClick={() => requestSort("totalDue")}>TOTAL DUE{renderSortIndicator("totalDue")}</th>}
                     {selectedColumns.includes("total_paid") && <th style={{ padding: "0.5rem 1rem", textAlign: "left", fontSize: "0.75rem", fontWeight: "600", color: "var(--text-secondary)", cursor: "pointer", userSelect: "none" }} onClick={() => requestSort("totalPaid")}>TOTAL PAID{renderSortIndicator("totalPaid")}</th>}
@@ -542,6 +555,7 @@ const FeeManagement = () => {
                         </td>
                       )}
                       {selectedColumns.includes("admission_number") && <td style={{ padding: "0.5rem 1rem", color: "var(--text-secondary)", fontSize: "0.875rem" }}>{s.admission_number || "-"}</td>}
+                      {selectedColumns.includes("doj") && <td style={{ padding: "0.5rem 1rem", color: "var(--text-secondary)", fontSize: "0.875rem" }}>{s.doj}</td>}
                       {selectedColumns.includes("class_name") && <td style={{ padding: "0.5rem 1rem", color: "var(--text-secondary)" }}>{s.className}</td>}
                       {selectedColumns.includes("total_due") && <td style={{ padding: "0.5rem 1rem", color: "var(--text-primary)", fontWeight: "500" }}>₹{s.totalDue}</td>}
                       {selectedColumns.includes("total_paid") && <td style={{ padding: "0.5rem 1rem", color: "#10b981", fontWeight: "500" }}>₹{s.totalPaid}</td>}

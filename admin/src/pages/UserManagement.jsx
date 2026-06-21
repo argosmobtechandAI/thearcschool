@@ -248,7 +248,7 @@ const UserManagement = () => {
       return [
         ...base,
         { key: "admission_number", label: "Admission No" },
-        { key: "admission_date", label: "Admission Date" },
+        { key: "admission_date", label: "Date of Joining" },
         { key: "house", label: "House" },
         { key: "father_name", label: "Father's Name" },
         { key: "mother_name", label: "Mother's Name" },

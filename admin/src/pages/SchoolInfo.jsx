@@ -3,7 +3,6 @@ import { useDispatch, useSelector } from "react-redux";
 import { fetchUsers, fetchClasses, fetchInfo } from "../features/dataSlice";
 import { 
     uploadFile, updateSettings, 
-    addChampion, updateChampion, deleteChampion, 
     addGalleryImage, deleteGalleryImage, 
     addNewsletter, deleteNewsletter 
 } from "../services/api";
@@ -11,18 +10,15 @@ import { toast } from "react-toastify";
 import { Link2, Trophy, Image as ImageIcon, FileText, Plus, Trash2, Edit, CheckCircle } from "lucide-react";
 
 const SchoolInfo = () => {
-    const { infoSettings, infoChampions, infoGallery, infoNewsletters, users, classes } = useSelector((state) => state.data);
+    const { infoSettings, infoGallery, infoNewsletters, users, classes } = useSelector((state) => state.data);
     const dispatch = useDispatch();
 
     const [modal, setModal] = useState(null);
-    const [editId, setEditId] = useState(null); 
     const [social, setNewSocial] = useState({ instagram_url: "", whatsapp_url: "", linkedin_url: "", twitter_url: "", late_fee_penalty: 10 });
-    const [champ, setNewChamp] = useState({ student_id: "", game_name: "", achievement_level: "", marks_score: "" });
-    const [searchQuery, setSearchQuery] = useState("");
 
     useEffect(() => {
         if (!users || users.length === 0) dispatch(fetchUsers());
-        if (!infoSettings && !infoChampions?.length) dispatch(fetchInfo());
+        if (!infoSettings) dispatch(fetchInfo());
         if (!classes || classes.length === 0) dispatch(fetchClasses());
     }, [dispatch]);
 
@@ -49,8 +45,7 @@ const SchoolInfo = () => {
         if (!window.confirm("Are you sure you want to delete this record?")) return;
         try {
             let res;
-            if (type === 'champion') res = await deleteChampion(id);
-            else if (type === 'gallery') res = await deleteGalleryImage(id);
+            if (type === 'gallery') res = await deleteGalleryImage(id);
             else if (type === 'newsletter') res = await deleteNewsletter(id);
             
             showToast(res.data?.message || "Deleted successfully", "success");
@@ -71,19 +66,7 @@ const SchoolInfo = () => {
         }
     };
 
-    const handleSaveChamp = async () => {
-        try {
-            let res;
-            if (editId) res = await updateChampion(editId, champ);
-            else res = await addChampion(champ);
-            showToast(res.data?.message || "Champion saved", "success");
-            dispatch(fetchInfo());
-            setModal(null);
-            setEditId(null);
-        } catch (error) {
-            showToast(error.response?.data?.message || "Error saving champion", "error");
-        }
-    };
+
 
     const handleUploadGallery = async (e) => {
         const file = e.target.files[0];
@@ -149,40 +132,7 @@ const SchoolInfo = () => {
                     </div>
                 </section>
 
-                {/* CHAMPION STUDENTS */}
-                <section className="glass-panel" style={{ padding: "1.5rem" }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.5rem" }}>
-                        <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
-                            <div style={{ padding: "0.5rem", background: "rgba(245, 158, 11, 0.1)", color: "#f59e0b", borderRadius: "12px" }}><Trophy size={20} /></div>
-                            <h2 style={{ fontSize: "1.25rem", fontWeight: "700", color: "var(--text-primary)" }}>Champion Students</h2>
-                        </div>
-                        <button onClick={() => { setModal("champ"); setEditId(null); setNewChamp({ student_id: "", game_name: "", achievement_level: "", marks_score: "" }); }} className="btn btn-primary" style={{ display: "flex", alignItems: "center", gap: "0.5rem", fontSize: "0.875rem", padding: "0.5rem 1rem" }}>
-                            <Plus size={16} /> Add Champion
-                        </button>
-                    </div>
-                    <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
-                        {infoChampions?.length > 0 ? infoChampions.map((champItem) => {
-                            const student = users?.find((c) => c.id === champItem.student_id);
-                            return (
-                                <div key={champItem.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "1rem", background: "var(--bg-secondary)", border: "1px solid var(--glass-border)", borderRadius: "12px" }}>
-                                    <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
-                                        <div style={{ width: "40px", height: "40px", background: "rgba(245, 158, 11, 0.1)", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: "bold", color: "#f59e0b" }}>{student?.name?.charAt(0) || "U"}</div>
-                                        <div>
-                                            <p style={{ fontWeight: "700", color: "var(--text-primary)", marginBottom: "0.25rem" }}>{student?.name || "Unknown Student"}</p>
-                                            <p style={{ fontSize: "0.75rem", color: "var(--text-secondary)", background: "var(--bg-primary)", padding: "0.25rem 0.5rem", borderRadius: "6px", display: "inline-block" }}>{champItem.game_name} • <span style={{ color: "#f59e0b" }}>{champItem.marks_score}</span></p>
-                                        </div>
-                                    </div>
-                                    <div style={{ display: "flex", gap: "0.5rem" }}>
-                                        <button onClick={() => { setModal("champ"); setEditId(champItem.id); setNewChamp(champItem); }} style={{ padding: "0.5rem", color: "var(--text-secondary)", background: "transparent", border: "none", cursor: "pointer", borderRadius: "8px" }}><Edit size={16} /></button>
-                                        <button onClick={() => handleDelete('champion', champItem.id)} style={{ padding: "0.5rem", color: "#ef4444", background: "rgba(239, 68, 68, 0.1)", border: "none", cursor: "pointer", borderRadius: "8px" }}><Trash2 size={16} /></button>
-                                    </div>
-                                </div>
-                            );
-                        }) : (
-                            <p style={{ fontSize: "0.875rem", color: "var(--text-secondary)", padding: "1rem", textAlign: "center", border: "1px dashed var(--glass-border)", borderRadius: "12px" }}>No champions recorded yet.</p>
-                        )}
-                    </div>
-                </section>
+
             </div>
 
             {/* GALLERY */}
@@ -257,7 +207,7 @@ const SchoolInfo = () => {
                         {/* Header */}
                         <div style={{ padding: "1.5rem", borderBottom: "1px solid var(--glass-border)", display: "flex", justifyContent: "space-between", alignItems: "center", background: "var(--bg-primary)" }}>
                             <h3 style={{ fontSize: "1.125rem", fontWeight: "700", color: "var(--text-primary)" }}>
-                                {modal === 'social' ? 'General Settings' : 'Champion Student'}
+                                {modal === 'social' ? 'General Settings' : ''}
                             </h3>
                             <button onClick={() => { setModal(null); }} style={{ background: "transparent", border: "none", fontSize: "1.25rem", cursor: "pointer", color: "var(--text-secondary)" }}>✕</button>
                         </div>
@@ -280,50 +230,13 @@ const SchoolInfo = () => {
                                 </div>
                             )}
 
-                            {/* CHAMPION MODAL */}
-                            {modal === "champ" && (
-                                <div style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
-                                    <div>
-                                        <label style={{ fontSize: "0.875rem", fontWeight: "700", color: "var(--text-primary)", marginBottom: "0.5rem", display: "block" }}>Search Student</label>
-                                        <input placeholder="Search by name..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} style={{ width: "100%", border: "1px solid var(--glass-border)", borderRadius: "8px", padding: "0.75rem", outline: "none", fontSize: "0.875rem", background: "var(--bg-primary)", color: "var(--text-primary)" }} />
-                                    </div>
-                                    <div style={{ border: "1px solid var(--glass-border)", borderRadius: "8px", maxHeight: "200px", overflowY: "auto", background: "var(--bg-primary)" }}>
-                                        {students?.filter((s) => s.name.toLowerCase().includes(searchQuery.toLowerCase())).map((stud) => {
-                                            const classe = classes?.find((c) => c.id == stud.classes?.[0]);
-                                            const isSelected = champ?.student_id == stud.id;
-                                            return (
-                                                <div key={stud.id} onClick={() => setNewChamp({ ...champ, student_id: stud.id })} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "0.75rem", cursor: "pointer", borderBottom: "1px solid var(--glass-border)", background: isSelected ? "var(--accent-light)" : "transparent" }}>
-                                                    <div>
-                                                        <p style={{ fontSize: "0.875rem", fontWeight: isSelected ? "700" : "500", color: isSelected ? "var(--accent-primary)" : "var(--text-primary)" }}>{stud.name}</p>
-                                                        <p style={{ fontSize: "0.75rem", color: "var(--text-secondary)" }}>{classe ? `Class ${classe.className}-${classe.section}` : "No Class"}</p>
-                                                    </div>
-                                                    {isSelected && <span style={{ color: "var(--accent-primary)" }}><CheckCircle size={18} /></span>}
-                                                </div>
-                                            );
-                                        })}
-                                    </div>
-                                    <div>
-                                        <label style={{ fontSize: "0.875rem", fontWeight: "700", color: "var(--text-primary)", marginBottom: "0.5rem", display: "block" }}>Achievement / Game Name</label>
-                                        <input placeholder="e.g. 100m Sprint" value={champ?.game_name || ""} onChange={(e) => setNewChamp({ ...champ, game_name: e.target.value })} style={{ width: "100%", border: "1px solid var(--glass-border)", borderRadius: "8px", padding: "0.75rem", outline: "none", fontSize: "0.875rem", background: "var(--bg-primary)", color: "var(--text-primary)" }} />
-                                    </div>
-                                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
-                                        <div>
-                                            <label style={{ fontSize: "0.875rem", fontWeight: "700", color: "var(--text-primary)", marginBottom: "0.5rem", display: "block" }}>Level</label>
-                                            <input placeholder="State / National" value={champ?.achievement_level || ""} onChange={(e) => setNewChamp({ ...champ, achievement_level: e.target.value })} style={{ width: "100%", border: "1px solid var(--glass-border)", borderRadius: "8px", padding: "0.75rem", outline: "none", fontSize: "0.875rem", background: "var(--bg-primary)", color: "var(--text-primary)" }} />
-                                        </div>
-                                        <div>
-                                            <label style={{ fontSize: "0.875rem", fontWeight: "700", color: "var(--text-primary)", marginBottom: "0.5rem", display: "block" }}>Score / Detail</label>
-                                            <input placeholder="e.g. Gold Medal" value={champ?.marks_score || ""} onChange={(e) => setNewChamp({ ...champ, marks_score: e.target.value })} style={{ width: "100%", border: "1px solid var(--glass-border)", borderRadius: "8px", padding: "0.75rem", outline: "none", fontSize: "0.875rem", background: "var(--bg-primary)", color: "var(--text-primary)" }} />
-                                        </div>
-                                    </div>
-                                </div>
-                            )}
+
                         </div>
 
                         {/* Footer Action */}
                         <div style={{ padding: "1rem 1.5rem", background: "var(--bg-primary)", borderTop: "1px solid var(--glass-border)", display: "flex", justifyContent: "flex-end", gap: "0.75rem" }}>
                             <button onClick={() => { setModal(null); }} className="btn btn-ghost" style={{ padding: "0.5rem 1rem", fontSize: "0.875rem" }}>Cancel</button>
-                            <button onClick={modal === 'social' ? handleSaveSocial : handleSaveChamp} className="btn btn-primary" style={{ padding: "0.5rem 1.5rem", fontSize: "0.875rem" }}>
+                            <button onClick={modal === 'social' ? handleSaveSocial : null} className="btn btn-primary" style={{ padding: "0.5rem 1.5rem", fontSize: "0.875rem" }}>
                                 Save
                             </button>
                         </div>

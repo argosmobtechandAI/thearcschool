@@ -85,6 +85,9 @@ const FinanceLayout = () => {
           <Link to="/metrics?view=students" style={getMetricStyle("students")}><Users size={16} /> Active Students</Link>
           <Link to="/metrics?view=exempted" style={getMetricStyle("exempted")}><TrendingUp size={16} /> Exempted Students</Link>
 
+          <NavGroup title="Master Data" />
+          <NavLink to="/student-master" style={navLinkStyle}><Users size={16} /> Student Master</NavLink>
+
           <NavGroup title="Accounts & Ledger" />
           <NavLink to="/ledger" style={navLinkStyle}><FileSpreadsheet size={16} /> Fee Collection</NavLink>
           <NavLink to="/income" style={navLinkStyle}><IndianRupee size={16} /> Income Ledger</NavLink>

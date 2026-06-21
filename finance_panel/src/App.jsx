@@ -13,6 +13,7 @@ import DashboardMetrics from './pages/DashboardMetrics';
 import FeeStructures from './pages/FeeStructures';
 import IncomeLedger from './pages/IncomeLedger';
 import ExpenseLedger from './pages/ExpenseLedger';
+import StudentMaster from './pages/StudentMaster';
 import IncomeCategories from './pages/IncomeCategories';
 import ExpenseCategories from './pages/ExpenseCategories';
 import ProfitLoss from './pages/ProfitLoss';
@@ -43,6 +44,7 @@ function App() {
           <Route path="reports" element={<Reports />} />
           <Route path="profit-loss" element={<ProfitLoss />} />
           <Route path="metrics" element={<DashboardMetrics />} />
+          <Route path="student-master" element={<StudentMaster />} />
         </Route>
         
         {/* Fallback routing temporarily */}

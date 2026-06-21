@@ -15,9 +15,10 @@ const Ledger = () => {
 
   const [studentSearch, setStudentSearch] = useState("");
   const [classFilter, setClassFilter] = useState("");
+  const [sectionFilter, setSectionFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("All");
   const [selectedColumns, setSelectedColumns] = useState([
-    "sno", "name", "admission_number", "class", "total_due", "total_paid", "balance", "fee_exempted", "actions"
+    "sno", "name", "admission_number", "doj", "class", "total_due", "total_paid", "balance", "fee_exempted", "actions"
   ]);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -72,15 +73,37 @@ const Ledger = () => {
       }
     });
 
-    return globalClasses
-      .filter(c => classSet.has(c.id))
-      .map(c => ({ value: c.id, label: `${c.name} ${c.section || ''}`.trim() }));
+    return Array.from(new Set(
+      globalClasses.filter(c => classSet.has(c.id)).map(c => c.name)
+    )).filter(Boolean).map(name => ({ value: name, label: name }));
+  }, [students, globalClasses]);
+
+  const sections = useMemo(() => {
+    const classSet = new Set();
+    students.forEach(s => {
+      if (s.classes && s.classes.length > 0) {
+        s.classes.forEach(c => classSet.add(c));
+      }
+    });
+    
+    return Array.from(new Set(
+      globalClasses.filter(c => classSet.has(c.id)).map(c => c.section)
+    )).filter(Boolean).map(sec => ({ value: sec, label: sec }));
   }, [students, globalClasses]);
 
   const filteredStudents = useMemo(() => {
     let result = students;
-    if (classFilter) {
-      result = result.filter(s => s.classes?.some(c => String(c) === String(classFilter)));
+    if (classFilter || sectionFilter) {
+      result = result.filter(s => {
+        if (!s.classes || s.classes.length === 0) return false;
+        const cls = globalClasses.find(c => String(c.id) === String(s.classes[0]));
+        if (!cls) return false;
+        
+        const matchesClass = !classFilter || cls.name === classFilter;
+        const matchesSection = !sectionFilter || cls.section === sectionFilter;
+        
+        return matchesClass && matchesSection;
+      });
     }
     if (studentSearch) {
       const search = studentSearch.toLowerCase();
@@ -99,6 +122,8 @@ const Ledger = () => {
       return {
         ...s,
         className: globalClasses.find(c => String(c.id) === String(s.classes?.[0]))?.name || "N/A",
+        section: globalClasses.find(c => String(c.id) === String(s.classes?.[0]))?.section || "",
+        doj: s.admission_date ? new Date(s.admission_date).toLocaleDateString() : (s.created_at ? new Date(s.created_at).toLocaleDateString() : "N/A"),
         total_due: b.totalDue,
         total_paid: b.totalPaid,
         balance: b.balance
@@ -206,6 +231,7 @@ const Ledger = () => {
     { key: "sno", label: "S.No" },
     { key: "name", label: "Name" },
     { key: "admission_number", label: "Admission No" },
+    { key: "doj", label: "Date of Joining" },
     { key: "total_due", label: "Total Due" },
     { key: "total_paid", label: "Total Paid" },
     { key: "balance", label: "Balance" },
@@ -264,6 +290,12 @@ const Ledger = () => {
               options: classes
             },
             {
+              label: "All Sections",
+              value: sectionFilter,
+              onChange: setSectionFilter,
+              options: sections
+            },
+            {
               label: "Status",
               value: statusFilter,
               onChange: setStatusFilter,
@@ -304,6 +336,7 @@ const Ledger = () => {
                   STUDENT{renderSortIndicator("name")}
                 </th>
                 {selectedColumns.includes("admission_number") && <th style={{ padding: "0.5rem 1rem", textAlign: "left", fontSize: "0.75rem", fontWeight: "600", color: "var(--text-secondary)", cursor: "pointer", userSelect: "none" }} onClick={() => requestSort("admission_number")}>ADM NO{renderSortIndicator("admission_number")}</th>}
+                {selectedColumns.includes("doj") && <th style={{ padding: "0.5rem 1rem", textAlign: "left", fontSize: "0.75rem", fontWeight: "600", color: "var(--text-secondary)", cursor: "pointer", userSelect: "none" }} onClick={() => requestSort("doj")}>DATE OF JOINING{renderSortIndicator("doj")}</th>}
                 {selectedColumns.includes("total_due") && <th style={{ padding: "0.5rem 1rem", textAlign: "left", fontSize: "0.75rem", fontWeight: "600", color: "var(--text-secondary)", cursor: "pointer", userSelect: "none" }} onClick={() => requestSort("total_due")}>TOTAL DUE{renderSortIndicator("total_due")}</th>}
                 {selectedColumns.includes("total_paid") && <th style={{ padding: "0.5rem 1rem", textAlign: "left", fontSize: "0.75rem", fontWeight: "600", color: "var(--text-secondary)", cursor: "pointer", userSelect: "none" }} onClick={() => requestSort("total_paid")}>TOTAL PAID{renderSortIndicator("total_paid")}</th>}
                 {selectedColumns.includes("balance") && <th style={{ padding: "0.5rem 1rem", textAlign: "left", fontSize: "0.75rem", fontWeight: "600", color: "var(--text-secondary)", cursor: "pointer", userSelect: "none" }} onClick={() => requestSort("balance")}>BALANCE{renderSortIndicator("balance")}</th>}
@@ -331,6 +364,7 @@ const Ledger = () => {
                       </div>
                     </td>
                     {selectedColumns.includes("admission_number") && <td style={{ padding: "0.5rem 1rem", color: "var(--text-secondary)", fontSize: "0.875rem" }}>{s.admission_number || "-"}</td>}
+                    {selectedColumns.includes("doj") && <td style={{ padding: "0.5rem 1rem", color: "var(--text-secondary)", fontSize: "0.875rem" }}>{s.doj}</td>}
                     {selectedColumns.includes("total_due") && <td style={{ padding: "0.5rem 1rem", color: "var(--text-primary)", fontWeight: "500" }}>₹{s.total_due}</td>}
                     {selectedColumns.includes("total_paid") && <td style={{ padding: "0.5rem 1rem", color: "#10b981", fontWeight: "500" }}>₹{s.total_paid}</td>}
                     {selectedColumns.includes("balance") && (
