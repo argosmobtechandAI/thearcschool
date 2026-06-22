@@ -3,10 +3,11 @@ import { auth } from "../../middlewares/authMiddleware.js";
 import { authorizeRoles } from "../../middlewares/roleMiddleware.js";
 
 // Import Controllers
-import { createExams, deleteExam, getExam, updateExam } from "../shared/academics/examsController.js";
+import { createExams, deleteExam, getExam, updateExam, bulkUpdateGrades } from "../shared/academics/examsController.js";
 import { createCourse, deletecourse, getcourse, submitAnswer, updatecourse } from "../shared/academics/courseController.js";
-import { updateAttendance, bulkUpdateAttendance, getAttendance } from "../shared/attendance/controller.js";
+
 import { getTeacherTimetable } from "../shared/timetable/controller.js";
+import { getClassStudents, getTeacherClasses } from "../shared/classes/controller.js";
 
 import { getPlannerEvents } from "../admin_panel/planner/controller.js";
 import communicationRouter from "../shared/communication/routes.js";
@@ -18,6 +19,7 @@ teacherRouter.use(auth);
 teacherRouter.use(authorizeRoles('teacher', 'admin', 'principal'));
 
 // Exams
+teacherRouter.post("/exams/grades/bulk", bulkUpdateGrades);
 teacherRouter.post("/exams", createExams);
 teacherRouter.get("/exams", getExam);
 teacherRouter.put("/exams/:id", updateExam);
@@ -30,13 +32,14 @@ teacherRouter.put("/course/:id", updatecourse);
 teacherRouter.delete("/course/:id", deletecourse);
 teacherRouter.put("/course/uploadFile", submitAnswer);
 
-// Attendance
-teacherRouter.put("/attendance/:id", updateAttendance);
-teacherRouter.post("/attendance/bulk", bulkUpdateAttendance);
-teacherRouter.get("/attendance", getAttendance);
+// Attendance endpoints moved to /api/attendance
 
 // Timetable
 teacherRouter.get("/timetable", getTeacherTimetable);
+
+// Classes (Students)
+teacherRouter.get("/classes", getTeacherClasses);
+teacherRouter.get("/classes/:id/students", getClassStudents);
 
 // Events & Info (Read-only)
 teacherRouter.get("/events", getPlannerEvents);

@@ -123,7 +123,7 @@ export const getTimeTable = async (req, res) => {
     // Fetch all normalized timetable rows
     const { data: timetables, error } = await supabase
       .from("timetable")
-      .select("*, class(name)");
+      .select("*, class(name, section)");
 
     if (error) throw error;
 
@@ -137,6 +137,8 @@ export const getTimeTable = async (req, res) => {
           groupedData[cId] = {
             id: row.id,
             classId: cId,
+            className: row.class?.name || 'Unknown Class',
+            section: row.class?.section || '',
             dates: {} // Maps date string (YYYY-MM-DD) to array of periods
           };
         }
@@ -361,7 +363,7 @@ export const getTeacherTimetable = async (req, res) => {
     // Fetch timetable where teacher_id matches
     const { data: timetables, error } = await supabase
       .from("timetable")
-      .select("*, class(name)")
+      .select("*, class(name, section)")
       .eq("teacher_id", userId);
 
     if (error) throw error;
@@ -375,7 +377,13 @@ export const getTeacherTimetable = async (req, res) => {
     timetables.forEach(row => {
       const cId = row.class_id;
       if (!groupedData[cId]) {
-        groupedData[cId] = { id: row.id, classId: cId, dates: {} };
+        groupedData[cId] = { 
+          id: row.id, 
+          classId: cId, 
+          className: row.class?.name || 'Unknown Class',
+          section: row.class?.section || '',
+          dates: {} 
+        };
       }
       
       const dateStr = row.date;

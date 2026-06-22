@@ -52,7 +52,7 @@ const AttendanceClassView = () => {
         end = selectedDate;
       }
       
-      const res = await api.get('/user/attendance', {
+      const res = await api.get('/attendance', {
         params: { startDate: start, endDate: end }
       });
       if (res.data.success) {
@@ -126,7 +126,7 @@ const AttendanceClassView = () => {
     }
 
     try {
-      await api.post('/user/attendance/bulk', { data: records });
+      await api.post('/attendance/bulk', { data: records });
       toast.success("All students marked as Present!");
       fetchAttendance(); // refresh
     } catch (err) {
@@ -136,7 +136,7 @@ const AttendanceClassView = () => {
 
   const handleSingleUpdate = async (userId, status) => {
     try {
-      await api.put(`/user/updateAttendace/${userId}`, { 
+      await api.put(`/attendance/${userId}`, { 
         data: { date: selectedDate, status } 
       });
       fetchAttendance(); // refresh
@@ -296,11 +296,11 @@ const AttendanceClassView = () => {
                             onClick={() => handleSingleUpdate(user.id, "present")}
                             style={{ 
                               padding: "4px 12px", borderRadius: "6px", border: "1px solid #10b981",
-                              background: "transparent", color: "#10b981", fontSize: "12px", fontWeight: "600",
+                              background: user.status === "present" ? "#10b981" : "transparent", color: user.status === "present" ? "white" : "#10b981", fontSize: "12px", fontWeight: "600",
                               cursor: "pointer", transition: "all 0.2s"
                             }}
-                            onMouseEnter={(e) => { e.target.style.background = "#10b981"; e.target.style.color = "white"; }}
-                            onMouseLeave={(e) => { e.target.style.background = "transparent"; e.target.style.color = "#10b981"; }}
+                            onMouseEnter={(e) => { if (user.status !== "present") { e.target.style.background = "#10b981"; e.target.style.color = "white"; } }}
+                            onMouseLeave={(e) => { if (user.status !== "present") { e.target.style.background = "transparent"; e.target.style.color = "#10b981"; } }}
                           >
                             Present
                           </button>
@@ -308,11 +308,11 @@ const AttendanceClassView = () => {
                             onClick={() => handleSingleUpdate(user.id, "late")}
                             style={{ 
                               padding: "4px 12px", borderRadius: "6px", border: "1px solid #f59e0b",
-                              background: "transparent", color: "#f59e0b", fontSize: "12px", fontWeight: "600",
+                              background: user.status === "late" ? "#f59e0b" : "transparent", color: user.status === "late" ? "white" : "#f59e0b", fontSize: "12px", fontWeight: "600",
                               cursor: "pointer", transition: "all 0.2s"
                             }}
-                            onMouseEnter={(e) => { e.target.style.background = "#f59e0b"; e.target.style.color = "white"; }}
-                            onMouseLeave={(e) => { e.target.style.background = "transparent"; e.target.style.color = "#f59e0b"; }}
+                            onMouseEnter={(e) => { if (user.status !== "late") { e.target.style.background = "#f59e0b"; e.target.style.color = "white"; } }}
+                            onMouseLeave={(e) => { if (user.status !== "late") { e.target.style.background = "transparent"; e.target.style.color = "#f59e0b"; } }}
                           >
                             Late
                           </button>
@@ -320,11 +320,11 @@ const AttendanceClassView = () => {
                             onClick={() => handleSingleUpdate(user.id, "absent")}
                             style={{ 
                               padding: "4px 12px", borderRadius: "6px", border: "1px solid #ef4444",
-                              background: "transparent", color: "#ef4444", fontSize: "12px", fontWeight: "600",
+                              background: user.status === "absent" ? "#ef4444" : "transparent", color: user.status === "absent" ? "white" : "#ef4444", fontSize: "12px", fontWeight: "600",
                               cursor: "pointer", transition: "all 0.2s"
                             }}
-                            onMouseEnter={(e) => { e.target.style.background = "#ef4444"; e.target.style.color = "white"; }}
-                            onMouseLeave={(e) => { e.target.style.background = "transparent"; e.target.style.color = "#ef4444"; }}
+                            onMouseEnter={(e) => { if (user.status !== "absent") { e.target.style.background = "#ef4444"; e.target.style.color = "white"; } }}
+                            onMouseLeave={(e) => { if (user.status !== "absent") { e.target.style.background = "transparent"; e.target.style.color = "#ef4444"; } }}
                           >
                             Absent
                           </button>

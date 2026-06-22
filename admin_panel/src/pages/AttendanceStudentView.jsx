@@ -39,7 +39,7 @@ const AttendanceStudentView = () => {
       const lastDay = new Date(year, month, 0).getDate();
       const end = `${year}-${month}-${String(lastDay).padStart(2, '0')}`;
 
-      const res = await api.get('/user/attendance', {
+      const res = await api.get('/attendance', {
         params: { startDate: start, endDate: end }
       });
       if (res.data.success) {
@@ -86,7 +86,7 @@ const AttendanceStudentView = () => {
     else if (currentStatus === "late") newStatus = "delete";
 
     try {
-      await api.put(`/user/updateAttendace/${studentId}`, { 
+      await api.put(`/attendance/${studentId}`, { 
         data: { date: fullDateString, status: newStatus } 
       });
       fetchAttendance(); // refresh quietly

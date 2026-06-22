@@ -338,3 +338,79 @@ export const deleteClasses = async (req, res) => {
     });
   }
 };
+
+export const getClassStudents = async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (!id) {
+      return res.status(400).json({ success: false, message: "Class ID is required" });
+    }
+
+    // Get student IDs in the class
+    const { data: classStudents, error: csError } = await supabase
+      .from("class_students")
+      .select("student_id")
+      .eq("class_id", id);
+      
+    if (csError) throw csError;
+    if (!classStudents || classStudents.length === 0) {
+      return res.status(200).json({ success: true, students: [] });
+    }
+
+    const studentIds = classStudents.map(cs => cs.student_id);
+
+    // Fetch full student details from user table
+    const { data: users, error: usersError } = await supabase
+      .from("user")
+      .select("id, name, email") 
+      .in("id", studentIds);
+
+    if (usersError) throw usersError;
+
+    return res.status(200).json({
+      success: true,
+      students: users || []
+    });
+
+  } catch (e) {
+    return res.status(500).json({
+      success: false,
+      message: `Error occurred: ${e.message}`
+    });
+  }
+};
+
+export const getTeacherClasses = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    
+    // Fetch only the classes where this teacher is assigned from class_teachers table
+    const { data: teacherClasses, error: tcError } = await supabase
+      .from("class_teachers")
+      .select("class_id, class(name, section)")
+      .eq("teacher_id", userId);
+      
+    if (tcError) throw tcError;
+    
+    if (!teacherClasses || teacherClasses.length === 0) {
+      return res.status(200).json({ success: true, classes: [] });
+    }
+    
+    // Format classes
+    const classes = teacherClasses.map(c => ({
+      classId: c.class_id,
+      className: c.class?.name,
+      section: c.class?.section
+    }));
+    
+    return res.status(200).json({
+      success: true,
+      classes: classes
+    });
+  } catch (e) {
+    return res.status(500).json({
+      success: false,
+      message: `Error occurred: ${e.message}`
+    });
+  }
+};

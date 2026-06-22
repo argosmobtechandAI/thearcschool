@@ -7,6 +7,7 @@ import api from "../services/api";
 import { toast } from "react-toastify";
 import DateRangePicker, { formatDate } from "../components/DateRangePicker";
 import AttendanceMatrixTable from "../components/AttendanceMatrixTable";
+import AttendanceReports from "../components/AttendanceReports";
 
 const Attendance = () => {
   const dispatch = useDispatch();
@@ -36,7 +37,7 @@ const Attendance = () => {
   const fetchAttendance = async () => {
     try {
       setLoadingAttendance(true);
-      const res = await api.get('/user/attendance', {
+      const res = await api.get('/attendance', {
         params: { startDate: todayString, endDate: todayString }
       });
       if (res.data.success) {
@@ -62,7 +63,7 @@ const Attendance = () => {
       const fetchMatrixData = async () => {
         setLoadingMatrix(true);
         try {
-          const res = await api.get('/user/attendance', {
+          const res = await api.get('/attendance', {
             params: { startDate: matrixDateRange.start, endDate: matrixDateRange.end, classId: matrixClassId }
           });
           if (res.data.success) {
@@ -201,10 +202,18 @@ const Attendance = () => {
           >
             Matrix View
           </button>
+          <button 
+            onClick={() => setActiveTab("reports")}
+            style={{ padding: "6px 12px", borderRadius: "6px", background: activeTab === "reports" ? "white" : "transparent", boxShadow: activeTab === "reports" ? "0 2px 4px rgba(0,0,0,0.1)" : "none", border: "none", fontWeight: "600", cursor: "pointer", color: activeTab === "reports" ? "#3b82f6" : "var(--text-secondary)", transition: "all 0.2s" }}
+          >
+            Reports
+          </button>
         </div>
       </div>
 
-      {activeTab === "overview" ? (
+      {activeTab === "reports" ? (
+        <AttendanceReports users={users} classes={classes} />
+      ) : activeTab === "overview" ? (
         <>
           {/* Snapshot Cards */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: "1.5rem", marginBottom: "2rem" }}>

@@ -5,6 +5,7 @@ import userRoutes from "./shared/users/routes.js";
 import uploadRouter from "./shared/upload/routes.js";
 import roomRouter from "./shared/rooms/routes.js";
 import communicationRouter from "./shared/communication/routes.js";
+import attendanceRouter from "./shared/attendance/routes.js";
 
 // Admin Web Panel Domains
 import adminPanelRouter from "./admin_panel/routes.js";
@@ -33,6 +34,7 @@ import courseRouter from "./course/routes.js";
 router.use("/course", courseRouter);
 router.use("/user", userRoutes);
 router.use("/communication", communicationRouter);
+router.use("/attendance", attendanceRouter);
 router.use("/upload", uploadRouter);
 router.use("/rooms", roomRouter);
 

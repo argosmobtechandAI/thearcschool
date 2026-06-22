@@ -29,7 +29,7 @@ const AttendanceFilteredView = () => {
   const fetchAttendance = async () => {
     try {
       setLoadingAttendance(true);
-      const res = await api.get('/user/attendance', {
+      const res = await api.get('/attendance', {
         params: { startDate: todayString, endDate: todayString }
       });
       if (res.data.success) {
@@ -76,7 +76,7 @@ const AttendanceFilteredView = () => {
 
   const handleSingleUpdate = async (userId, newStatus) => {
     try {
-      await api.put(`/user/updateAttendace/${userId}`, { 
+      await api.put(`/attendance/${userId}`, { 
         data: { date: todayString, status: newStatus } 
       });
       fetchAttendance(); // refresh the records to potentially remove them from this list
