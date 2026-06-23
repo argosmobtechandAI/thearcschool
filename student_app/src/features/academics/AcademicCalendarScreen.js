@@ -6,9 +6,11 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/Feather';
 import { colors, shadows } from '../../theme/colors';
-import { Calendar, CalendarProvider, ExpandableCalendar } from 'react-native-calendars';
+import { Calendar } from 'react-native-calendars';
 import { useGetEventsQuery, useGetAcademicsQuery } from '../../store/apiSlice';
 import { useDrawer } from '../../navigation/DrawerContext';
+import { useSelector, useDispatch } from 'react-redux';
+import { setAcademicYear } from '../../store/settingsSlice';
 
 // Helper to format YYYY-MM-DD
 const formatDate = (dateObj) => {
@@ -19,19 +21,32 @@ const formatDate = (dateObj) => {
 };
 
 const AcademicCalendarScreen = ({ navigation }) => {
+  const dispatch = useDispatch();
   const { openDrawer } = useDrawer();
+  const academicYear = useSelector(state => state.settings.academicYear);
   const [currentMonth, setCurrentMonth] = useState(formatDate(new Date()));
   const [refreshing, setRefreshing] = useState(false);
   const [activeTab, setActiveTab] = useState('dateSheet'); // 'dateSheet' | 'annualCalendar'
 
-  const { data: eventsData, isLoading: eventsLoading, refetch: refetchEvents } = useGetEventsQuery();
-  const { data: acadData, isLoading: acadLoading, refetch: refetchAcad } = useGetAcademicsQuery();
+  const getAvailableYears = () => {
+    const currentStartYear = parseInt(academicYear.split('-')[0]) || new Date().getFullYear();
+    return [
+      `${currentStartYear - 1}-${currentStartYear}`,
+      `${currentStartYear}-${currentStartYear + 1}`,
+      `${currentStartYear + 1}-${currentStartYear + 2}`
+    ];
+  };
+
+  const availableYears = getAvailableYears();
+
+  const { data: eventsData, isLoading: eventsLoading, refetch: refetchEvents } = useGetEventsQuery(academicYear);
+  const { data: acadData, isLoading: acadLoading, refetch: refetchAcads } = useGetAcademicsQuery(academicYear);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    await Promise.all([refetchEvents(), refetchAcad()]);
+    await Promise.all([refetchEvents(), refetchAcads()]);
     setRefreshing(false);
-  }, [refetchEvents, refetchAcad]);
+  }, [refetchEvents, refetchAcads]);
 
   const isLoading = eventsLoading || acadLoading;
 
@@ -106,14 +121,14 @@ const AcademicCalendarScreen = ({ navigation }) => {
     upcomingExams.forEach(ex => {
       const dStr = ex.date;
       if (!dStr) return;
-      const title = ex.exams?.name ? `${ex.exams.name} - ${ex.subject?.name || 'Subject'}` : (ex.name || 'Exam');
+      const title = ex.title ? `${ex.title} - ${ex.subject || 'Subject'}` : (ex.subject || 'Exam');
       
       list.push({
         id: `exam-${ex.id}`,
         title: title,
-        subtitle: `Duration: ${ex.duration_minutes || 60} mins`,
+        subtitle: `Duration: ${ex.duration || 60} mins`,
         date: dStr,
-        time: ex.start_time || '09:00 AM',
+        time: ex.time || '09:00 AM',
         type: 'exam',
         color: colors.danger,
         icon: 'edit-3'
@@ -178,6 +193,25 @@ const AcademicCalendarScreen = ({ navigation }) => {
       </View>
 
       <View style={styles.container}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.yearScroll} contentContainerStyle={styles.yearScrollContent}>
+          {availableYears.map(year => (
+            <TouchableOpacity 
+              key={year} 
+              style={[styles.yearChip, academicYear === year && styles.yearChipActive]}
+              onPress={() => {
+                if (academicYear === year) {
+                  refetchEvents();
+                  refetchAcads();
+                } else {
+                  dispatch(setAcademicYear(year));
+                }
+              }}
+            >
+              <Text style={[styles.yearChipText, academicYear === year && styles.yearChipTextActive]}>{year}</Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+
         {/* Dual Tab Toggle */}
         <View style={styles.tabContainer}>
           <TouchableOpacity 
@@ -205,20 +239,20 @@ const AcademicCalendarScreen = ({ navigation }) => {
             {activeTab === 'annualCalendar' && (
               <>
                 <View style={styles.calendarContainer}>
-                  <CalendarProvider date={currentMonth} onDateChanged={(date) => setCurrentMonth(date)}>
-                    <ExpandableCalendar
-                      firstDay={1}
-                      markedDates={eventsMarks}
-                      theme={{
-                        todayTextColor: colors.primary,
-                        arrowColor: colors.primary,
-                        textDayFontWeight: '500',
-                        textMonthFontWeight: 'bold',
-                        textDayHeaderFontWeight: '600',
-                        calendarBackground: colors.surface,
-                      }}
-                    />
-                  </CalendarProvider>
+                  <Calendar
+                    current={currentMonth}
+                    onMonthChange={(month) => setCurrentMonth(month.dateString)}
+                    markedDates={eventsMarks}
+                    theme={{
+                      todayTextColor: colors.primary,
+                      arrowColor: colors.primary,
+                      textDayFontWeight: '500',
+                      textMonthFontWeight: 'bold',
+                      textDayHeaderFontWeight: '600',
+                      calendarBackground: colors.surface,
+                    }}
+                    enableSwipeMonths={true}
+                  />
                 </View>
                 <View style={styles.agendaHeader}>
                   <Text style={styles.agendaHeaderText}>School Events</Text>
@@ -279,6 +313,13 @@ const styles = StyleSheet.create({
   },
   headerTitle: { color: '#fff', fontSize: 18, fontWeight: '700' },
   headerBtn: { padding: 6, backgroundColor: 'rgba(255,255,255,0.15)', borderRadius: 10 },
+
+  yearScroll: { maxHeight: 50, flexGrow: 0, marginTop: 16 },
+  yearScrollContent: { paddingHorizontal: 16, gap: 10 },
+  yearChip: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20, backgroundColor: colors.background, borderWidth: 1, borderColor: colors.border },
+  yearChipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
+  yearChipText: { fontSize: 14, fontWeight: '600', color: colors.textMuted },
+  yearChipTextActive: { color: '#fff' },
 
   tabContainer: {
     flexDirection: 'row', backgroundColor: colors.surface,

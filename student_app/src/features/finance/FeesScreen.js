@@ -8,11 +8,13 @@ import Icon from 'react-native-vector-icons/Feather';
 import { colors, shadows } from '../../theme/colors';
 import { useGetFeesQuery } from '../../store/apiSlice';
 import { useDrawer } from '../../navigation/DrawerContext';
-import { useSelector } from 'react-redux';
+import { useSelector, useDispatch } from 'react-redux';
 import { generateReceiptPDF } from '../../utils/exportUtils';
 import { BarChart } from 'react-native-gifted-charts';
+import { setAcademicYear } from '../../store/settingsSlice';
 
 const FeesScreen = ({ navigation }) => {
+  const dispatch = useDispatch();
   const user = useSelector(state => state.auth.user);
   const { openDrawer } = useDrawer();
   const [refreshing, setRefreshing] = useState(false);
@@ -38,7 +40,7 @@ const FeesScreen = ({ navigation }) => {
     ];
   };
 
-  const [academicYear, setAcademicYear] = useState(getCurrentAcademicYear());
+  const academicYear = useSelector(state => state.settings.academicYear);
   const { data, isLoading, refetch } = useGetFeesQuery(academicYear, { refetchOnMountOrArgChange: true });
   const availableYears = getAvailableYears();
 
@@ -274,7 +276,7 @@ const FeesScreen = ({ navigation }) => {
                 if (academicYear === year) {
                   refetch();
                 } else {
-                  setAcademicYear(year);
+                  dispatch(setAcademicYear(year));
                 }
               }}
             >

@@ -11,7 +11,7 @@ export const getStudentAcademics = async (req, res) => {
         id,
         marks,
         feedback,
-        exams:exam_id (id, name, date, marks)
+        exams:exam_id (id, title, date, marks)
       `)
       .eq('student_id', studentId)
       .order('created_at', { ascending: false });
@@ -28,17 +28,29 @@ export const getStudentAcademics = async (req, res) => {
 
     let dateSheets = [];
     if (classData && classData.class_id) {
-      const { data: dsData, error: dsError } = await supabase
-        .from('date_sheets')
+      let query = supabase
+        .from('exams')
         .select(`
           id,
+          title,
+          subject,
           date,
-          start_time,
-          end_time,
-          subject:subject_id (name)
+          time,
+          duration,
+          marks
         `)
-        .eq('class_id', classData.class_id)
-        .order('date', { ascending: true });
+        .eq('class_id', classData.class_id);
+
+      // Filter by academic year
+      const academic_year = req.query.academic_year;
+      if (academic_year) {
+        const [startYear, endYear] = academic_year.split('-');
+        const startDate = `${startYear}-04-01`;
+        const endDate = `${endYear}-03-31`;
+        query = query.gte("date", startDate).lte("date", endDate);
+      }
+
+      const { data: dsData, error: dsError } = await query.order('date', { ascending: true });
         
       if (!dsError && dsData) {
         // Only return upcoming

@@ -36,7 +36,10 @@ export const apiSlice = createApi({
     }),
     
     getAcademics: builder.query({
-      query: () => '/student_app/exams',
+      query: (academicYear) => ({
+        url: '/student_app/exams',
+        params: { academic_year: academicYear },
+      }),
       providesTags: ['Academics'],
     }),
     
@@ -64,7 +67,10 @@ export const apiSlice = createApi({
     }),
 
     getEvents: builder.query({
-      query: () => '/student_app/events',
+      query: (academicYear) => ({
+        url: '/student_app/events',
+        params: { academic_year: academicYear },
+      }),
       providesTags: ['Events'],
     }),
 
