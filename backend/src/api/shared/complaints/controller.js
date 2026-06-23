@@ -13,7 +13,8 @@ export const createComplaint = async (req, res) => {
 
 export const getComplaints = async (req, res) => {
   try {
-    const complaints = await ComplaintService.getComplaints();
+    const { studentId } = req.query;
+    const complaints = await ComplaintService.getComplaints(studentId);
     return res.status(200).json({ success: true, complaint: complaints || [] });
   } catch (e) {
     return res.status(500).json({ success: false, message: e.message });

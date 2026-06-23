@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useMemo } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { useNavigate } from "react-router-dom";
-import { fetchExams, fetchCourses, fetchClasses, fetchUsers, fetchSubjects, fetchRooms } from "../features/dataSlice";
+import { fetchExams, fetchCourses, fetchClasses, fetchUsers, fetchSubjects, fetchRooms, fetchResults } from "../features/dataSlice";
 import { toast } from "react-toastify";
 import api, { uploadFile } from "../services/api";
 import { BookOpen, Calendar, Trash2, Edit, Plus, FileSpreadsheet } from "lucide-react";
@@ -13,13 +13,15 @@ import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 import { letterheadBase64 } from "../utils/letterhead";
 import * as XLSX from "xlsx";
+import ResultsTab from "../components/ResultsTab";
+import ClassMatrixTab from "../components/ClassMatrixTab";
 
-const coursesTypes = ["exam", "Material", "Assignment"];
+const coursesTypes = ["exam", "Material", "Assignment", "Results", "Class Matrix"];
 
 const Exams = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
-  const { exams, courses, classes, users, subjects, rooms } = useSelector((state) => state.data);
+  const { exams, courses, classes, users, subjects, rooms, results } = useSelector((state) => state.data);
 
   const [courseType, setCourseType] = useState("exam");
   const [mode, setMode] = useState("view");
@@ -64,6 +66,7 @@ const Exams = () => {
     dispatch(fetchUsers());
     dispatch(fetchSubjects());
     dispatch(fetchRooms());
+    dispatch(fetchResults());
   }, [dispatch]);
 
   const materials = useMemo(() => {
@@ -407,46 +410,58 @@ const Exams = () => {
       <div className="glass-panel" style={{ padding: "0.5rem 1rem" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.5rem" }}>
           <h2 style={{ fontSize: "1.1rem", fontWeight: "600", textTransform: "capitalize", margin: 0 }}>{courseType === "exam" ? "Date Sheets" : courseType} List</h2>
-          <button onClick={() => handleOpenModal()} className="btn btn-primary" style={{ padding: "0.25rem 0.75rem", fontSize: "0.875rem", minHeight: "auto" }}>
-            <Calendar size={14} style={{ marginRight: "4px" }} /> Create {courseType === "exam" ? "Date Sheet" : courseType}
-          </button>
+          {courseType !== "Results" && courseType !== "Class Matrix" && (
+            <button onClick={() => handleOpenModal()} className="btn btn-primary" style={{ padding: "0.25rem 0.75rem", fontSize: "0.875rem", minHeight: "auto" }}>
+              <Calendar size={14} style={{ marginRight: "4px" }} /> Create {courseType === "exam" ? "Date Sheet" : courseType}
+            </button>
+          )}
         </div>
 
-        <div style={{ flexShrink: 0 }}>
-          <TableFilterHeader
-            searchQuery={searchQuery}
-            setSearchQuery={setSearchQuery}
-            searchPlaceholder={`Search ${courseType}...`}
-            filters={[
-              {
-                label: "All Classes",
-                value: classFilter,
-                onChange: (val) => { setClassFilter(val); setSectionFilter(""); },
-                options: [...new Set(classes?.map(c => c.className))].map(className => ({ value: className, label: className }))
-              },
-              ...(classFilter ? [{
-                label: "All Sections",
-                value: sectionFilter,
-                onChange: setSectionFilter,
-                options: classes?.filter(c => c.className === classFilter).map(c => ({ value: c.section, label: c.section })) || []
-              }] : []),
-              {
-                label: "Status",
-                value: statusFilter,
-                onChange: setStatusFilter,
-                options: [
-                  { value: "Upcoming", label: "Upcoming" },
-                  { value: "Completed", label: "Completed" }
-                ]
-              }
-            ]}
-            onExportPDF={courseType === "exam" ? handleExportPDF : null}
-            onExportExcel={courseType === "exam" ? handleExportExcel : null}
-            hideSearch={courseType === "exam"}
-          >
-            {courseType !== "exam" && <DateRangePicker onRangeChange={setDateRange} />}
-          </TableFilterHeader>
-        </div>
+        {courseType !== "Results" && courseType !== "Class Matrix" && (
+          <div style={{ flexShrink: 0 }}>
+            <TableFilterHeader
+              searchQuery={searchQuery}
+              setSearchQuery={setSearchQuery}
+              searchPlaceholder={`Search ${courseType}...`}
+              filters={[
+                {
+                  label: "All Classes",
+                  value: classFilter,
+                  onChange: (val) => { setClassFilter(val); setSectionFilter(""); },
+                  options: [...new Set(classes?.map(c => c.className))].map(className => ({ value: className, label: className }))
+                },
+                ...(classFilter ? [{
+                  label: "All Sections",
+                  value: sectionFilter,
+                  onChange: setSectionFilter,
+                  options: classes?.filter(c => c.className === classFilter).map(c => ({ value: c.section, label: c.section })) || []
+                }] : []),
+                {
+                  label: "Status",
+                  value: statusFilter,
+                  onChange: setStatusFilter,
+                  options: [
+                    { value: "Upcoming", label: "Upcoming" },
+                    { value: "Completed", label: "Completed" }
+                  ]
+                }
+              ]}
+              onExportPDF={courseType === "exam" ? handleExportPDF : null}
+              onExportExcel={courseType === "exam" ? handleExportExcel : null}
+              hideSearch={courseType === "exam"}
+            >
+              {courseType !== "exam" && <DateRangePicker onRangeChange={setDateRange} />}
+            </TableFilterHeader>
+          </div>
+        )}
+
+        {courseType === "Results" && (
+          <ResultsTab results={results} />
+        )}
+
+        {courseType === "Class Matrix" && (
+          <ClassMatrixTab results={results} classes={classes} />
+        )}
 
         {courseType === "exam" && (
           <div style={{ display: "flex", gap: "1rem", marginTop: "1rem" }}>
@@ -524,7 +539,7 @@ const Exams = () => {
               ))
             )}
           </div>
-        ) : (
+        ) : courseType !== "Results" ? (
           <div className="animate-fade-in" style={{ display: "flex", flexDirection: "column", gap: "1rem", marginTop: "1rem" }}>
             {materials?.length === 0 ? (
               <div style={{ padding: "2rem", textAlign: "center", color: "var(--text-secondary)" }}>
@@ -563,7 +578,7 @@ const Exams = () => {
               ))
             )}
           </div>
-        )}
+        ) : null}
       </div>
 
       {isModalOpen && (

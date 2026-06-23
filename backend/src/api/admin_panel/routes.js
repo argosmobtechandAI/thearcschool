@@ -21,6 +21,7 @@ import timeTableRouter from "../shared/timetable/routes.js";
 import plannerRouter from "./planner/routes.js";
 import infoRouter from "../shared/info/routes.js";
 import { createDateSheet, getDateSheetGrades, getExam, updateExam, deleteExam, bulkUpdateGrades } from "../shared/academics/examsController.js";
+import { getAggregatedResults } from "./resultsController.js";
 import { createRole, getRoles, updateRole, deleteRole } from "./rolesController.js";
 
 const router = Router();
@@ -53,13 +54,14 @@ router.use("/info", infoRouter);
 router.get("/subjectTeachers", getSubjectTeachers);
 router.post("/subjectTeachers/assign", assignSubjectTeacher);
 
-// --- Exams & Date Sheets ---
+// --- Exams & Date Sheets & Results ---
 router.post("/exams/datesheet", createDateSheet);
 router.get("/exams/datesheet/:title/:class_id/grades", getDateSheetGrades);
 router.post("/exams/datesheet/:title/:class_id/grades/bulk", bulkUpdateGrades);
 router.get("/exams", getExam);
 router.delete("/exams/deleteExams/:id", deleteExam);
 router.put("/exams/updateExams/:id", updateExam);
+router.get("/results", getAggregatedResults);
 
 // --- Staff Roles & Responsibilities ---
 router.post("/roles", createRole);

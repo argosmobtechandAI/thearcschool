@@ -58,7 +58,7 @@ const Dashboard = () => {
           api.get("/admission_panel/getAllNewUser").catch(() => ({ data: { data: [] } })),
           api.get("/finance_panel/dashboardStats").catch(() => ({ data: { stats: {} } })),
           api.get("/admin_panel/planner").catch(() => ({ data: { data: [] } })),
-          api.get("/user/attendance", { params: { startDate: today, endDate: today } }).catch(() => ({ data: { records: [] } })),
+          api.get("/attendance", { params: { startDate: today, endDate: today } }).catch(() => ({ data: { records: [] } })),
           api.get("/rooms/getRooms").catch(() => ({ data: { rooms: [] } }))
         ]);
 

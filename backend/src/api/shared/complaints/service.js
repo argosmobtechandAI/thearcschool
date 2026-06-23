@@ -56,11 +56,16 @@ export class ComplaintService {
     return complaints[0];
   }
 
-  static async getComplaints() {
-    const { data: complaints, error } = await supabase
+  static async getComplaints(studentId) {
+    let query = supabase
       .from("complaints")
-      .select("*, user:user_id(name)")
-      .order('created_at', { ascending: false });
+      .select("*, user:user_id(name)");
+      
+    if (studentId) {
+      query = query.eq("user_id", studentId);
+    }
+    
+    const { data: complaints, error } = await query.order('created_at', { ascending: false });
 
     if (error) throw error;
 

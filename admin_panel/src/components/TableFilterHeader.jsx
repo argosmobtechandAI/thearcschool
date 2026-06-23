@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Search, FileSpreadsheet, FileText, Columns } from 'lucide-react';
+import Select from 'react-select';
 
 const TableFilterHeader = ({
   searchQuery,
@@ -81,25 +82,56 @@ const TableFilterHeader = ({
         )}
 
         {/* Dynamic Dropdown Filters */}
-        {filters.map((filter, index) => (
-          <div key={index} style={{ minWidth: "150px" }}>
-            <select
-              className="input-glass"
-              value={filter.value}
-              onChange={(e) => filter.onChange(e.target.value)}
-              style={{ appearance: "none", margin: 0, width: "100%", cursor: "pointer" }}
-            >
-              {filter.label && (
-                <option value="" style={{ color: "black" }}>{filter.label}</option>
-              )}
-              {filter.options.map((opt, i) => (
-                <option key={i} value={opt.value} style={{ color: "black" }}>
-                  {opt.label}
-                </option>
-              ))}
-            </select>
-          </div>
-        ))}
+        {filters.map((filter, index) => {
+          const selectOptions = filter.label 
+            ? [{ value: "", label: filter.label }, ...filter.options]
+            : filter.options;
+
+          const selectedOption = selectOptions.find(o => o.value === filter.value) || selectOptions[0];
+
+          return (
+            <div key={index} style={{ minWidth: "150px", flex: 1, maxWidth: "250px" }}>
+              <Select
+                value={selectedOption}
+                onChange={(option) => filter.onChange(option.value)}
+                options={selectOptions}
+                isSearchable={false}
+                styles={{
+                  control: (base, state) => ({
+                    ...base,
+                    background: "rgba(255, 255, 255, 0.7)",
+                    backdropFilter: "blur(12px)",
+                    border: "1px solid var(--glass-border)",
+                    borderRadius: "12px",
+                    boxShadow: state.isFocused ? "0 0 0 2px rgba(59, 130, 246, 0.3)" : "none",
+                    minHeight: "42px",
+                    cursor: "pointer"
+                  }),
+                  option: (base, state) => ({
+                    ...base,
+                    background: state.isSelected ? "#3b82f6" : state.isFocused ? "rgba(59, 130, 246, 0.1)" : "white",
+                    color: state.isSelected ? "white" : "black",
+                    cursor: "pointer",
+                    padding: "10px 14px",
+                  }),
+                  menu: (base) => ({
+                    ...base,
+                    borderRadius: "12px",
+                    overflow: "hidden",
+                    border: "1px solid var(--glass-border)",
+                    boxShadow: "0 10px 25px -5px rgba(0, 0, 0, 0.1)",
+                    zIndex: 50
+                  }),
+                  singleValue: (base) => ({
+                    ...base,
+                    color: "black",
+                    fontSize: "0.875rem"
+                  })
+                }}
+              />
+            </div>
+          );
+        })}
 
         {/* Custom Children (e.g. DateRangePicker) */}
         {children}

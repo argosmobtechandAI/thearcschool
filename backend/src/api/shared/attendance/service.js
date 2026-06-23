@@ -62,7 +62,7 @@ export class AttendanceService {
     return true;
   }
 
-  static async getAttendance(startDate, endDate, classId) {
+  static async getAttendance(startDate, endDate, classId, studentId) {
     let query = supabase.from("attendance").select("*");
     
     if (startDate) {
@@ -71,8 +71,12 @@ export class AttendanceService {
     if (endDate) {
       query = query.lte("date", endDate);
     }
+    
+    if (studentId) {
+      query = query.eq("user_id", studentId);
+    }
 
-    if (classId) {
+    if (classId && !studentId) {
       const { data: classStudents, error: csError } = await supabase
         .from("class_students")
         .select("student_id")

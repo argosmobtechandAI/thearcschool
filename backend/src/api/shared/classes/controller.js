@@ -362,7 +362,7 @@ export const getClassStudents = async (req, res) => {
     // Fetch full student details from user table
     const { data: users, error: usersError } = await supabase
       .from("user")
-      .select("id, name, email") 
+      .select("id, name, email, admission_number, father_name, mother_name, phone, address") 
       .in("id", studentIds);
 
     if (usersError) throw usersError;
@@ -384,24 +384,46 @@ export const getTeacherClasses = async (req, res) => {
   try {
     const userId = req.user.id;
     
-    // Fetch only the classes where this teacher is assigned from class_teachers table
+    // Fetch classes where this teacher is assigned from class_teachers table
     const { data: teacherClasses, error: tcError } = await supabase
       .from("class_teachers")
       .select("class_id, class(name, section)")
       .eq("teacher_id", userId);
       
     if (tcError) throw tcError;
+
+    // Fetch classes where this teacher teaches a subject
+    const { data: subjectTeachersData, error: stError } = await supabase
+      .from("subject_teachers")
+      .select("class_id, class(name, section)")
+      .eq("teacher_id", userId);
+
+    if (stError) throw stError;
     
-    if (!teacherClasses || teacherClasses.length === 0) {
-      return res.status(200).json({ success: true, classes: [] });
-    }
-    
-    // Format classes
-    const classes = teacherClasses.map(c => ({
-      classId: c.class_id,
-      className: c.class?.name,
-      section: c.class?.section
-    }));
+    // Format and combine classes
+    const combinedClassesMap = new Map();
+
+    (teacherClasses || []).forEach(c => {
+      if (c.class) {
+        combinedClassesMap.set(c.class_id, {
+          classId: c.class_id,
+          className: c.class.name,
+          section: c.class.section
+        });
+      }
+    });
+
+    (subjectTeachersData || []).forEach(st => {
+      if (st.class) {
+        combinedClassesMap.set(st.class_id, {
+          classId: st.class_id,
+          className: st.class.name,
+          section: st.class.section
+        });
+      }
+    });
+
+    const classes = Array.from(combinedClassesMap.values());
     
     return res.status(200).json({
       success: true,

@@ -48,9 +48,9 @@ export const bulkUpdateAttendance = async (req, res) => {
 
 export const getAttendance = async (req, res) => {
   try {
-    const { startDate, endDate, classId } = req.query;
-    console.log(`[getAttendance] Query params: startDate=${startDate}, endDate=${endDate}, classId=${classId}`);
-    const records = await AttendanceService.getAttendance(startDate, endDate, classId);
+    const { startDate, endDate, classId, studentId } = req.query;
+    console.log(`[getAttendance] Query params: startDate=${startDate}, endDate=${endDate}, classId=${classId}, studentId=${studentId}`);
+    const records = await AttendanceService.getAttendance(startDate, endDate, classId, studentId);
     console.log(`[getAttendance] Returned ${records.length} records from service.`);
     return res.status(200).json({ success: true, records });
   } catch (e) {

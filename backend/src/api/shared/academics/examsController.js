@@ -127,7 +127,14 @@ export const createExams = async (req, res) => {
 
 export const getExam = async (req, res) => {
   try {
-    const { data: exams, error } = await supabase.from("exams").select("*, user(name)");
+    const { classId } = req.query;
+    let query = supabase.from("exams").select("*, user(name)");
+    
+    if (classId) {
+      query = query.eq("class_id", classId);
+    }
+
+    const { data: exams, error } = await query;
 
     if (error) throw error;
 
@@ -282,6 +289,40 @@ export const getStudentExams = async (req, res) => {
   }
 };
 
+export const getStudentGrades = async (req, res) => {
+  try {
+    const { studentId, examId } = req.query;
+    if (!studentId && !examId) {
+      return res.status(400).json({ success: false, message: "studentId or examId is required" });
+    }
+
+    let query = supabase.from("grades").select("marks, exam_id, student_id, exams(*)");
+    if (studentId) query = query.eq("student_id", studentId);
+    if (examId) query = query.eq("exam_id", examId);
+
+    const { data: grades, error: gradesError } = await query;
+
+    if (gradesError) throw gradesError;
+
+    const formattedGrades = grades.map(g => ({
+      marks: g.marks,
+      exam_id: g.exam_id,
+      student_id: g.student_id,
+      title: g.exams?.title,
+      subject: g.exams?.subject,
+      maxMarks: g.exams?.marks,
+      date: g.exams?.date
+    }));
+
+    return res.status(200).json({
+      success: true,
+      grades: formattedGrades
+    });
+  } catch (e) {
+    return res.status(500).json({ success: false, message: e.message });
+  }
+};
+
 export const updateMarks = async (req, res) => {
   try {
     const { data } = req.body;
@@ -402,10 +443,22 @@ export const getDateSheetGrades = async (req, res) => {
 
     const { data: classStudents, error: studentsError } = await supabase
       .from("class_students")
-      .select("student_id, class_id, user(name, admission_number)")
+      .select("student_id, class_id")
       .in("class_id", classIds);
       
     if (studentsError) throw studentsError;
+
+    // Fetch user details separately
+    const studentIds = classStudents.map(cs => cs.student_id);
+    const { data: usersData } = await supabase
+      .from("user")
+      .select("id, name, admission_number")
+      .in("id", studentIds);
+
+    const userMap = {};
+    usersData?.forEach(u => {
+      userMap[u.id] = u;
+    });
 
     const { data: grades, error: gradesError } = await supabase
       .from("grades")
@@ -439,13 +492,14 @@ export const getDateSheetGrades = async (req, res) => {
         };
       });
 
-      const sectionInfo = classData?.find(c => c.id === cs.class_id);
+      const classInfo = classData?.find(c => c.id === cs.class_id);
+      const user = userMap[cs.student_id] || {};
 
       return {
         student_id: cs.student_id,
-        name: cs.user?.name,
-        admission_number: cs.user?.admission_number,
-        section: sectionInfo ? sectionInfo.section : "",
+        name: user.name || "Unknown",
+        admission_number: user.admission_number || "Unknown",
+        section: classInfo ? classInfo.section : "",
         grades: studentGrades
       };
     });
@@ -486,19 +540,47 @@ export const bulkUpdateGrades = async (req, res) => {
 
     if (fetchError) throw fetchError;
 
-    const upsertData = grades.map(g => {
+    // Fetch subjects from exams to satisfy the not-null constraint on grades
+    const { data: examsData } = await supabase
+      .from("exams")
+      .select("id, subject")
+      .in("id", examIds);
+      
+    const examSubjectMap = {};
+    if (examsData) {
+      examsData.forEach(ex => {
+        examSubjectMap[ex.id] = ex.subject;
+      });
+    }
+
+    const inserts = [];
+    const updates = [];
+
+    grades.forEach(g => {
       const existing = existingGrades?.find(eg => eg.exam_id === g.exam_id && eg.student_id === g.student_id);
-      return {
-        ...(existing ? { id: existing.id } : {}), // If existing, include ID to trigger update
+      const data = {
         student_id: g.student_id,
         exam_id: g.exam_id,
-        marks: g.marks !== "" && g.marks !== null ? Number(g.marks) : null
+        subject: examSubjectMap[g.exam_id] || "Unknown",
+        marks: g.marks !== "" && g.marks !== null ? Number(g.marks) : 0
       };
+
+      if (existing) {
+        updates.push({ id: existing.id, ...data });
+      } else {
+        inserts.push(data);
+      }
     });
 
-    const { error: upsertError } = await supabase.from("grades").upsert(upsertData);
+    if (inserts.length > 0) {
+      const { error: insertError } = await supabase.from("grades").insert(inserts);
+      if (insertError) throw insertError;
+    }
 
-    if (upsertError) throw upsertError;
+    if (updates.length > 0) {
+      const { error: upsertError } = await supabase.from("grades").upsert(updates);
+      if (upsertError) throw upsertError;
+    }
 
     return res.status(200).json({ success: true, message: "Grades saved successfully" });
   } catch (e) {

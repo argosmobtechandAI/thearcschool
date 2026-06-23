@@ -61,6 +61,8 @@ export const deleteChampion = (id) => api.delete(`/admin_panel/info/champion/${i
 export const addGalleryImage = (data) => api.post('/admin_panel/info/gallery', data);
 export const deleteGalleryImage = (id) => api.delete(`/admin_panel/info/gallery/${id}`);
 
+export const getResults = () => api.get('/admin_panel/results');
+
 export const addNewsletter = (data) => api.post('/admin_panel/info/newsletter', data);
 export const deleteNewsletter = (id) => api.delete(`/admin_panel/info/newsletter/${id}`);
 

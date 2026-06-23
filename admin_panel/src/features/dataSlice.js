@@ -1,5 +1,5 @@
 import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
-import api, { getCommunication, getInfo } from "../services/api";
+import api, { getCommunication, getInfo, getResults } from "../services/api";
 
 export const fetchUsers = createAsyncThunk(
   "data/fetchUsers",
@@ -43,6 +43,18 @@ export const fetchExams = createAsyncThunk(
     try {
       const response = await api.get("/admin_panel/exams");
       return response.data.exams || response.data;
+    } catch (error) {
+      return rejectWithValue(error.response?.data || "Network Error");
+    }
+  }
+);
+
+export const fetchResults = createAsyncThunk(
+  "data/fetchResults",
+  async (_, { rejectWithValue }) => {
+    try {
+      const response = await getResults();
+      return response.data.data;
     } catch (error) {
       return rejectWithValue(error.response?.data || "Network Error");
     }
@@ -128,6 +140,7 @@ const initialState = {
   timeTables: [],
   events: [],
   chats: [],
+  results: [],
   infoSettings: null,
   infoChampions: [],
   infoGallery: [],
@@ -137,6 +150,7 @@ const initialState = {
   loadingClasses: false,
   loadingFees: false,
   loadingExams: false,
+  loadingResults: false,
   loadingCourses: false,
   loadingSubjects: false,
   loadingSubjectTeachers: false,
@@ -197,6 +211,18 @@ export const dataSlice = createSlice({
       })
       .addCase(fetchExams.rejected, (state, action) => {
         state.loadingExams = false;
+        state.error = action.payload;
+      })
+      // Results
+      .addCase(fetchResults.pending, (state) => {
+        state.loadingResults = true;
+      })
+      .addCase(fetchResults.fulfilled, (state, action) => {
+        state.loadingResults = false;
+        state.results = action.payload;
+      })
+      .addCase(fetchResults.rejected, (state, action) => {
+        state.loadingResults = false;
         state.error = action.payload;
       })
       // Courses

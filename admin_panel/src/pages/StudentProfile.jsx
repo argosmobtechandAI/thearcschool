@@ -2,7 +2,9 @@ import React, { useEffect, useMemo, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import { fetchUsers } from "../features/dataSlice";
-import { ArrowLeft, User, Phone, Mail, Calendar, BookOpen, GraduationCap, CreditCard, Activity, FileText } from "lucide-react";
+import { ArrowLeft, User, Phone, Mail, Calendar, BookOpen, GraduationCap, CreditCard, Activity, FileText, Download } from "lucide-react";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
+import { generateReportCardPDF } from "../utils/reportCardPDF";
 import { toast } from "react-toastify";
 
 const StudentProfile = () => {
@@ -10,7 +12,7 @@ const StudentProfile = () => {
   const navigate = useNavigate();
   const dispatch = useDispatch();
   
-  const { users, classes, loadingUsers } = useSelector((state) => state.data);
+  const { users, classes, results, loadingUsers } = useSelector((state) => state.data);
   const student = useMemo(() => {
     return users.find(u => String(u.id) === String(id) && u.type === 'student') || null;
   }, [users, id]);
@@ -25,6 +27,10 @@ const StudentProfile = () => {
     if (!student || !student.classes || student.classes.length === 0) return null;
     return classes.find(c => c.id === student.classes[0]);
   }, [student, classes]);
+
+  const studentResults = useMemo(() => {
+    return results?.filter(r => r.studentId === student?.id) || [];
+  }, [results, student]);
 
   if (loadingUsers) {
     return <div style={{ padding: "2rem", textAlign: "center", color: "var(--text-secondary)" }}>Loading profile...</div>;
@@ -161,21 +167,92 @@ const StudentProfile = () => {
 
             {activeTab === "academic" && (
               <div className="glass-panel" style={{ padding: "1.5rem" }}>
-                <h3 style={{ fontSize: "1.125rem", fontWeight: "600", marginBottom: "1.5rem", borderBottom: "1px solid var(--glass-border)", paddingBottom: "0.5rem" }}>Academic Record</h3>
-                {(!student.grade || student.grade.length === 0) ? (
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.5rem", borderBottom: "1px solid var(--glass-border)", paddingBottom: "0.5rem" }}>
+                  <h3 style={{ fontSize: "1.125rem", fontWeight: "600", margin: 0 }}>Academic Record</h3>
+                  <button 
+                    onClick={() => navigate('/exams')}
+                    className="btn-ghost" 
+                    style={{ fontSize: "0.875rem", display: "flex", alignItems: "center", gap: "0.5rem", color: "#3b82f6" }}
+                  >
+                    View Full Analytics <ArrowLeft size={16} style={{ transform: "rotate(180deg)" }} />
+                  </button>
+                </div>
+                
+                {(!studentResults || studentResults.length === 0) ? (
                   <div style={{ textAlign: "center", padding: "3rem", color: "var(--text-secondary)" }}>
                     <BookOpen size={48} style={{ opacity: 0.2, margin: "0 auto 1rem" }} />
-                    <p>No grades recorded for this student yet.</p>
+                    <p>No aggregated results available for this student yet.</p>
                   </div>
                 ) : (
-                  <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
-                    {student.grade.map((g, idx) => (
-                      <div key={idx} style={{ padding: "1rem", background: "rgba(0,0,0,0.2)", borderRadius: "8px", border: "1px solid var(--glass-border)" }}>
-                        <div style={{ fontWeight: "600", marginBottom: "0.5rem" }}>Exam ID: {g.exam_id}</div>
-                        <div style={{ color: "var(--text-secondary)", fontSize: "0.875rem" }}>Marks: {g.marks}</div>
-                        {g.remarks && <div style={{ color: "var(--text-secondary)", fontSize: "0.875rem" }}>Remarks: {g.remarks}</div>}
-                      </div>
-                    ))}
+                  <div style={{ display: "flex", flexDirection: "column", gap: "3rem" }}>
+                    {studentResults.map((termResult, idx) => {
+                      const chartData = termResult.subjects.map((sub) => ({
+                        subject: sub.subject,
+                        "Marks Obtained": sub.marksObtained,
+                        "Max Marks": sub.maxMarks,
+                      }));
+
+                      return (
+                        <div key={idx} style={{ background: "rgba(255,255,255,0.02)", border: "1px solid var(--glass-border)", borderRadius: "16px", padding: "1.5rem" }}>
+                          
+                          {/* Term Header & Report Card Download */}
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.5rem", borderBottom: "1px solid rgba(0,0,0,0.1)", paddingBottom: "1rem" }}>
+                            <h4 style={{ fontSize: "1.25rem", fontWeight: "700", color: "#1e293b", margin: 0 }}>{termResult.term}</h4>
+                            <button 
+                              onClick={() => generateReportCardPDF(termResult)}
+                              className="btn btn-primary"
+                              style={{ display: "flex", alignItems: "center", gap: "0.5rem", padding: "0.5rem 1rem", fontSize: "0.875rem" }}
+                            >
+                              <Download size={16} /> Download Report Card
+                            </button>
+                          </div>
+
+                          {/* Highlight Cards */}
+                          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "1rem", marginBottom: "2rem" }}>
+                            <div className="glass-card" style={{ padding: "1.5rem", textAlign: "center" }}>
+                              <div style={{ fontSize: "0.875rem", color: "var(--text-secondary)", marginBottom: "0.5rem" }}>Overall Percentage</div>
+                              <div style={{ fontSize: "2rem", fontWeight: "700", color: termResult.percentage >= 40 ? "#16a34a" : "#ef4444" }}>
+                                {termResult.percentage.toFixed(1)}%
+                              </div>
+                            </div>
+                            <div className="glass-card" style={{ padding: "1.5rem", textAlign: "center" }}>
+                              <div style={{ fontSize: "0.875rem", color: "var(--text-secondary)", marginBottom: "0.5rem" }}>Total Marks</div>
+                              <div style={{ fontSize: "2rem", fontWeight: "700", color: "#3b82f6" }}>
+                                {termResult.totalMarksObtained} <span style={{ fontSize: "1rem", color: "var(--text-secondary)" }}>/ {termResult.totalMaxMarks}</span>
+                              </div>
+                            </div>
+                            <div className="glass-card" style={{ padding: "1.5rem", textAlign: "center" }}>
+                              <div style={{ fontSize: "0.875rem", color: "var(--text-secondary)", marginBottom: "0.5rem" }}>Final Grade</div>
+                              <div style={{ fontSize: "2rem", fontWeight: "700", color: termResult.gradeColor || "#f97316" }}>
+                                {termResult.grade}
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Charts Section */}
+                          <h5 style={{ fontSize: "1rem", fontWeight: "600", marginBottom: "1rem" }}>Subject Performance Analysis</h5>
+                          <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: "1.5rem" }}>
+                            <div className="glass-card" style={{ padding: "1.5rem", height: "300px" }}>
+                              <ResponsiveContainer width="100%" height="100%">
+                                <BarChart data={chartData} margin={{ top: 20, right: 30, left: 0, bottom: 5 }}>
+                                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(0,0,0,0.05)" />
+                                  <XAxis dataKey="subject" tick={{ fontSize: 12, fill: '#64748b' }} axisLine={false} tickLine={false} />
+                                  <YAxis tick={{ fontSize: 12, fill: '#64748b' }} axisLine={false} tickLine={false} />
+                                  <Tooltip 
+                                    cursor={{ fill: 'rgba(0,0,0,0.02)' }}
+                                    contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 15px rgba(0,0,0,0.1)' }}
+                                  />
+                                  <Legend iconType="circle" />
+                                  <Bar dataKey="Marks Obtained" fill="#3b82f6" radius={[4, 4, 0, 0]} barSize={40} />
+                                  <Bar dataKey="Max Marks" fill="#cbd5e1" radius={[4, 4, 0, 0]} barSize={40} />
+                                </BarChart>
+                              </ResponsiveContainer>
+                            </div>
+                          </div>
+
+                        </div>
+                      );
+                    })}
                   </div>
                 )}
               </div>
