@@ -7,14 +7,22 @@ export const getStudentAttendance = async (req, res) => {
 
     const { data: records, error } = await supabase
       .from("attendance")
-      .select("*")
+      .select(`
+        *,
+        user:marked_by ( name )
+      `)
       .eq("user_id", userId);
 
     if (error) throw error;
 
     return res.status(200).json({
       success: true,
-      records: records ? records.map(r => ({ ...r, student_id: r.user_id, status: r.status?.toLowerCase() })) : [],
+      records: records ? records.map(r => ({ 
+        ...r, 
+        student_id: r.user_id, 
+        status: r.status?.toLowerCase(),
+        teacherName: r.user?.name
+      })) : [],
     });
   } catch (e) {
     return res.status(500).json({ success: false, message: e.message });

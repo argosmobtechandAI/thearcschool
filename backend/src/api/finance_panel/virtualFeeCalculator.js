@@ -38,40 +38,38 @@ export const calculateVirtualDues = async (studentId, academicYear = getCurrentA
     if (classObj) className = classObj.name;
   }
 
-  // 2. Fetch fee structures for this academic year
+  // 2. Fetch ALL fee structures for this student's class (or generic) to do global waterfall
   const { data: structures, error: structErr } = await supabase
     .from("fee_structures")
     .select("*")
-    .eq("academic_year", academicYear)
     .or(`class_name.eq.${className},class_name.is.null`);
 
   if (structErr) throw new Error("Failed to fetch fee structures");
 
   const virtualDues = [];
-  const sessionStartYear = parseInt(academicYear.split("-")[0]);
   
-  // Create an array of months from April to current month (or March if next year)
   const today = new Date();
   const currentMonth = today.getMonth();
   const currentYear = today.getFullYear();
-  
-  let monthsPassed = 0;
-  if (currentYear === sessionStartYear && currentMonth >= 3) {
-    monthsPassed = currentMonth - 3 + 1; // Apr = 0+1=1, May = 1+1=2, etc.
-  } else if (currentYear === sessionStartYear + 1 && currentMonth < 3) {
-    monthsPassed = 9 + currentMonth + 1; // Apr-Dec (9) + Jan (1) = 10
-  } else if (currentYear > sessionStartYear) {
-    monthsPassed = 12; // Whole year passed
-  }
-
-  // Cap at 12 months
-  if (monthsPassed > 12) monthsPassed = 12;
-  if (monthsPassed < 0) monthsPassed = 0;
-
   const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 
   // 3. Generate the dues dynamically for ALL configured fee structures
   structures.forEach(struct => {
+    const structAcademicYear = struct.academic_year;
+    if (!structAcademicYear) return;
+    const sessionStartYear = parseInt(structAcademicYear.split("-")[0]);
+    
+    let monthsPassed = 0;
+    if (currentYear === sessionStartYear && currentMonth >= 3) {
+      monthsPassed = currentMonth - 3 + 1; // Apr = 0+1=1, May = 1+1=2, etc.
+    } else if (currentYear === sessionStartYear + 1 && currentMonth < 3) {
+      monthsPassed = 9 + currentMonth + 1; // Apr-Dec (9) + Jan (1) = 10
+    } else if (currentYear > sessionStartYear) {
+      monthsPassed = 12; // Whole year passed
+    } else {
+      monthsPassed = 0; // Future year
+    }
+
     let frequency = 'monthly';
     let baseCategory = struct.fee_category;
     
@@ -87,21 +85,17 @@ export const calculateVirtualDues = async (studentId, academicYear = getCurrentA
     }
 
     const categoryTitle = baseCategory.split(/[_ ]/).map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
-
     let joinMonthStart = new Date(sessionStartYear, 3, 1); // default April 1st of session
-    if (student.created_at) {
-        const cDate = new Date(student.created_at);
-        joinMonthStart = new Date(cDate.getFullYear(), cDate.getMonth(), 1);
-    }
 
     if (frequency === 'annual') {
       if (monthsPassed > 0) {
         const monthIndex = 3; // April always
         const year = sessionStartYear;
-        const dueDate = new Date(year, monthIndex, 10).toISOString().split('T')[0];
+        const dueDate = `${year}-04-10`;
         
         virtualDues.push({
           id: `virtual-${struct.id}-${monthIndex}-${year}`,
+          academic_year: structAcademicYear,
           fee: {
             title: `${categoryTitle} - ${year}-${year+1}`,
             base_title: `${categoryTitle} - ${year}-${year+1}`,
@@ -124,7 +118,6 @@ export const calculateVirtualDues = async (studentId, academicYear = getCurrentA
         if (struct.created_at) {
           const createdDate = new Date(struct.created_at);
           if (createdDate > new Date(sessionStartYear, 3, 1)) {
-            // Next month of creation
             monthIndex = createdDate.getMonth() + 1;
             year = createdDate.getFullYear();
             if (monthIndex > 11) {
@@ -134,10 +127,11 @@ export const calculateVirtualDues = async (studentId, academicYear = getCurrentA
           }
         }
         
-        const dueDate = new Date(year, monthIndex, 10).toISOString().split('T')[0];
+        const dueDate = `${year}-${String(monthIndex + 1).padStart(2, '0')}-10`;
         
         virtualDues.push({
           id: `virtual-${struct.id}-${monthIndex}-${year}`,
+          academic_year: structAcademicYear,
           fee: {
             title: `${categoryTitle} - ${year}-${year+1}`,
             base_title: `${categoryTitle} - ${year}-${year+1}`,
@@ -160,10 +154,11 @@ export const calculateVirtualDues = async (studentId, academicYear = getCurrentA
         
         const dueMonthStart = new Date(year, monthIndex, 1);
         if (dueMonthStart >= joinMonthStart) {
-          const dueDate = new Date(year, monthIndex, 10).toISOString().split('T')[0]; 
+          const dueDate = `${year}-${String(monthIndex + 1).padStart(2, '0')}-10`;
           
           virtualDues.push({
             id: `virtual-${struct.id}-${monthIndex}-${year}`,
+            academic_year: structAcademicYear,
             fee: {
               title: `${categoryTitle} - ${monthNames[monthIndex]} ${year}`,
               base_title: `${categoryTitle} - ${monthNames[monthIndex]} ${year}`,
@@ -222,44 +217,97 @@ export const calculateVirtualDues = async (studentId, academicYear = getCurrentA
   const { data: settingsData } = await supabase.from("school_settings").select("late_fee_penalty").limit(1).single();
   const lateFeePenaltyAmount = settingsData?.late_fee_penalty !== undefined && settingsData?.late_fee_penalty !== null ? Number(settingsData.late_fee_penalty) : 10;
 
-  const todayDate = new Date();
+  // Helper: convert a date to IST day number (days since epoch at IST midnight)
+  const toISTDayNumber = (date) => {
+    const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;
+    return Math.floor((date.getTime() + IST_OFFSET_MS) / (1000 * 60 * 60 * 24));
+  };
 
+  const todayDate = new Date();
+  const todayISTDay = toISTDayNumber(todayDate);
+
+  // Step 1: Calculate penalties using strict remark matching (same logic as before)
   virtualDues.forEach(due => {
     const relatedPayments = payments.filter(p => p.remarks && p.remarks.includes(due.fee.base_title));
-    const totalPaid = relatedPayments.reduce((acc, p) => acc + Number(p.amount_paid || 0), 0);
+    // Parse due_date as IST midnight by appending T00:00:00+05:30
+    const dueDateObj = new Date(due.fee.due_date + 'T00:00:00+05:30');
+    const dueDayNumber = toISTDayNumber(dueDateObj);
+    let penaltyEndDayNumber = todayISTDay;
     
-    due.total_paid_amount = totalPaid;
-    if (totalPaid >= due.fee.amount) {
-      due.status = "paid";
-    } else {
-      due.status = "pending";
-    }
-
-    const dueDateObj = new Date(due.fee.due_date);
-    let penaltyEndDate = todayDate;
     if (relatedPayments.length > 0) {
       const sortedPayments = [...relatedPayments].sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
-      penaltyEndDate = new Date(sortedPayments[0].created_at);
+      penaltyEndDayNumber = toISTDayNumber(new Date(sortedPayments[0].created_at));
+      
+      const latestPayment = [...relatedPayments].sort((a, b) => new Date(b.created_at) - new Date(a.created_at))[0];
+      due.payment_date = latestPayment.created_at;
     }
 
-    if (penaltyEndDate > dueDateObj && due.status !== "paid") {
-       const daysLate = Math.floor((penaltyEndDate - dueDateObj) / (1000 * 60 * 60 * 24));
+    if (penaltyEndDayNumber > dueDayNumber) {
+       const daysLate = penaltyEndDayNumber - dueDayNumber;
        if (daysLate > 0) {
          const penalty = daysLate * lateFeePenaltyAmount;
          due.fee.amount += penalty;
-         due.fee.penalty = penalty; // Keep track of breakup
+         due.fee.penalty = penalty;
          due.fee.title += ` (+₹${penalty} Late Fee)`;
-         
-         if (totalPaid >= due.fee.amount) {
-           due.status = "paid";
-         } else {
-           due.status = "pending";
-         }
        }
     }
   });
 
-  return { virtualDues, payments };
+  // Step 2: Explicit Allocation followed by Global Waterfall
+  const paymentBalances = payments.map(p => ({
+    ...p,
+    remaining: Number(p.amount_paid || 0)
+  }));
+
+  // Sort dues chronologically by due date so oldest dues are processed first
+  virtualDues.sort((a, b) => new Date(a.fee.due_date) - new Date(b.fee.due_date));
+
+  // First pass: Explicit Allocation
+  virtualDues.forEach(due => {
+    due.total_paid_amount = 0;
+    due.status = "pending";
+    
+    // Find payments specifically mentioning this due
+    const matchingPayments = paymentBalances.filter(p => p.remaining > 0 && p.remarks && p.remarks.includes(due.fee.base_title));
+    
+    matchingPayments.forEach(p => {
+      const amountNeeded = due.fee.amount - due.total_paid_amount;
+      if (amountNeeded <= 0) return;
+      
+      const amountToApply = Math.min(p.remaining, amountNeeded);
+      due.total_paid_amount += amountToApply;
+      p.remaining -= amountToApply;
+    });
+    
+    if (due.total_paid_amount >= due.fee.amount) {
+      due.status = "paid";
+    }
+  });
+
+  // Second pass: Global Waterfall for remaining unallocated money
+  let unallocatedPaymentPool = paymentBalances.reduce((sum, p) => sum + p.remaining, 0);
+
+  if (unallocatedPaymentPool > 0) {
+    virtualDues.forEach(due => {
+      if (unallocatedPaymentPool <= 0) return;
+      
+      const amountNeeded = due.fee.amount - due.total_paid_amount;
+      if (amountNeeded > 0) {
+        const amountToApply = Math.min(unallocatedPaymentPool, amountNeeded);
+        due.total_paid_amount += amountToApply;
+        unallocatedPaymentPool -= amountToApply;
+        
+        if (due.total_paid_amount >= due.fee.amount) {
+          due.status = "paid";
+        }
+      }
+    });
+  }
+
+  const filteredVirtualDues = virtualDues.filter(due => due.academic_year === academicYear);
+  const filteredStructures = structures.filter(s => s.academic_year === academicYear);
+
+  return { virtualDues: filteredVirtualDues, payments, structures: filteredStructures };
 };
 
 export const calculateTotalVirtualDueForStudent = (student, sClassName, structures, sPayments, sessionStartYear, monthsPassed, lateFeePenaltyAmount = 10, startMonthsPassed = 0) => {
@@ -268,6 +316,24 @@ export const calculateTotalVirtualDueForStudent = (student, sClassName, structur
 
   const todayDate = new Date();
   const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+
+  // Helper: convert a date to IST day number (same fix as calculateVirtualDues)
+  const toISTDayNumber = (date) => {
+    const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;
+    return Math.floor((date.getTime() + IST_OFFSET_MS) / (1000 * 60 * 60 * 24));
+  };
+  const todayISTDay = toISTDayNumber(todayDate);
+
+  const getDaysLate = (dueDateStr, paymentDates) => {
+    // Parse due date as IST midnight
+    const dueDateObj = new Date(dueDateStr + 'T00:00:00+05:30');
+    const dueDayNumber = toISTDayNumber(dueDateObj);
+    let penaltyEndDayNumber = todayISTDay;
+    if (paymentDates && paymentDates.length > 0) {
+      penaltyEndDayNumber = toISTDayNumber(new Date(paymentDates[0]));
+    }
+    return Math.max(0, penaltyEndDayNumber - dueDayNumber);
+  };
 
   const sStructures = (structures || []).filter(st => st.class_name === sClassName || !st.class_name);
 
@@ -289,35 +355,19 @@ export const calculateTotalVirtualDueForStudent = (student, sClassName, structur
     const categoryTitle = baseCategory.split(/[_ ]/).map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
 
     let joinMonthStart = new Date(sessionStartYear, 3, 1); // default April 1st of session
-    if (student.created_at) {
-        const cDate = new Date(student.created_at);
-        joinMonthStart = new Date(cDate.getFullYear(), cDate.getMonth(), 1);
-    }
 
     if (frequency === 'annual') {
       if (monthsPassed > 0 && startMonthsPassed === 0) {
-        const monthIndex = 3;
         const year = sessionStartYear;
-        const dueDateObj = new Date(year, monthIndex, 10);
-        
+        const dueDateStr = `${year}-04-10`;
         const feeTitle = `${categoryTitle} - ${year}-${year+1}`;
         
         let amount = struct.amount;
         const relatedPayments = sPayments.filter(p => p.remarks && p.remarks.includes(feeTitle));
-        const totalPaid = relatedPayments.reduce((acc, p) => acc + Number(p.amount_paid || 0), 0);
+        const sortedDates = [...relatedPayments].sort((a, b) => new Date(a.created_at) - new Date(b.created_at)).map(p => p.created_at);
         
-        let penaltyEndDate = todayDate;
-        if (relatedPayments.length > 0) {
-          const sortedPayments = [...relatedPayments].sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
-          penaltyEndDate = new Date(sortedPayments[0].created_at);
-        }
-
-        if (penaltyEndDate > dueDateObj && totalPaid < amount) {
-           const daysLate = Math.floor((penaltyEndDate - dueDateObj) / (1000 * 60 * 60 * 24));
-           if (daysLate > 0) {
-             amount += daysLate * lateFeePenaltyAmount;
-           }
-        }
+        const daysLate = getDaysLate(dueDateStr, sortedDates);
+        if (daysLate > 0) amount += daysLate * lateFeePenaltyAmount;
         totalVirtualDue += amount;
       }
     } else if (frequency === 'one_time') {
@@ -328,36 +378,21 @@ export const calculateTotalVirtualDueForStudent = (student, sClassName, structur
         if (struct.created_at) {
           const createdDate = new Date(struct.created_at);
           if (createdDate > new Date(sessionStartYear, 3, 1)) {
-            // Next month of creation
             monthIndex = createdDate.getMonth() + 1;
             year = createdDate.getFullYear();
-            if (monthIndex > 11) {
-              monthIndex = 0;
-              year += 1;
-            }
+            if (monthIndex > 11) { monthIndex = 0; year += 1; }
           }
         }
         
-        const dueDateObj = new Date(year, monthIndex, 10);
-        
+        const dueDateStr = `${year}-${String(monthIndex + 1).padStart(2, '0')}-10`;
         const feeTitle = `${categoryTitle} - ${year}-${year+1}`;
         
         let amount = struct.amount;
         const relatedPayments = sPayments.filter(p => p.remarks && p.remarks.includes(feeTitle));
-        const totalPaid = relatedPayments.reduce((acc, p) => acc + Number(p.amount_paid || 0), 0);
+        const sortedDates = [...relatedPayments].sort((a, b) => new Date(a.created_at) - new Date(b.created_at)).map(p => p.created_at);
         
-        let penaltyEndDate = todayDate;
-        if (relatedPayments.length > 0) {
-          const sortedPayments = [...relatedPayments].sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
-          penaltyEndDate = new Date(sortedPayments[0].created_at);
-        }
-
-        if (penaltyEndDate > dueDateObj && totalPaid < amount) {
-           const daysLate = Math.floor((penaltyEndDate - dueDateObj) / (1000 * 60 * 60 * 24));
-           if (daysLate > 0) {
-             amount += daysLate * lateFeePenaltyAmount;
-           }
-        }
+        const daysLate = getDaysLate(dueDateStr, sortedDates);
+        if (daysLate > 0) amount += daysLate * lateFeePenaltyAmount;
         totalVirtualDue += amount;
       }
     } else {
@@ -367,26 +402,15 @@ export const calculateTotalVirtualDueForStudent = (student, sClassName, structur
         
         const dueMonthStart = new Date(year, monthIndex, 1);
         if (dueMonthStart >= joinMonthStart) {
-          const dueDateObj = new Date(year, monthIndex, 10);
-          
+          const dueDateStr = `${year}-${String(monthIndex + 1).padStart(2, '0')}-10`;
           const feeTitle = `${categoryTitle} - ${monthNames[monthIndex]} ${year}`;
           
           let amount = struct.amount;
           const relatedPayments = sPayments.filter(p => p.remarks && p.remarks.includes(feeTitle));
-          const totalPaid = relatedPayments.reduce((acc, p) => acc + Number(p.amount_paid || 0), 0);
+          const sortedDates = [...relatedPayments].sort((a, b) => new Date(a.created_at) - new Date(b.created_at)).map(p => p.created_at);
           
-          let penaltyEndDate = todayDate;
-          if (relatedPayments.length > 0) {
-            const sortedPayments = [...relatedPayments].sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
-            penaltyEndDate = new Date(sortedPayments[0].created_at);
-          }
-
-          if (penaltyEndDate > dueDateObj && totalPaid < amount) {
-             const daysLate = Math.floor((penaltyEndDate - dueDateObj) / (1000 * 60 * 60 * 24));
-             if (daysLate > 0) {
-               amount += daysLate * lateFeePenaltyAmount;
-             }
-          }
+          const daysLate = getDaysLate(dueDateStr, sortedDates);
+          if (daysLate > 0) amount += daysLate * lateFeePenaltyAmount;
           totalVirtualDue += amount;
         }
       }

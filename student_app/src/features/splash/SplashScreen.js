@@ -94,7 +94,7 @@ const SplashScreen = ({ onFinish }) => {
       
       <Animated.View style={[styles.textContainer, { opacity: textOpacityAnim, transform: [{ translateY: translateYAnim }] }]}>
         <Text style={styles.title}>The Arc School</Text>
-        <Text style={styles.subtitle}>App for Teachers of Our School</Text>
+        <Text style={styles.subtitle}>App for Students of Our School</Text>
       </Animated.View>
     </View>
   );

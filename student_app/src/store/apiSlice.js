@@ -18,7 +18,7 @@ export const apiSlice = createApi({
       return headers;
     },
   }),
-  tagTypes: ['Dashboard', 'Academics', 'Attendance', 'Notifications', 'Chats'],
+  tagTypes: ['Dashboard', 'Academics', 'Attendance', 'Notifications', 'Chats', 'Quote', 'Rewards', 'Timetable', 'CourseWork', 'Events', 'Fees'],
   endpoints: (builder) => ({
     // Auth endpoints
     login: builder.mutation({
@@ -46,6 +46,53 @@ export const apiSlice = createApi({
         params,
       }),
       providesTags: ['Attendance'],
+    }),
+
+    getTimetable: builder.query({
+      query: () => '/student_app/timetable',
+      providesTags: ['Timetable'],
+    }),
+
+    getCourseWork: builder.query({
+      query: () => '/student_app/course',
+      providesTags: ['CourseWork'],
+    }),
+
+    getQuote: builder.query({
+      query: () => '/student_app/quote',
+      providesTags: ['Quote'],
+    }),
+
+    getEvents: builder.query({
+      query: () => '/student_app/events',
+      providesTags: ['Events'],
+    }),
+
+    getRewards: builder.query({
+      query: () => '/student_app/rewards',
+      providesTags: ['Rewards'],
+    }),
+
+    getFees: builder.query({
+      query: (academicYear) => ({
+        url: '/student_app/fees',
+        params: { academic_year: academicYear },
+      }),
+      providesTags: ['Fees'],
+    }),
+
+    getChats: builder.query({
+      query: (type) => `/student_app/communication/getChat/${type}`,
+      providesTags: ['Chats'],
+    }),
+
+    createChat: builder.mutation({
+      query: (data) => ({
+        url: '/student_app/communication/createChat',
+        method: 'POST',
+        body: data,
+      }),
+      invalidatesTags: ['Chats'],
     }),
 
     // Notifications
@@ -77,7 +124,16 @@ export const {
   useGetDashboardQuery,
   useGetAcademicsQuery,
   useGetAttendanceQuery,
+  useGetTimetableQuery,
+  useGetCourseWorkQuery,
+  useGetQuoteQuery,
+  useGetEventsQuery,
+  useGetRewardsQuery,
+  useGetFeesQuery,
+  useGetChatsQuery,
+  useCreateChatMutation,
   useRegisterFcmTokenMutation,
   useGetNotificationsQuery,
   useMarkNotificationReadMutation,
 } = apiSlice;
+

@@ -313,7 +313,7 @@ export const getStudentTimetable = async (req, res) => {
     // Fetch timetable for that specific class
     const { data: timetables, error } = await supabase
       .from("timetable")
-      .select("*, class(name)")
+      .select("*, class(name), user(name)")
       .eq("class_id", studentClass.class_id);
 
     if (error) throw error;
@@ -338,6 +338,7 @@ export const getStudentTimetable = async (req, res) => {
       groupedData[cId].dates[dateStr].push({
           id: row.id,
           teacher: row.teacher_id,
+          teacherName: row.user?.name || null,
           time: row.time_slot,
           subject: row.subject,
           isBreak: row.is_break,

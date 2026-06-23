@@ -2,20 +2,20 @@ import { supabase } from "../../../config/supabaseClient.js";
 import { FinanceService } from "./service.js";
 
 
+import { calculateVirtualDues, getCurrentAcademicYear } from "../../finance_panel/virtualFeeCalculator.js";
+
 export const getStudentFees = async (req, res) => {
   try {
     const userId = req.user.id;
+    const academic_year = req.query.academic_year || getCurrentAcademicYear();
 
-    const { data: records, error } = await supabase
-      .from("student_fees")
-      .select("*, fee(*)")
-      .eq("student_id", userId);
-
-    if (error) throw error;
+    const { virtualDues, payments, structures } = await calculateVirtualDues(userId, academic_year);
 
     return res.status(200).json({
       success: true,
-      fees: records || [],
+      fees: virtualDues,
+      payments: payments || [],
+      feeStructure: structures || [],
     });
   } catch (e) {
     return res.status(500).json({ success: false, message: e.message });

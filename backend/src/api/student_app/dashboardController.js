@@ -35,26 +35,29 @@ export const getDashboardData = async (req, res) => {
       if (!ttError && ttData) timetable = ttData;
     }
 
-    // 3. Fetch latest grade
+    // 3. Fetch all grades for avg calculation
     let latestGrade = null;
-    const { data: gradeData, error: gradeError } = await supabase
+    let avgGradePercentage = 0;
+    const { data: allGrades, error: gradeError } = await supabase
       .from('grades')
-      .select(`
-        marks,
-        exams!inner(name, marks)
-      `)
+      .select('marks, exams!inner(name, marks)')
       .eq('student_id', studentId)
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle();
+      .order('created_at', { ascending: false });
 
-    if (!gradeError && gradeData) {
+    if (!gradeError && allGrades && allGrades.length > 0) {
+      const latest = allGrades[0];
       latestGrade = {
-        examName: gradeData.exams?.name || 'Exam',
-        obtained: gradeData.marks,
-        total: gradeData.exams?.marks,
-        percentage: gradeData.exams?.marks > 0 ? (gradeData.marks / gradeData.exams.marks) * 100 : 0
+        examName: latest.exams?.name || 'Exam',
+        obtained: latest.marks,
+        total: latest.exams?.marks,
+        percentage: latest.exams?.marks > 0 ? (latest.marks / latest.exams.marks) * 100 : 0
       };
+
+      const total = allGrades.reduce((sum, g) => {
+        const examMarks = g.exams?.marks || 0;
+        return sum + (examMarks > 0 ? (g.marks / examMarks) * 100 : 0);
+      }, 0);
+      avgGradePercentage = Math.round((total / allGrades.length) * 10) / 10;
     }
 
     // 4. Fetch overall attendance
@@ -73,6 +76,25 @@ export const getDashboardData = async (req, res) => {
       };
     }
 
+    // 5. Upcoming events (from planner)
+    let upcomingEvents = [];
+    const todayStr = new Date().toISOString().split('T')[0];
+    const { data: eventsData } = await supabase
+      .from('planner')
+      .select('id, title, description, date, end_date, type, color')
+      .gte('date', todayStr)
+      .order('date', { ascending: true })
+      .limit(5);
+
+    if (eventsData) upcomingEvents = eventsData;
+
+    // 6. Pending assignments count (from courses table)
+    let pendingCount = 0;
+    const { data: coursesData } = await supabase
+      .from('courses')
+      .select('id');
+    if (coursesData) pendingCount = coursesData.length;
+
     // Combine response
     return res.status(200).json({
       success: true,
@@ -81,7 +103,10 @@ export const getDashboardData = async (req, res) => {
         classInfo: classData?.class ? { id: classData.class_id, ...classData.class } : null,
         todaySchedule: timetable,
         latestGrade,
-        attendance: attendanceStats
+        avgGradePercentage,
+        attendance: attendanceStats,
+        upcomingEvents,
+        pendingCount,
       }
     });
 

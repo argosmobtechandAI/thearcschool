@@ -12,6 +12,8 @@ import { getPlannerEvents } from "../admin_panel/planner/controller.js";
 import communicationRouter from "../shared/communication/routes.js";
 import { getDashboardData } from "./dashboardController.js";
 import { registerToken, getNotificationHistory, markAsRead } from "../shared/notifications/controller.js";
+import { getQuote } from "./quotesController.js";
+import { getRewards } from "./rewardsController.js";
 
 const studentRouter = Router();
 
@@ -36,7 +38,14 @@ studentRouter.put('/notifications/:id/read', markAsRead);
 // Dashboard
 studentRouter.get("/dashboard", getDashboardData);
 
+// Thought of the Day
+studentRouter.get("/quote", getQuote);
+
+// Rewards / Gamification
+studentRouter.get("/rewards", getRewards);
+
 // Chat
 studentRouter.use("/communication", communicationRouter);
 
 export default studentRouter;
+

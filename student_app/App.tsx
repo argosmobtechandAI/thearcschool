@@ -28,7 +28,7 @@ const App = () => {
     <GestureHandlerRootView style={styles.container}>
       <Provider store={store}>
         <SafeAreaProvider style={styles.container}>
-          <StatusBar barStyle={showSplash ? "light-content" : "dark-content"} backgroundColor={showSplash ? colors.primary : '#FFFFFF'} />
+          <StatusBar barStyle="light-content" backgroundColor={colors.primary} />
         {showSplash ? (
           <SplashScreen onFinish={() => setShowSplash(false)} />
         ) : (

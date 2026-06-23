@@ -12,6 +12,7 @@ import { getClassStudents, getTeacherClasses } from "../shared/classes/controlle
 import { getPlannerEvents } from "../admin_panel/planner/controller.js";
 import communicationRouter from "../shared/communication/routes.js";
 import notificationsRouter from "../shared/notifications/routes.js";
+import passwordRoutes from "./passwordRoutes.js";
 import { getTeacherProfile } from "./controller.js";
 import { getClassPerformance } from "./performanceController.js";
 
@@ -62,5 +63,8 @@ teacherRouter.use("/communication", communicationRouter);
 
 // Notifications
 teacherRouter.use("/notifications", notificationsRouter);
+
+// Auth / Settings
+teacherRouter.use("/auth", passwordRoutes);
 
 export default teacherRouter;
