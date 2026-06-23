@@ -12,7 +12,7 @@ const NotificationsScreen = ({ navigation }) => {
   const [markRead] = useMarkNotificationReadMutation();
   const [refreshing, setRefreshing] = useState(false);
 
-  const notifications = data?.notifications || [];
+  const notifications = data?.data || [];
 
   const handleMarkRead = async (id) => {
     try { await markRead(id); } catch (_) {}

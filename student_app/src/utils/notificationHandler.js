@@ -23,26 +23,27 @@ export const handleNotificationEvent = async ({ type, detail }) => {
           ? (typeof detail.notification.data.routeParams === 'string' ? JSON.parse(detail.notification.data.routeParams) : detail.notification.data.routeParams)
           : {};
         
-        let targetStack = null;
         let actualScreen = routeScreen;
 
-        if (routeScreen === 'AttendanceHome') {
-          targetStack = 'Attend';
-        } else if (routeScreen === 'ExamsList') {
-          targetStack = 'Work';
-        } else if (routeScreen === 'DateSheet') {
-          targetStack = 'Work';
-          actualScreen = 'DateSheetScreen';
-        } else if (routeScreen === 'StudentAcademicHistory') {
-          targetStack = 'Work';
-          actualScreen = 'StudentAcademicHistoryScreen';
+        if (routeScreen === 'AttendanceHome' || routeScreen === 'Attendance') {
+          actualScreen = 'Attendance';
+        } else if (routeScreen === 'ExamsList' || routeScreen === 'Result' || routeScreen === 'StudentAcademicHistory' || routeScreen === 'StudentAcademicHistoryScreen') {
+          actualScreen = 'Result';
+        } else if (routeScreen === 'DateSheet' || routeScreen === 'DateSheetScreen') {
+          actualScreen = 'DateSheet';
+        } else if (routeScreen === 'AcademicCalendar') {
+          actualScreen = 'AcademicCalendar';
+        } else if (routeScreen === 'Fees') {
+          actualScreen = 'Fees';
+        } else if (routeScreen === 'Notifications') {
+          actualScreen = 'Notifications';
+        } else if (routeScreen === 'Class') {
+          actualScreen = 'Class';
+        } else if (routeScreen === 'Home' || routeScreen === 'Dashboard') {
+          actualScreen = 'Home';
         }
 
-        if (targetStack) {
-          navigate(targetStack, { screen: actualScreen, params: routeParams });
-        } else {
-          navigate(actualScreen, routeParams);
-        }
+        navigate(actualScreen, routeParams);
       } catch (error) {
         console.error("Error parsing deep link params:", error);
       }

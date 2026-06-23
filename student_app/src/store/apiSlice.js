@@ -103,10 +103,10 @@ export const apiSlice = createApi({
 
     // Notifications
     registerFcmToken: builder.mutation({
-      query: (token) => ({
+      query: ({ fcm_token, device_type }) => ({
         url: '/student_app/notifications/register-token',
         method: 'POST',
-        body: { token },
+        body: { fcm_token, device_type },
       }),
     }),
     

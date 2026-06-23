@@ -1,0 +1,22 @@
+{"timestamp":"2026-06-23T20:16:01.971Z","studentId":"4ae87b28-c579-41e1-b3fb-0cdd4d43777b","query":{"academic_year":"2026-2027"}}
+{"timestamp":"2026-06-23T20:16:59.043Z","studentId":"4ae87b28-c579-41e1-b3fb-0cdd4d43777b","query":{"academic_year":"2025-2026"}}
+{"timestamp":"2026-06-23T20:17:02.053Z","studentId":"4ae87b28-c579-41e1-b3fb-0cdd4d43777b","query":{"academic_year":"2026-2027"}}
+{"timestamp":"2026-06-23T20:17:05.874Z","studentId":"4ae87b28-c579-41e1-b3fb-0cdd4d43777b","query":{"academic_year":"2026-2027"}}
+{"timestamp":"2026-06-23T20:17:11.550Z","studentId":"4ae87b28-c579-41e1-b3fb-0cdd4d43777b","query":{"academic_year":"2027-2028"}}
+classData: {"class_id":"feb63a61-5bd8-4a24-9269-6a5a03a2df42"}
+Filtering date from 2027-04-01 to 2028-03-31
+dsData count: 0, dsError: null
+{"timestamp":"2026-06-23T20:17:16.529Z","studentId":"4ae87b28-c579-41e1-b3fb-0cdd4d43777b","query":{"academic_year":"2026-2027"}}
+classData: {"class_id":"feb63a61-5bd8-4a24-9269-6a5a03a2df42"}
+Filtering date from 2026-04-01 to 2027-03-31
+dsData count: 1, dsError: null
+{"timestamp":"2026-06-23T20:17:26.023Z","studentId":"4ae87b28-c579-41e1-b3fb-0cdd4d43777b","query":{}}
+classData: {"class_id":"feb63a61-5bd8-4a24-9269-6a5a03a2df42"}
+dsData count: 1, dsError: null
+{"timestamp":"2026-06-23T20:17:26.964Z","studentId":"4ae87b28-c579-41e1-b3fb-0cdd4d43777b","query":{}}
+classData: {"class_id":"feb63a61-5bd8-4a24-9269-6a5a03a2df42"}
+dsData count: 1, dsError: null
+{"timestamp":"2026-06-23T20:18:41.064Z","studentId":"4ae87b28-c579-41e1-b3fb-0cdd4d43777b","query":{"academic_year":"2026-2027"}}
+classData: {"class_id":"feb63a61-5bd8-4a24-9269-6a5a03a2df42"}
+Filtering date from 2026-04-01 to 2027-03-31
+dsData count: 1, dsError: null

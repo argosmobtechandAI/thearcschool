@@ -84,7 +84,7 @@ const SplashScreen = ({ onFinish }) => {
     ]).start(() => {
       if (onFinish) onFinish();
     });
-  }, [scaleAnim, opacityAnim, textOpacityAnim, translateYAnim, onFinish]);
+  }, [scaleAnim, opacityAnim, textOpacityAnim, translateYAnim, onFinish, dispatch]);
 
   return (
     <View style={styles.container}>

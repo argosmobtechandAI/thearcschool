@@ -1,10 +1,10 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, RefreshControl,
   ActivityIndicator, TouchableOpacity, Share, Platform
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useGetDashboardQuery, useGetQuoteQuery, useGetRewardsQuery } from '../../store/apiSlice';
+import { useGetDashboardQuery, useGetQuoteQuery, useGetRewardsQuery, useGetNotificationsQuery } from '../../store/apiSlice';
 import Icon from 'react-native-vector-icons/Feather';
 import { colors, shadows } from '../../theme/colors';
 import { useDrawer } from '../../navigation/DrawerContext';
@@ -22,6 +22,15 @@ const formatEventDate = (dateStr) => {
     month: d.toLocaleDateString('en-US', { month: 'short' }).toUpperCase(),
     day: d.getDate(),
   };
+};
+
+const getLetterGrade = (pct) => {
+  if (pct >= 90) return 'A+';
+  if (pct >= 80) return 'A';
+  if (pct >= 70) return 'B+';
+  if (pct >= 60) return 'B';
+  if (pct >= 50) return 'C';
+  return 'D';
 };
 
 const getTimeStatus = (startTime, endTime) => {
@@ -50,12 +59,34 @@ const DashboardScreen = ({ navigation }) => {
   const { data, isLoading, refetch: refetchDash, error } = useGetDashboardQuery();
   const { data: quoteData, refetch: refetchQuote } = useGetQuoteQuery();
   const { data: rewardsData, refetch: refetchRewards } = useGetRewardsQuery();
+  const { data: notificationsData, refetch: refetchNotifs } = useGetNotificationsQuery();
+  const [registerFcmToken] = require('../../store/apiSlice').useRegisterFcmTokenMutation();
+
+  useEffect(() => {
+    const initNotifications = async () => {
+      try {
+        const { requestUserPermission, getFCMToken } = require('../../utils/notificationHandler');
+        const hasPermission = await requestUserPermission();
+        if (hasPermission) {
+          const fcmToken = await getFCMToken();
+          if (fcmToken) {
+            registerFcmToken({ fcm_token: fcmToken, device_type: Platform.OS })
+              .unwrap()
+              .catch(err => console.log('Failed to register FCM token from dashboard:', err));
+          }
+        }
+      } catch (err) {
+        console.log('Failed to request notifications permission from dashboard:', err);
+      }
+    };
+    initNotifications();
+  }, [registerFcmToken]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    await Promise.all([refetchDash(), refetchQuote(), refetchRewards()]);
+    await Promise.all([refetchDash(), refetchQuote(), refetchRewards(), refetchNotifs()]);
     setRefreshing(false);
-  }, [refetchDash, refetchQuote, refetchRewards]);
+  }, [refetchDash, refetchQuote, refetchRewards, refetchNotifs]);
 
   if (isLoading) {
     return (
@@ -80,6 +111,7 @@ const DashboardScreen = ({ navigation }) => {
   const { profile, classInfo, todaySchedule, avgGradePercentage, attendance, upcomingEvents } = data?.data || {};
   const quote = quoteData?.data;
   const rewards = rewardsData?.data;
+  const notices = notificationsData?.data || [];
   
   const studentOfWeek = rewards?.studentOfWeek;
   const attendanceBadge = rewards?.attendance?.badge;
@@ -204,6 +236,9 @@ const DashboardScreen = ({ navigation }) => {
               <Icon name="trending-up" size={18} color="#A855F7" />
             </View>
             <Text style={styles.actionCardTitle}>Check{'\n'}Results</Text>
+            {avgGradePercentage !== undefined && avgGradePercentage > 0 && (
+              <Text style={styles.actionCardSubtitle}>Avg: {avgGradePercentage}% ({getLetterGrade(avgGradePercentage)})</Text>
+            )}
             <Icon name="trending-up" size={64} color="rgba(255,255,255,0.15)" style={styles.actionCardWatermark} />
           </TouchableOpacity>
         </View>
@@ -247,7 +282,7 @@ const DashboardScreen = ({ navigation }) => {
             color={colors.success}
           />
           <StatChip
-            value={`${avgGradePercentage || 0}%`}
+            value={avgGradePercentage > 0 ? `${avgGradePercentage}% (${getLetterGrade(avgGradePercentage)})` : 'N/A'}
             label="AVG GRADE"
             icon="trending-up"
             color={colors.primary}
@@ -303,27 +338,56 @@ const DashboardScreen = ({ navigation }) => {
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <Text style={[styles.sectionTitle, { fontSize: 18 }]}>Notice Board</Text>
+            {notices.length > 0 && (
+              <TouchableOpacity onPress={() => navigation.navigate('Notifications')}>
+                <Text style={styles.sectionLink}>View All</Text>
+              </TouchableOpacity>
+            )}
           </View>
           <View style={[styles.card, { paddingVertical: 8 }]}>
-            <View style={styles.noticeRow}>
-              <View style={[styles.noticeIconBox, { backgroundColor: '#3B82F615' }]}>
-                <Icon name="bell" size={16} color="#3B82F6" />
+            {notices.length > 0 ? (
+              notices.slice(0, 2).map((notif, index) => {
+                const isLast = index === Math.min(notices.length, 2) - 1;
+                let timeText = '';
+                if (notif.created_at) {
+                  const d = new Date(notif.created_at);
+                  const today = new Date();
+                  const diffTime = Math.abs(today - d);
+                  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                  if (d.toDateString() === today.toDateString()) {
+                    timeText = 'Today, ' + d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+                  } else if (diffDays === 1) {
+                    timeText = 'Yesterday';
+                  } else {
+                    timeText = d.toLocaleDateString();
+                  }
+                }
+                
+                return (
+                  <React.Fragment key={notif.id || index}>
+                    <TouchableOpacity 
+                      style={styles.noticeRow}
+                      onPress={() => navigation.navigate('Notifications')}
+                      activeOpacity={0.8}
+                    >
+                      <View style={[styles.noticeIconBox, { backgroundColor: colors.primary + '15' }]}>
+                        <Icon name="bell" size={16} color={colors.primary} />
+                      </View>
+                      <View style={styles.noticeInfo}>
+                        <Text style={styles.noticeTitle} numberOfLines={1}>{notif.title || 'Notice'}</Text>
+                        <Text style={styles.noticeTime}>{timeText}</Text>
+                      </View>
+                    </TouchableOpacity>
+                    {!isLast && <View style={styles.noticeDivider} />}
+                  </React.Fragment>
+                );
+              })
+            ) : (
+              <View style={{ paddingVertical: 20, alignItems: 'center' }}>
+                <Icon name="bell-off" size={24} color={colors.textMuted} style={{ marginBottom: 6 }} />
+                <Text style={{ fontSize: 13, color: colors.textMuted, fontWeight: '500' }}>No announcements</Text>
               </View>
-              <View style={styles.noticeInfo}>
-                <Text style={styles.noticeTitle}>Science Fair Registration</Text>
-                <Text style={styles.noticeTime}>Today, 9:00 AM</Text>
-              </View>
-            </View>
-            <View style={styles.noticeDivider} />
-            <View style={styles.noticeRow}>
-              <View style={[styles.noticeIconBox, { backgroundColor: '#EF444415' }]}>
-                <Icon name="bell" size={16} color="#EF4444" />
-              </View>
-              <View style={styles.noticeInfo}>
-                <Text style={styles.noticeTitle}>Math Exam Rescheduled</Text>
-                <Text style={styles.noticeTime}>Yesterday</Text>
-              </View>
-            </View>
+            )}
           </View>
         </View>
 
@@ -429,6 +493,7 @@ const styles = StyleSheet.create({
   actionCard: { flex: 1, borderRadius: 16, padding: 16, overflow: 'hidden', position: 'relative' },
   actionCardIconBox: { width: 36, height: 36, borderRadius: 8, backgroundColor: 'rgba(255,255,255,0.2)', justifyContent: 'center', alignItems: 'center', marginBottom: 12 },
   actionCardTitle: { color: '#fff', fontSize: 16, fontWeight: '800', lineHeight: 22, zIndex: 1 },
+  actionCardSubtitle: { color: 'rgba(255,255,255,0.85)', fontSize: 13, fontWeight: '600', marginTop: 4, zIndex: 1 },
   actionCardWatermark: { position: 'absolute', right: -10, bottom: -10, zIndex: 0 },
 
   // Badges / Trophy Cabinet

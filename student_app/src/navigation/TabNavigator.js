@@ -13,6 +13,7 @@ import RewardsScreen from '../features/rewards/RewardsScreen';
 import CommunicationScreen from '../features/communication/CommunicationScreen';
 import AttendanceScreen from '../features/attendance/AttendanceScreen';
 import AcademicCalendarScreen from '../features/academics/AcademicCalendarScreen';
+import DateSheetScreen from '../features/academics/DateSheetScreen';
 import FeesScreen from '../features/finance/FeesScreen';
 import NotificationsScreen from '../features/notifications/NotificationsScreen';
 
@@ -72,6 +73,7 @@ const TabNavigator = () => {
       <Tab.Screen name="Communication" component={CommunicationScreen} options={{ tabBarItemStyle: { display: 'none' } }} />
       <Tab.Screen name="Attendance" component={AttendanceScreen} options={{ tabBarItemStyle: { display: 'none' } }} />
       <Tab.Screen name="AcademicCalendar" component={AcademicCalendarScreen} options={{ tabBarItemStyle: { display: 'none' } }} />
+      <Tab.Screen name="DateSheet" component={DateSheetScreen} options={{ tabBarItemStyle: { display: 'none' } }} />
       <Tab.Screen name="Fees" component={FeesScreen} options={{ tabBarItemStyle: { display: 'none' } }} />
       <Tab.Screen name="Notifications" component={NotificationsScreen} options={{ tabBarItemStyle: { display: 'none' } }} />
     </Tab.Navigator>

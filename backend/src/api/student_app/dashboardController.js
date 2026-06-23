@@ -40,14 +40,14 @@ export const getDashboardData = async (req, res) => {
     let avgGradePercentage = 0;
     const { data: allGrades, error: gradeError } = await supabase
       .from('grades')
-      .select('marks, exams!inner(name, marks)')
+      .select('marks, exams:exam_id(title, marks)')
       .eq('student_id', studentId)
       .order('created_at', { ascending: false });
 
     if (!gradeError && allGrades && allGrades.length > 0) {
       const latest = allGrades[0];
       latestGrade = {
-        examName: latest.exams?.name || 'Exam',
+        examName: latest.exams?.title || 'Exam',
         obtained: latest.marks,
         total: latest.exams?.marks,
         percentage: latest.exams?.marks > 0 ? (latest.marks / latest.exams.marks) * 100 : 0

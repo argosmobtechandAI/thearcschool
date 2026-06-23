@@ -10,6 +10,14 @@ import { navigationRef } from './navigationRef';
 
 const Stack = createNativeStackNavigator();
 
+const MainScreen = () => {
+  return (
+    <DrawerProvider>
+      <TabNavigator />
+    </DrawerProvider>
+  );
+};
+
 // ─── Root Navigator ──────────────────────────────────────────────────────────
 
 const RootNavigator = () => {
@@ -21,13 +29,7 @@ const RootNavigator = () => {
         {!isAuthenticated ? (
           <Stack.Screen name="Login" component={LoginScreen} />
         ) : (
-          <Stack.Screen name="Main">
-            {() => (
-              <DrawerProvider>
-                <TabNavigator />
-              </DrawerProvider>
-            )}
-          </Stack.Screen>
+          <Stack.Screen name="Main" component={MainScreen} />
         )}
       </Stack.Navigator>
     </NavigationContainer>

@@ -94,6 +94,7 @@ const DrawerContent = ({ close }) => {
         <DrawerItem icon="calendar"       label="Timetable"     color="#8B5CF6" onPress={() => go('Class')} />
         <DrawerItem icon="credit-card"    label="Fee Details"   color="#EF4444" onPress={() => go('Fees')} />
         <DrawerItem icon="file-text"      label="Academic Calendar"    color="#06B6D4" onPress={() => go('AcademicCalendar')} />
+        <DrawerItem icon="edit-3"         label="Date Sheet"    color="#F97316" onPress={() => go('DateSheet')} />
         <DrawerItem icon="award"          label="My Grades"     color="#EAB308" onPress={() => go('Result')} />
         <DrawerItem icon="bell"           label="Announcements" color="#F43F5E" badgeCount={2} onPress={() => go('Notifications')} />
         <DrawerItem icon="message-square" label="Communication" color="#14B8A6" onPress={() => go('Communication')} />
@@ -124,72 +125,72 @@ const DrawerContent = ({ close }) => {
 // ─── Provider ────────────────────────────────────────────────────────────────
 
 export const DrawerProvider = ({ children }) => {
-  const [visible, setVisible] = useState(false);
+  const [isOpen, setIsOpen] = useState(false);
   const slideAnim = useRef(new Animated.Value(-DRAWER_WIDTH)).current;
   const overlayAnim = useRef(new Animated.Value(0)).current;
 
   const openDrawer = useCallback(() => {
-    setVisible(true);
+    setIsOpen(true);
+  }, []);
+
+  const closeDrawer = useCallback(() => {
+    setIsOpen(false);
+  }, []);
+
+  React.useEffect(() => {
     Animated.parallel([
       Animated.timing(slideAnim, {
-        toValue: 0,
-        duration: 250,
+        toValue: isOpen ? 0 : -DRAWER_WIDTH,
+        duration: isOpen ? 250 : 200,
         useNativeDriver: true,
       }),
       Animated.timing(overlayAnim, {
-        toValue: 1,
-        duration: 250,
+        toValue: isOpen ? 1 : 0,
+        duration: isOpen ? 250 : 200,
         useNativeDriver: true,
       }),
     ]).start();
-  }, [slideAnim, overlayAnim]);
-
-  const closeDrawer = useCallback(() => {
-    Animated.parallel([
-      Animated.timing(slideAnim, {
-        toValue: -DRAWER_WIDTH,
-        duration: 200,
-        useNativeDriver: true,
-      }),
-      Animated.timing(overlayAnim, {
-        toValue: 0,
-        duration: 200,
-        useNativeDriver: true,
-      }),
-    ]).start(() => {
-      setVisible(false);
-    });
-  }, [slideAnim, overlayAnim]);
+  }, [isOpen, slideAnim, overlayAnim]);
 
   return (
     <DrawerContext.Provider value={{ openDrawer, closeDrawer }}>
-      {children}
+      <View style={{ flex: 1 }}>
+        {children}
 
-      {/* Drawer overlay rendered as a Modal so it sits above everything */}
-      <Modal
-        visible={visible}
-        transparent
-        animationType="none"
-        statusBarTranslucent
-        onRequestClose={closeDrawer}
-      >
-        <View style={styles.modalContainer}>
-          {/* Drawer panel on the left */}
-          <Animated.View
+        {/* Dark overlay covering the whole screen */}
+        <TouchableWithoutFeedback onPress={closeDrawer} disabled={!isOpen}>
+          <Animated.View 
+            pointerEvents={isOpen ? 'auto' : 'none'}
             style={[
-              styles.drawerPanel,
-              { width: DRAWER_WIDTH, transform: [{ translateX: slideAnim }] },
-            ]}
-          >
-            <DrawerContent close={closeDrawer} />
-          </Animated.View>
+              StyleSheet.absoluteFill, 
+              { 
+                backgroundColor: 'rgba(0,0,0,0.5)', 
+                opacity: overlayAnim, 
+                zIndex: 99 
+              }
+            ]} 
+          />
+        </TouchableWithoutFeedback>
 
-          {/* Tappable dark overlay on the right — tap to close */}
-          <TouchableWithoutFeedback onPress={closeDrawer}>
-            <Animated.View style={[styles.overlay, { opacity: overlayAnim }]} />
-          </TouchableWithoutFeedback>
-        </View>
-      </Modal>
+        {/* Drawer panel sliding in from the left */}
+        <Animated.View
+          pointerEvents={isOpen ? 'auto' : 'none'}
+          style={[
+            styles.drawerPanel,
+            { 
+              position: 'absolute',
+              top: 0,
+              bottom: 0,
+              left: 0,
+              width: DRAWER_WIDTH,
+              transform: [{ translateX: slideAnim }],
+              zIndex: 100,
+            },
+          ]}
+        >
+          <DrawerContent close={closeDrawer} />
+        </Animated.View>
+      </View>
     </DrawerContext.Provider>
   );
 };
