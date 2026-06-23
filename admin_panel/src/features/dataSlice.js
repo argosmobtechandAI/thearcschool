@@ -61,6 +61,18 @@ export const fetchResults = createAsyncThunk(
   }
 );
 
+export const fetchGradingScales = createAsyncThunk(
+  "data/fetchGradingScales",
+  async (_, { rejectWithValue }) => {
+    try {
+      const response = await api.get("/admin_panel/grading-scales");
+      return response.data;
+    } catch (error) {
+      return rejectWithValue(error.response?.data || "Network Error");
+    }
+  }
+);
+
 export const fetchCourses = createAsyncThunk(
   "data/fetchCourses",
   async (_, { rejectWithValue }) => {
@@ -139,6 +151,10 @@ const initialState = {
   newUsers: [],
   timeTables: [],
   events: [],
+  rooms: [],
+  roles: [],
+  gradingScales: [],
+  communication: null,
   chats: [],
   results: [],
   infoSettings: null,
@@ -189,6 +205,11 @@ export const dataSlice = createSlice({
         state.loadingClasses = false;
         state.error = action.payload;
       })
+
+      // Fetch Grading Scales
+      .addCase(fetchGradingScales.pending, (state) => { state.loading = true; state.error = null; })
+      .addCase(fetchGradingScales.fulfilled, (state, action) => { state.loading = false; state.gradingScales = action.payload; })
+      .addCase(fetchGradingScales.rejected, (state, action) => { state.loading = false; state.error = action.payload?.message || "Failed to fetch grading scales"; })
       // Fees
       .addCase(fetchFees.pending, (state) => {
         state.loadingFees = true;

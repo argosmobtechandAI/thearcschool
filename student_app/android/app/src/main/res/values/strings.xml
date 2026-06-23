@@ -1,0 +1,10 @@
+<resources>
+    <string name="app_name">student_app</string>
+    <string name="google_app_id" translatable="false">1:349267453118:android:5d0ef8f866f43c5d1feaef</string>
+    <string name="gcm_defaultSenderId" translatable="false">349267453118</string>
+    <string name="default_web_client_id" translatable="false"></string>
+    <string name="firebase_database_url" translatable="false"></string>
+    <string name="google_api_key" translatable="false">AIzaSyBd21GLxzD7KrrL9dUup3iJ2Uq2Gbrn4oA</string>
+    <string name="google_crashlytics_mapping_file_id" translatable="false"></string>
+    <string name="project_id" translatable="false">thearcschool-a374b</string>
+</resources>

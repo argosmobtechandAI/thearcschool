@@ -21,6 +21,7 @@ const AttendanceStudentView = () => {
   
   const [attendanceRecords, setAttendanceRecords] = useState([]);
   const [loadingAttendance, setLoadingAttendance] = useState(false);
+  const [editMode, setEditMode] = useState(false);
   const [publicHolidays, setPublicHolidays] = useState([]);
 
   useEffect(() => {
@@ -80,6 +81,10 @@ const AttendanceStudentView = () => {
   }, [gridMonth, publicHolidays]);
 
   const handleGridCellClick = async (fullDateString, currentStatus) => {
+    if (!editMode) {
+      toast.info("Please enable Edit Mode to change attendance");
+      return;
+    }
     let newStatus = "present";
     if (currentStatus === "present") newStatus = "absent";
     else if (currentStatus === "absent") newStatus = "late";
@@ -179,6 +184,21 @@ const AttendanceStudentView = () => {
           </div>
 
           <div style={{ display: "flex", gap: "0.5rem", marginLeft: "1rem", borderLeft: "1px solid rgba(0,0,0,0.1)", paddingLeft: "1rem", alignItems: "center" }}>
+            <button 
+              onClick={() => setEditMode(!editMode)} 
+              style={{ 
+                padding: "8px 16px", 
+                borderRadius: "8px", 
+                fontWeight: "600", 
+                cursor: "pointer",
+                border: editMode ? "none" : "1px solid #10b981", 
+                background: editMode ? "#10b981" : "transparent", 
+                color: editMode ? "white" : "#10b981",
+                transition: "all 0.2s"
+              }}
+            >
+              {editMode ? "Exit Edit Mode" : "Enable Edit Mode"}
+            </button>
             <button onClick={handleExportExcel} className="btn-ghost" style={{ padding: "8px", display: "flex", alignItems: "center", gap: "0.5rem" }} title="Export Excel">
               <FileSpreadsheet size={18} />
             </button>

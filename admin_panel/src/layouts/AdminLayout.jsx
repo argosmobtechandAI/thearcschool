@@ -1,7 +1,12 @@
 import { Outlet, useNavigate, NavLink } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
+import { useEffect } from "react";
 import { LogOut, LayoutDashboard, Users, BookOpen, UserCircle, Settings, UserCheck, IndianRupee, FileEdit, Clock, Calendar, ClipboardCheck, Bell, DollarSign, MessageSquare, Info, ShieldAlert, MapPin, ExternalLink } from "lucide-react";
+import { toast } from "react-toastify";
 import { logout } from "../features/authSlice";
+import { messaging } from "../config/firebase";
+import { getToken, onMessage } from "firebase/messaging";
+import api from "../services/api";
 
 const AdminLayout = () => {
   const dispatch = useDispatch();
@@ -12,6 +17,47 @@ const AdminLayout = () => {
     dispatch(logout());
     navigate("/login");
   };
+
+  useEffect(() => {
+    if (user && messaging) {
+      const setupFCM = async () => {
+        try {
+          const permission = await Notification.requestPermission();
+          if (permission === "granted") {
+            // Hardcoded the VAPID key normally, but we will leave it empty if we don't have it, 
+            // but it's recommended to have a VAPID key for web push.
+            const token = await getToken(messaging, { 
+              // vapidKey: 'YOUR_VAPID_KEY_HERE' 
+            });
+            
+            if (token) {
+              await api.post('/notifications/register-token', {
+                fcm_token: token,
+                device_type: 'web'
+              });
+            }
+          }
+        } catch (error) {
+          console.error("FCM Token Error:", error);
+        }
+      };
+
+      setupFCM();
+
+      const unsubscribe = onMessage(messaging, (payload) => {
+        toast.info(
+          <div>
+            <strong>{payload.notification.title}</strong>
+            <p style={{ margin: 0 }}>{payload.notification.body}</p>
+          </div>
+        );
+      });
+
+      return () => {
+        unsubscribe();
+      };
+    }
+  }, [user]);
 
   const navLinkStyle = ({ isActive }) => ({
     display: "flex", alignItems: "center", gap: "0.5rem", padding: "0.35rem 0.75rem", 

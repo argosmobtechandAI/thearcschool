@@ -15,8 +15,9 @@ import { letterheadBase64 } from "../utils/letterhead";
 import * as XLSX from "xlsx";
 import ResultsTab from "../components/ResultsTab";
 import ClassMatrixTab from "../components/ClassMatrixTab";
+import GradingScalesTab from "../components/GradingScalesTab";
 
-const coursesTypes = ["exam", "Material", "Assignment", "Results", "Class Matrix"];
+const coursesTypes = ["exam", "Material", "Assignment", "Results", "Class Matrix", "Grading Settings"];
 
 const Exams = () => {
   const dispatch = useDispatch();
@@ -461,6 +462,10 @@ const Exams = () => {
 
         {courseType === "Class Matrix" && (
           <ClassMatrixTab results={results} classes={classes} />
+        )}
+
+        {courseType === "Grading Settings" && (
+          <GradingScalesTab />
         )}
 
         {courseType === "exam" && (

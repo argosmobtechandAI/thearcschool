@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "349267453118",
+    "project_id": "thearcschool-a374b",
+    "storage_bucket": "thearcschool-a374b.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:349267453118:android:4d0ef8f866f43c5d1feaef",
+        "android_client_info": {
+          "package_name": "com.teacherapp"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBd21GLxzD7KrrL9dUup3iJ2Uq2Gbrn4oA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:349267453118:android:5d0ef8f866f43c5d1feaef",
+        "android_client_info": {
+          "package_name": "com.student_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBd21GLxzD7KrrL9dUup3iJ2Uq2Gbrn4oA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

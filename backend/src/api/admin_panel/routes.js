@@ -23,6 +23,8 @@ import infoRouter from "../shared/info/routes.js";
 import { createDateSheet, getDateSheetGrades, getExam, updateExam, deleteExam, bulkUpdateGrades } from "../shared/academics/examsController.js";
 import { getAggregatedResults } from "./resultsController.js";
 import { createRole, getRoles, updateRole, deleteRole } from "./rolesController.js";
+import { getGradingScales, createGradingScale, updateGradingScale, deleteGradingScale } from "./gradingScalesController.js";
+import notificationsRouter from "../shared/notifications/routes.js";
 
 const router = Router();
 
@@ -68,5 +70,14 @@ router.post("/roles", createRole);
 router.get("/roles", getRoles);
 router.put("/roles/:id", updateRole);
 router.delete("/roles/:id", deleteRole);
+
+// --- Grading Scales ---
+router.get("/grading-scales", getGradingScales);
+router.post("/grading-scales", createGradingScale);
+router.put("/grading-scales/:id", updateGradingScale);
+router.delete("/grading-scales/:id", deleteGradingScale);
+
+// --- Notifications ---
+router.use("/notifications", notificationsRouter);
 
 export default router;

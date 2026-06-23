@@ -1,13 +1,14 @@
 import { useEffect, useState, useMemo } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { fetchUsers, fetchClasses } from "../features/dataSlice";
-import { Users, UserX, Clock, HelpCircle, ChevronRight, PieChart } from "lucide-react";
+import { Users, UserX, Clock, HelpCircle, ChevronRight, PieChart, Download, FileSpreadsheet } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import api from "../services/api";
 import { toast } from "react-toastify";
 import DateRangePicker, { formatDate } from "../components/DateRangePicker";
 import AttendanceMatrixTable from "../components/AttendanceMatrixTable";
 import AttendanceReports from "../components/AttendanceReports";
+import { exportToExcel, exportToPDF } from "../utils/exportUtils";
 
 const Attendance = () => {
   const dispatch = useDispatch();
@@ -63,9 +64,9 @@ const Attendance = () => {
       const fetchMatrixData = async () => {
         setLoadingMatrix(true);
         try {
-          const res = await api.get('/attendance', {
-            params: { startDate: matrixDateRange.start, endDate: matrixDateRange.end, classId: matrixClassId }
-          });
+          const params = { startDate: matrixDateRange.start, endDate: matrixDateRange.end };
+          if (matrixClassId !== 'all') params.classId = matrixClassId;
+          const res = await api.get('/attendance', { params });
           if (res.data.success) {
             setMatrixAttendance(res.data.records);
           }
@@ -106,7 +107,7 @@ const Attendance = () => {
 
   const matrixClassStudents = useMemo(() => {
     if (!matrixClassId) return [];
-    const students = users.filter(u => u.type === 'student' && u.classes && u.classes.includes(matrixClassId));
+    const students = users.filter(u => u.type === 'student' && (matrixClassId === 'all' || (u.classes && u.classes.includes(matrixClassId))));
     return students.map(student => ({
       ...student,
       records: matrixAttendance.filter(r => r.student_id === student.id)
@@ -180,6 +181,61 @@ const Attendance = () => {
     if (pct >= 85) return "#10b981";
     if (pct >= 70) return "#f59e0b";
     return "#ef4444";
+  };
+
+  const handleExportMatrixCSV = () => {
+    const exportData = matrixClassStudents.map(student => {
+      const row = { 'Student Name': student.name };
+      gridDays.forEach(day => {
+        if (day.isWeekend) row[day.fullDateString] = 'W';
+        else if (day.isPublicHoliday) row[day.fullDateString] = 'H';
+        else {
+          const record = student.records?.find(r => r.date === day.fullDateString);
+          if (record?.status === 'present') row[day.fullDateString] = 'P';
+          else if (record?.status === 'absent') row[day.fullDateString] = 'A';
+          else if (record?.status === 'late') row[day.fullDateString] = 'L';
+          else row[day.fullDateString] = '-';
+        }
+      });
+      let totalDays = 0, presentDays = 0;
+      gridDays.forEach(day => {
+        if (!day.isWeekend && !day.isPublicHoliday) {
+          totalDays++;
+          if (student.records?.find(r => r.date === day.fullDateString)?.status === 'present') presentDays++;
+        }
+      });
+      row['% Present'] = totalDays > 0 ? Math.round((presentDays / totalDays) * 100) + '%' : '0%';
+      return row;
+    });
+    exportToExcel(exportData, `Attendance_Matrix_${matrixDateRange.start}_to_${matrixDateRange.end}`);
+  };
+
+  const handleExportMatrixPDF = () => {
+    const columns = ["Student Name", ...gridDays.map(d => d.dateNumber), "%"];
+    const rows = matrixClassStudents.map(student => {
+      const row = [student.name];
+      gridDays.forEach(day => {
+        if (day.isWeekend) row.push('W');
+        else if (day.isPublicHoliday) row.push('H');
+        else {
+          const record = student.records?.find(r => r.date === day.fullDateString);
+          if (record?.status === 'present') row.push('P');
+          else if (record?.status === 'absent') row.push('A');
+          else if (record?.status === 'late') row.push('L');
+          else row.push('-');
+        }
+      });
+      let totalDays = 0, presentDays = 0;
+      gridDays.forEach(day => {
+        if (!day.isWeekend && !day.isPublicHoliday) {
+          totalDays++;
+          if (student.records?.find(r => r.date === day.fullDateString)?.status === 'present') presentDays++;
+        }
+      });
+      row.push(totalDays > 0 ? Math.round((presentDays / totalDays) * 100) + '%' : '0%');
+      return row;
+    });
+    exportToPDF(columns, rows, `Attendance_Matrix_${matrixDateRange.start}_to_${matrixDateRange.end}`, `Attendance Matrix (${matrixDateRange.start} to ${matrixDateRange.end})`);
   };
 
   return (
@@ -372,6 +428,7 @@ const Attendance = () => {
                 style={{ padding: "0.5rem", width: "200px", appearance: "auto" }}
               >
                 <option value="">-- Choose Class --</option>
+                <option value="all">All Classes</option>
                 {classes.map(cls => (
                   <option key={cls.id} value={cls.id}>Class {cls.className} - {cls.section}</option>
                 ))}
@@ -387,6 +444,22 @@ const Attendance = () => {
                 defaultRange="mtd"
               />
             </div>
+            {matrixClassId && (
+              <div style={{ display: "flex", gap: "10px", marginTop: "auto" }}>
+                <button 
+                  onClick={handleExportMatrixCSV}
+                  style={{ display: "flex", alignItems: "center", gap: "6px", background: "#10b981", color: "white", padding: "8px 16px", borderRadius: "8px", border: "none", cursor: "pointer", fontWeight: "600" }}
+                >
+                  <FileSpreadsheet size={18} /> Export Excel Matrix
+                </button>
+                <button 
+                  onClick={handleExportMatrixPDF}
+                  style={{ display: "flex", alignItems: "center", gap: "6px", background: "#ef4444", color: "white", padding: "8px 16px", borderRadius: "8px", border: "none", cursor: "pointer", fontWeight: "600" }}
+                >
+                  <Download size={18} /> Export PDF Matrix
+                </button>
+              </div>
+            )}
           </div>
 
           {!matrixClassId ? (

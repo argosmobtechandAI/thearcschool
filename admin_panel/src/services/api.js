@@ -68,6 +68,8 @@ export const deleteNewsletter = (id) => api.delete(`/admin_panel/info/newsletter
 
 // Notification API
 export const updateNotification = (id) => api.put(`/user/updateNotification/${id}`);
+export const sendBroadcastNotification = (data) => api.post('/admin_panel/notifications/broadcast', data);
+export const getAllNotifications = (params) => api.get('/admin_panel/notifications/all', { params });
 
 // File Upload API (proxied through backend — NO direct Supabase access)
 export const uploadFile = async (file, bucket = "school") => {

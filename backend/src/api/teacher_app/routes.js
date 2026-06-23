@@ -3,7 +3,7 @@ import { auth } from "../../middlewares/authMiddleware.js";
 import { authorizeRoles } from "../../middlewares/roleMiddleware.js";
 
 // Import Controllers
-import { createExams, deleteExam, getExam, updateExam, bulkUpdateGrades, getStudentGrades } from "../shared/academics/examsController.js";
+import { createExams, deleteExam, getExam, updateExam, bulkUpdateGrades, getStudentGrades, getDateSheetGrades } from "../shared/academics/examsController.js";
 import { createCourse, deletecourse, getcourse, submitAnswer, updatecourse } from "../shared/academics/courseController.js";
 
 import { getTeacherTimetable } from "../shared/timetable/controller.js";
@@ -11,7 +11,9 @@ import { getClassStudents, getTeacherClasses } from "../shared/classes/controlle
 
 import { getPlannerEvents } from "../admin_panel/planner/controller.js";
 import communicationRouter from "../shared/communication/routes.js";
+import notificationsRouter from "../shared/notifications/routes.js";
 import { getTeacherProfile } from "./controller.js";
+import { getClassPerformance } from "./performanceController.js";
 
 const teacherRouter = Router();
 
@@ -24,6 +26,7 @@ teacherRouter.post("/exams/grades/bulk", bulkUpdateGrades);
 teacherRouter.post("/exams", createExams);
 teacherRouter.get("/exams", getExam);
 teacherRouter.get("/exams/grades", getStudentGrades);
+teacherRouter.get("/exams/datesheet/:title/:class_id/grades", getDateSheetGrades);
 teacherRouter.put("/exams/:id", updateExam);
 teacherRouter.delete("/exams/:id", deleteExam);
 
@@ -39,9 +42,10 @@ teacherRouter.put("/course/uploadFile", submitAnswer);
 // Timetable
 teacherRouter.get("/timetable", getTeacherTimetable);
 
-// Classes (Students)
+// Classes (Students & Performance)
 teacherRouter.get("/classes", getTeacherClasses);
 teacherRouter.get("/classes/:id/students", getClassStudents);
+teacherRouter.get("/classes/:id/performance", getClassPerformance);
 
 // Teacher Profile / Assignments
 teacherRouter.get("/profile", getTeacherProfile);
@@ -55,5 +59,8 @@ teacherRouter.get("/complaints", getComplaints);
 
 // Chat
 teacherRouter.use("/communication", communicationRouter);
+
+// Notifications
+teacherRouter.use("/notifications", notificationsRouter);
 
 export default teacherRouter;

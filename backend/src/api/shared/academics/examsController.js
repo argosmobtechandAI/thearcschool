@@ -142,11 +142,29 @@ export const getExam = async (req, res) => {
       return res.status(200).json({ success: true, count: 0, exams: [] });
     }
 
-    const classIds = [...new Set(exams.map(e => e.class_id).filter(Boolean))];
+    let filteredExams = exams;
+
+    if (req.user.type === "teacher") {
+      const { data: ctData } = await supabase.from("class_teachers").select("class_id").eq("teacher_id", req.user.id);
+      const classTeacherClassIds = ctData ? ctData.map(c => c.class_id) : [];
+
+      const { data: stData } = await supabase.from("subject_teachers").select("class_id, subject(name)").eq("teacher_id", req.user.id);
+      
+      filteredExams = exams.filter(ex => {
+        // If they are the class teacher for this class, they can see all exams for it
+        if (classTeacherClassIds.includes(ex.class_id)) return true;
+        
+        // If they are a subject teacher for this class, they can only see exams for their specific subjects
+        const teachesSubject = stData?.some(st => st.class_id === ex.class_id && st.subject?.name === ex.subject);
+        return teachesSubject;
+      });
+    }
+
+    const classIds = [...new Set(filteredExams.map(e => e.class_id).filter(Boolean))];
     const { data: classes } = await supabase.from("class").select("id, name, section").in("id", classIds);
 
     // Map back to what frontend expects
-    const mappedExams = exams.map(ex => {
+    const mappedExams = filteredExams.map(ex => {
         const cls = classes?.find(c => c.id === ex.class_id);
         return {
           ...ex,
@@ -304,15 +322,49 @@ export const getStudentGrades = async (req, res) => {
 
     if (gradesError) throw gradesError;
 
-    const formattedGrades = grades.map(g => ({
-      marks: g.marks,
-      exam_id: g.exam_id,
-      student_id: g.student_id,
-      title: g.exams?.title,
-      subject: g.exams?.subject,
-      maxMarks: g.exams?.marks,
-      date: g.exams?.date
-    }));
+    // Fetch grading scales
+    const { data: gradingScalesData, error: scaleError } = await supabase
+      .from("grading_scales")
+      .select("*")
+      .order("min_percentage", { ascending: false });
+
+    const gradingScales = gradingScalesData?.length > 0 ? gradingScalesData : [
+      { grade: 'A+', min_percentage: 90, max_percentage: 100, color_hex: '#16a34a' },
+      { grade: 'A', min_percentage: 80, max_percentage: 89.99, color_hex: '#16a34a' },
+      { grade: 'B', min_percentage: 70, max_percentage: 79.99, color_hex: '#3b82f6' },
+      { grade: 'C', min_percentage: 60, max_percentage: 69.99, color_hex: '#eab308' },
+      { grade: 'D', min_percentage: 50, max_percentage: 59.99, color_hex: '#f97316' },
+      { grade: 'F', min_percentage: 0, max_percentage: 49.99, color_hex: '#ef4444' },
+    ];
+
+    const formattedGrades = grades.map(g => {
+      let percentage = 0;
+      let grade = "N/A";
+      let gradeColor = "#ef4444";
+
+      const maxMarks = g.exams?.marks;
+      if (maxMarks > 0 && g.marks !== null) {
+        percentage = (g.marks / maxMarks) * 100;
+        const matchedScale = gradingScales.find(
+          s => percentage >= s.min_percentage && percentage <= s.max_percentage
+        ) || gradingScales[gradingScales.length - 1];
+
+        grade = matchedScale.grade;
+        gradeColor = matchedScale.color_hex;
+      }
+
+      return {
+        marks: g.marks,
+        exam_id: g.exam_id,
+        student_id: g.student_id,
+        title: g.exams?.title,
+        subject: g.exams?.subject,
+        maxMarks: maxMarks,
+        date: g.exams?.date,
+        grade,
+        gradeColor
+      };
+    });
 
     return res.status(200).json({
       success: true,
@@ -439,7 +491,26 @@ export const getDateSheetGrades = async (req, res) => {
       return res.status(404).json({ success: false, message: "No exams found for this date sheet." });
     }
 
-    const examIds = exams.map(e => e.id);
+    let filteredExams = exams;
+
+    if (req.user.type === "teacher") {
+      const { data: ctData } = await supabase.from("class_teachers").select("class_id").eq("teacher_id", req.user.id);
+      const classTeacherClassIds = ctData ? ctData.map(c => c.class_id) : [];
+
+      const { data: stData } = await supabase.from("subject_teachers").select("class_id, subject(name)").eq("teacher_id", req.user.id);
+      
+      filteredExams = exams.filter(ex => {
+        if (classTeacherClassIds.includes(ex.class_id)) return true;
+        const teachesSubject = stData?.some(st => st.class_id === ex.class_id && st.subject?.name === ex.subject);
+        return teachesSubject;
+      });
+    }
+
+    if (filteredExams.length === 0) {
+      return res.status(404).json({ success: false, message: "No exams found for your assigned subjects." });
+    }
+
+    const examIds = filteredExams.map(e => e.id);
 
     const { data: classStudents, error: studentsError } = await supabase
       .from("class_students")
@@ -470,7 +541,7 @@ export const getDateSheetGrades = async (req, res) => {
     // Filter to unique subjects across these exams for the table headers
     const uniqueSubjects = [];
     const seenSubjects = new Set();
-    exams.forEach(ex => {
+    filteredExams.forEach(ex => {
        if (!seenSubjects.has(ex.subject)) {
            seenSubjects.add(ex.subject);
            uniqueSubjects.push({ subject: ex.subject, maxMarks: ex.marks });
@@ -481,7 +552,7 @@ export const getDateSheetGrades = async (req, res) => {
 
     const results = classStudents.map(cs => {
       const studentGrades = {};
-      const studentExams = exams.filter(e => e.class_id === cs.class_id);
+      const studentExams = filteredExams.filter(e => e.class_id === cs.class_id);
 
       studentExams.forEach(ex => {
         const gradeRecord = grades?.find(g => g.student_id === cs.student_id && g.exam_id === ex.id);

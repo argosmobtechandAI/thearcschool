@@ -362,7 +362,7 @@ export const getClassStudents = async (req, res) => {
     // Fetch full student details from user table
     const { data: users, error: usersError } = await supabase
       .from("user")
-      .select("id, name, email, admission_number, father_name, mother_name, phone, address") 
+      .select("id, name, email, admission_number, father_name, mother_name, phone, address, dob, house, admission_date, leave_school") 
       .in("id", studentIds);
 
     if (usersError) throw usersError;
@@ -408,18 +408,23 @@ export const getTeacherClasses = async (req, res) => {
         combinedClassesMap.set(c.class_id, {
           classId: c.class_id,
           className: c.class.name,
-          section: c.class.section
+          section: c.class.section,
+          isClassTeacher: true
         });
       }
     });
 
     (subjectTeachersData || []).forEach(st => {
       if (st.class) {
-        combinedClassesMap.set(st.class_id, {
-          classId: st.class_id,
-          className: st.class.name,
-          section: st.class.section
-        });
+        // Only add if not already added as a class teacher
+        if (!combinedClassesMap.has(st.class_id)) {
+          combinedClassesMap.set(st.class_id, {
+            classId: st.class_id,
+            className: st.class.name,
+            section: st.class.section,
+            isClassTeacher: false
+          });
+        }
       }
     });
 

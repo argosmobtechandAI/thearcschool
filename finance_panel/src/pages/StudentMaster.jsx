@@ -4,6 +4,7 @@ import { fetchUsers, fetchClasses } from "../features/dataSlice";
 import TableFilterHeader from "../components/TableFilterHeader";
 import { useSortableData } from "../hooks/useSortableData";
 import { exportToExcel, exportToPDF } from "../utils/exportUtils";
+import { Link } from "react-router-dom";
 
 const StudentMaster = () => {
   const dispatch = useDispatch();
@@ -186,12 +187,14 @@ const StudentMaster = () => {
                     {selectedColumns.includes("sno") && <td style={{ padding: "0.75rem 1rem", color: "var(--text-secondary)", fontSize: "0.875rem" }}>{actualIdx + 1}</td>}
                     {selectedColumns.includes("name") && (
                       <td style={{ padding: "0.75rem 1rem" }}>
-                        <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
-                          <div style={{ width: "32px", height: "32px", borderRadius: "50%", background: "var(--accent-light)", color: "var(--accent-primary)", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: "600", fontSize: "0.875rem" }}>
-                            {s.name?.charAt(0) || "S"}
+                        <Link to={`/student-master/${s.id}`} style={{ textDecoration: 'none' }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
+                            <div style={{ width: "32px", height: "32px", borderRadius: "50%", background: "var(--accent-light)", color: "var(--accent-primary)", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: "600", fontSize: "0.875rem" }}>
+                              {s.name?.charAt(0) || "S"}
+                            </div>
+                            <div style={{ fontWeight: "600", color: "#3b82f6" }}>{s.name}</div>
                           </div>
-                          <div style={{ fontWeight: "500", color: "var(--text-primary)" }}>{s.name}</div>
-                        </div>
+                        </Link>
                       </td>
                     )}
                     {selectedColumns.includes("admission_number") && <td style={{ padding: "0.75rem 1rem", color: "var(--text-secondary)", fontSize: "0.875rem" }}>{s.admission_number || "-"}</td>}

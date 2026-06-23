@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line, CartesianGrid, Legend } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line, CartesianGrid, Legend, LabelList } from 'recharts';
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
@@ -213,6 +213,7 @@ const AttendanceReports = ({ users, classes }) => {
                     outerRadius={80}
                     paddingAngle={5}
                     dataKey="value"
+                    label={({ name, value }) => `${name}: ${value}`}
                   >
                     {statusDistribution.map((entry, index) => (
                       <Cell key={`cell-${index}`} fill={entry.color} />
@@ -230,12 +231,15 @@ const AttendanceReports = ({ users, classes }) => {
             <h3 style={{ fontSize: "1.1rem", fontWeight: "600", marginBottom: "1rem" }}>Daily Attendance % Trend</h3>
             <div style={{ height: "250px" }}>
               <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={dailyTrend}>
+                <LineChart data={dailyTrend} margin={{ top: 20, right: 20, left: 0, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} opacity={0.3} />
                   <XAxis dataKey="date" tick={{fontSize: 12}} />
                   <YAxis domain={[0, 100]} tick={{fontSize: 12}} />
                   <Tooltip formatter={(value) => `${value}%`} />
-                  <Line type="monotone" dataKey="percentage" stroke="#3b82f6" strokeWidth={3} dot={{r: 4}} activeDot={{r: 6}} />
+                  <Legend verticalAlign="top" height={36} />
+                  <Line name="Attendance %" type="monotone" dataKey="percentage" stroke="#3b82f6" strokeWidth={3} dot={{r: 4}} activeDot={{r: 6}}>
+                    <LabelList dataKey="percentage" position="top" formatter={(value) => `${value}%`} fontSize={10} />
+                  </Line>
                 </LineChart>
               </ResponsiveContainer>
             </div>
@@ -246,12 +250,14 @@ const AttendanceReports = ({ users, classes }) => {
             <h3 style={{ fontSize: "1.1rem", fontWeight: "600", marginBottom: "1rem" }}>Class Attendance Comparison</h3>
             <div style={{ height: "300px" }}>
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={classComparison} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+                <BarChart data={classComparison} margin={{ top: 30, right: 30, left: 20, bottom: 5 }}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} opacity={0.3} />
                   <XAxis dataKey="name" tick={{fontSize: 12}} />
                   <YAxis domain={[0, 100]} tick={{fontSize: 12}} />
                   <Tooltip formatter={(value) => `${value}%`} />
-                  <Bar dataKey="percentage" fill="#10b981" radius={[4, 4, 0, 0]}>
+                  <Legend verticalAlign="top" height={36} payload={[{ value: 'Attendance %', type: 'rect', color: '#10b981' }]} />
+                  <Bar name="Attendance %" dataKey="percentage" fill="#10b981" radius={[4, 4, 0, 0]}>
+                    <LabelList dataKey="percentage" position="top" formatter={(value) => `${value}%`} fontSize={10} />
                     {classComparison.map((entry, index) => (
                       <Cell key={`cell-${index}`} fill={entry.percentage < 75 ? '#ef4444' : entry.percentage < 85 ? '#f59e0b' : '#10b981'} />
                     ))}

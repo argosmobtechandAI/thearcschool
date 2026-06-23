@@ -133,7 +133,6 @@ const DateRangePicker = ({
     setRangeDates(val);
   };
 
-  // If user manually edits dates, switch to custom
   const handleDateChange = (type, val) => {
     setSelectedRange('custom');
     if (typeof onRangeChange === 'function') {
@@ -146,10 +145,10 @@ const DateRangePicker = ({
   };
 
   return (
-    <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
+    <div style={{ display: "flex", gap: "0.5rem", alignItems: "center", flexWrap: "wrap" }}>
       <select 
         className="input-glass"
-        style={{ padding: "0.4rem 0.5rem", cursor: "pointer", width: "160px", fontSize: "0.8rem", appearance: "auto" }}
+        style={{ padding: "0.4rem 0.5rem", cursor: "pointer", minWidth: "140px", flex: 1, fontSize: "0.85rem", appearance: "auto" }}
         value={selectedRange}
         onChange={handleRangeChange}
       >
@@ -158,24 +157,24 @@ const DateRangePicker = ({
         ))}
       </select>
 
-      <div style={{ position: "relative" }}>
-        <Calendar size={16} style={{ position: "absolute", left: "0.75rem", top: "50%", transform: "translateY(-50%)", color: "var(--text-secondary)" }} />
+      <div style={{ position: "relative", flex: 1, minWidth: "120px" }}>
+        <Calendar size={14} style={{ position: "absolute", left: "0.5rem", top: "50%", transform: "translateY(-50%)", color: "var(--text-secondary)" }} />
         <input
           type="date"
           className="input-glass"
-          style={{ paddingLeft: "2rem", margin: 0, paddingRight: "0.5rem", width: "145px", fontSize: "0.8rem", padding: "0.4rem 0.4rem 0.4rem 2.2rem" }}
+          style={{ width: "100%", fontSize: "0.85rem", padding: "0.4rem 0.2rem 0.4rem 1.8rem" }}
           value={actualStartDate || ""}
           onChange={(e) => handleDateChange('start', e.target.value)}
           title="Start Date"
         />
       </div>
-      <span style={{ color: "var(--text-secondary)", fontSize: "0.875rem" }}>to</span>
-      <div style={{ position: "relative" }}>
-        <Calendar size={16} style={{ position: "absolute", left: "0.75rem", top: "50%", transform: "translateY(-50%)", color: "var(--text-secondary)" }} />
+      <span style={{ color: "var(--text-secondary)", fontSize: "0.85rem" }}>to</span>
+      <div style={{ position: "relative", flex: 1, minWidth: "120px" }}>
+        <Calendar size={14} style={{ position: "absolute", left: "0.5rem", top: "50%", transform: "translateY(-50%)", color: "var(--text-secondary)" }} />
         <input
           type="date"
           className="input-glass"
-          style={{ paddingLeft: "2rem", margin: 0, paddingRight: "0.5rem", width: "145px", fontSize: "0.8rem", padding: "0.4rem 0.4rem 0.4rem 2.2rem" }}
+          style={{ width: "100%", fontSize: "0.85rem", padding: "0.4rem 0.2rem 0.4rem 1.8rem" }}
           value={actualEndDate || ""}
           onChange={(e) => handleDateChange('end', e.target.value)}
           title="End Date"
