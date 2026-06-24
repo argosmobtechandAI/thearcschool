@@ -23,7 +23,25 @@ import {
 import Icon from 'react-native-vector-icons/Feather';
 import { colors, shadows } from '../theme/colors';
 
-const AppModal = ({
+export interface AppModalAction {
+  label: string;
+  onPress?: () => void;
+  style?: 'primary' | 'danger' | 'success' | 'cancel' | string;
+  icon?: string;
+}
+
+export interface AppModalProps {
+  visible?: boolean;
+  title?: string;
+  message?: string;
+  icon?: string;
+  iconColor?: string;
+  actions?: AppModalAction[];
+  onClose?: () => void;
+  children?: React.ReactNode;
+}
+
+const AppModal: React.FC<AppModalProps> = ({
   visible = false,
   title,
   message,
@@ -35,7 +53,7 @@ const AppModal = ({
 }) => {
   if (!visible) return null;
 
-  const buttonStyle = (style) => {
+  const buttonStyle = (style?: string) => {
     switch (style) {
       case 'danger':    return { bg: colors.danger,   text: '#fff' };
       case 'primary':   return { bg: colors.primary,  text: '#fff' };
@@ -83,7 +101,7 @@ const AppModal = ({
                     style={[
                       styles.actionBtn,
                       { backgroundColor: bs.bg },
-                      actions.length <= 2 && { flex: 1 },
+                      actions.length <= 2 ? { flex: 1 } : undefined,
                     ]}
                     onPress={action.onPress}
                     activeOpacity={0.8}

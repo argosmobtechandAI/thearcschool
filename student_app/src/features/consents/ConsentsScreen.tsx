@@ -1,23 +1,52 @@
-import React from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { useGetConsentsQuery, useUpdateConsentStatusMutation } from '../../store/apiSlice';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
+import AppModal from '../../components/AppModal';
+import MetricsFilterBar from '../../components/MetricsFilterBar';
 
 const ConsentsScreen = () => {
   const { data: response, isLoading, refetch } = useGetConsentsQuery(undefined);
   const [updateConsentStatus, { isLoading: isUpdating }] = useUpdateConsentStatusMutation();
 
-  const consents = response?.data || [];
+  const [searchQuery, setSearchQuery] = useState('');
+  const [sortOrder, setSortOrder] = useState('desc');
+  const [startDate, setStartDate] = useState(null);
+  const [endDate, setEndDate] = useState(null);
+  const [modalConfig, setModalConfig] = useState({ visible: false, title: '', message: '', type: 'success' });
+
+  const rawConsents = response?.data || [];
 
   const handleUpdateStatus = async (id: string, status: 'accepted' | 'declined') => {
     try {
       await updateConsentStatus({ id, status }).unwrap();
-      Alert.alert('Success', `Consent ${status} successfully!`);
+      setModalConfig({ visible: true, title: 'Success', message: `Consent ${status} successfully!`, type: 'success' });
     } catch (error) {
       console.error(error);
-      Alert.alert('Error', 'Failed to update consent status.');
+      setModalConfig({ visible: true, title: 'Error', message: 'Failed to update consent status.', type: 'error' });
     }
   };
+
+  const filteredConsents = rawConsents.filter((item: any) => {
+    const consent = item.consent || {};
+    if (searchQuery && !consent.title?.toLowerCase().includes(searchQuery.toLowerCase()) && !consent.description?.toLowerCase().includes(searchQuery.toLowerCase())) {
+      return false;
+    }
+    if (startDate && consent.event_date) {
+      const eventDate = new Date(consent.event_date).getTime();
+      const sDate = new Date(startDate).getTime();
+      const eDate = endDate ? new Date(endDate).getTime() : sDate;
+      const eDateEnd = eDate + 24 * 60 * 60 * 1000 - 1;
+      if (eventDate < sDate || eventDate > eDateEnd) {
+        return false;
+      }
+    }
+    return true;
+  }).sort((a: any, b: any) => {
+    const dateA = new Date(a.consent?.event_date || 0).getTime();
+    const dateB = new Date(b.consent?.event_date || 0).getTime();
+    return sortOrder === 'desc' ? dateB - dateA : dateA - dateB;
+  });
 
   const renderItem = ({ item }: { item: any }) => {
     const consentDetails = item.consent || {};
@@ -74,16 +103,28 @@ const ConsentsScreen = () => {
 
   return (
     <View style={styles.container}>
-      {isLoading && consents.length === 0 ? (
+      <MetricsFilterBar
+        searchQuery={searchQuery}
+        setSearchQuery={setSearchQuery}
+        sortOrder={sortOrder}
+        setSortOrder={setSortOrder}
+        startDate={startDate}
+        setStartDate={setStartDate}
+        endDate={endDate}
+        setEndDate={setEndDate}
+        searchPlaceholder="Search consents..."
+      />
+
+      {isLoading && rawConsents.length === 0 ? (
         <View style={styles.centered}>
           <ActivityIndicator size="large" color="#4F46E5" />
         </View>
       ) : (
         <FlatList
-          data={consents}
+          data={filteredConsents}
           keyExtractor={(item) => item.id}
           renderItem={renderItem}
-          contentContainerStyle={[styles.listContainer, consents.length === 0 && { flex: 1 }]}
+          contentContainerStyle={[styles.listContainer, filteredConsents.length === 0 && { flex: 1 }]}
           refreshing={isLoading}
           onRefresh={refetch}
           ListEmptyComponent={
@@ -94,6 +135,18 @@ const ConsentsScreen = () => {
           }
         />
       )}
+
+      <AppModal
+        visible={modalConfig.visible}
+        title={modalConfig.title}
+        message={modalConfig.message}
+        icon={modalConfig.type === 'success' ? 'check-circle' : 'x-circle'}
+        iconColor={modalConfig.type === 'success' ? '#10B981' : '#EF4444'}
+        actions={[
+          { label: 'OK', onPress: () => setModalConfig({ ...modalConfig, visible: false }), style: modalConfig.type === 'success' ? 'success' : 'danger' }
+        ]}
+        onClose={() => setModalConfig({ ...modalConfig, visible: false })}
+      />
     </View>
   );
 };
