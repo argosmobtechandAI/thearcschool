@@ -2,12 +2,12 @@ import notifee, { EventType, AndroidImportance } from '@notifee/react-native';
 import FileViewer from 'react-native-file-viewer';
 import messaging from '@react-native-firebase/messaging';
 import { navigate } from '../navigation/navigationRef';
-import { store } from '../store';
-import { apiSlice } from '../store/apiSlice';
 
 // Invalidate the RTK Query notifications cache so the in-app list auto-refreshes
 const invalidateNotificationsCache = () => {
   try {
+    const { store } = require('../store');
+    const { apiSlice } = require('../store/apiSlice');
     store.dispatch(apiSlice.util.invalidateTags(['Notifications', 'Dashboard']));
   } catch (e) {
     console.warn('Could not invalidate notifications cache:', e);
@@ -116,7 +116,6 @@ export const displayNotification = async (remoteMessage) => {
     data: remoteMessage.data,
     android: {
       channelId,
-      smallIcon: 'ic_launcher',
       color: '#4f46e5',
       pressAction: {
         id: 'default',

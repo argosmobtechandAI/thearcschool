@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, RefreshControl } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, RefreshControl, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/Feather';
 import { useSelector, useDispatch } from 'react-redux';
@@ -46,6 +46,28 @@ const DashboardScreen = ({ navigation }) => {
   const performanceData = performanceResponse?.data || [];
   const topPerformers = performanceData.slice(0, 5);
   const bottomPerformers = [...performanceData].reverse().slice(0, 5);
+
+  const [registerFcmToken] = require('../../store/apiSlice').useRegisterFcmTokenMutation();
+
+  useEffect(() => {
+    const initNotifications = async () => {
+      try {
+        const { requestUserPermission, getFCMToken } = require('../../utils/notificationHandler');
+        const hasPermission = await requestUserPermission();
+        if (hasPermission) {
+          const fcmToken = await getFCMToken();
+          if (fcmToken) {
+            registerFcmToken({ fcm_token: fcmToken, device_type: Platform.OS })
+              .unwrap()
+              .catch(err => console.log('Failed to register FCM token from dashboard:', err));
+          }
+        }
+      } catch (err) {
+        console.log('Failed to request notifications permission from dashboard:', err);
+      }
+    };
+    initNotifications();
+  }, [registerFcmToken]);
 
   const onRefresh = React.useCallback(() => {
     refetchExams();

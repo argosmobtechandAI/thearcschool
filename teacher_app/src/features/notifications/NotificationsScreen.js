@@ -5,11 +5,10 @@ import Icon from 'react-native-vector-icons/Feather';
 import CustomHeader from '../../components/CustomHeader';
 import { useGetNotificationsQuery, useMarkNotificationReadMutation } from '../../store/apiSlice';
 import { colors, shadows } from '../../theme/colors';
-import { format } from 'date-fns';
 
 const NotificationsScreen = ({ navigation }) => {
   const { data, isLoading, refetch, isFetching } = useGetNotificationsQuery(undefined, {
-    pollingInterval: 30000, // safety net: auto-refetch every 30s
+    pollingInterval: 30000,
     refetchOnMountOrArgChange: true,
   });
   const [markAsRead] = useMarkNotificationReadMutation();
@@ -82,42 +81,53 @@ const NotificationsScreen = ({ navigation }) => {
     return msg.split('|||')[0];
   };
 
+  const formatTime = (dateStr) => {
+    try {
+      const d = new Date(dateStr);
+      return d.toLocaleDateString() + ' ' + d.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+    } catch(e) {
+      return '';
+    }
+  };
+
   const renderItem = ({ item }) => (
     <TouchableOpacity 
       style={[styles.notificationCard, !item.is_read && styles.unreadCard]}
       onPress={() => handlePress(item)}
+      activeOpacity={0.8}
     >
-      <View style={styles.iconContainer}>
-        <Icon name="bell" size={24} color={!item.is_read ? colors.primary : colors.textMuted} />
+      <View style={[styles.iconContainer, { backgroundColor: !item.is_read ? colors.primary + '20' : colors.textMuted + '15' }]}>
+        <Icon name="bell" size={20} color={!item.is_read ? colors.primary : colors.textMuted} />
       </View>
       <View style={styles.contentContainer}>
         <Text style={[styles.title, !item.is_read && styles.unreadText]}>{item.title}</Text>
         <Text style={styles.body} numberOfLines={2}>{getCleanMessage(item.message || item.body)}</Text>
-        <Text style={styles.time}>{format(new Date(item.created_at), 'MMM dd, hh:mm a')}</Text>
+        <Text style={styles.time}>{formatTime(item.created_at)}</Text>
       </View>
       {!item.is_read && <View style={styles.unreadDot} />}
     </TouchableOpacity>
   );
 
   return (
-    <SafeAreaView style={styles.container} edges={['bottom']}>
+    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       <CustomHeader title="Notifications" showBack />
       
       {isLoading ? (
         <View style={styles.center}>
-          <Text>Loading...</Text>
+          <Icon name="loader" size={32} color={colors.textMuted} />
         </View>
       ) : (
         <FlatList
           data={notifications}
-          keyExtractor={item => item.id}
+          keyExtractor={item => item.id?.toString() || Math.random().toString()}
           renderItem={renderItem}
           contentContainerStyle={[styles.listContainer, notifications.length === 0 && { flex: 1 }]}
-          refreshControl={<RefreshControl refreshing={isFetching} onRefresh={refetch} />}
+          refreshControl={<RefreshControl refreshing={isFetching} onRefresh={refetch} colors={[colors.primary]} />}
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
               <Icon name="bell-off" size={64} color={colors.border} />
-              <Text style={styles.emptyText}>No notifications yet.</Text>
+              <Text style={styles.emptyTitle}>No Notifications</Text>
+              <Text style={styles.emptyText}>You're all caught up! 🎉</Text>
             </View>
           }
         />
@@ -128,23 +138,28 @@ const NotificationsScreen = ({ navigation }) => {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
-  listContainer: { padding: 16 },
+  listContainer: { padding: 16, paddingBottom: 40 },
   notificationCard: {
     flexDirection: 'row',
     backgroundColor: colors.surface,
     padding: 16,
-    borderRadius: 12,
+    borderRadius: 16,
     marginBottom: 12,
+    alignItems: 'center',
     ...shadows.card,
   },
   unreadCard: {
-    backgroundColor: colors.primaryLight + '10',
+    backgroundColor: colors.surface,
     borderColor: colors.primaryLight,
-    borderWidth: 1,
+    borderLeftWidth: 4,
   },
   iconContainer: {
     marginRight: 16,
     justifyContent: 'center',
+    alignItems: 'center',
+    width: 44,
+    height: 44,
+    borderRadius: 22,
   },
   contentContainer: {
     flex: 1,
@@ -157,24 +172,25 @@ const styles = StyleSheet.create({
   },
   unreadText: {
     fontWeight: '800',
-    color: colors.primary,
+    color: colors.text,
   },
   body: {
     fontSize: 14,
     color: colors.textMuted,
     marginBottom: 8,
+    lineHeight: 20,
   },
   time: {
     fontSize: 12,
     color: colors.textMuted,
+    fontWeight: '500',
   },
   unreadDot: {
     width: 10,
     height: 10,
     borderRadius: 5,
     backgroundColor: colors.primary,
-    alignSelf: 'center',
-    marginLeft: 8,
+    marginLeft: 12,
   },
   center: {
     flex: 1,
@@ -185,11 +201,16 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    opacity: 0.5,
+  },
+  emptyTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: colors.text,
+    marginTop: 16,
   },
   emptyText: {
-    marginTop: 16,
-    fontSize: 16,
+    marginTop: 8,
+    fontSize: 14,
     color: colors.textMuted,
   },
 });
