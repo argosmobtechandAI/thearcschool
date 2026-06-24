@@ -2,6 +2,17 @@ import notifee, { EventType, AndroidImportance } from '@notifee/react-native';
 import FileViewer from 'react-native-file-viewer';
 import messaging from '@react-native-firebase/messaging';
 import { navigate } from '../navigation/navigationRef';
+import { store } from '../store';
+import { apiSlice } from '../store/apiSlice';
+
+// Invalidate the RTK Query notifications cache so the in-app list auto-refreshes
+const invalidateNotificationsCache = () => {
+  try {
+    store.dispatch(apiSlice.util.invalidateTags(['Notifications', 'Dashboard']));
+  } catch (e) {
+    console.warn('Could not invalidate notifications cache:', e);
+  }
+};
 
 export const handleNotificationEvent = async ({ type, detail }) => {
   if (type === EventType.PRESS && detail.notification) {
@@ -52,12 +63,17 @@ export const handleNotificationEvent = async ({ type, detail }) => {
 };
 
 export const registerBackgroundHandler = () => {
+  // Request notification permission once at startup
+  notifee.requestPermission();
+
   notifee.onBackgroundEvent(handleNotificationEvent);
 
-  // Handle background FCM messages
+  // Handle background FCM messages — display the notification AND invalidate cache
   messaging().setBackgroundMessageHandler(async remoteMessage => {
-    console.log('Message handled in the background!', remoteMessage);
+    console.log('FCM background message received:', remoteMessage.messageId);
     await displayNotification(remoteMessage);
+    // Invalidate cache so next app open shows the new notification immediately
+    invalidateNotificationsCache();
   });
 };
 
@@ -85,35 +101,38 @@ export const getFCMToken = async () => {
 };
 
 export const displayNotification = async (remoteMessage) => {
-  await notifee.requestPermission();
-
   const channelId = await notifee.createChannel({
     id: 'default-sound',
     name: 'Default Sound Channel',
     importance: AndroidImportance.HIGH,
     sound: 'default',
+    vibration: true,
+    vibrationPattern: [300, 500],
   });
 
   await notifee.displayNotification({
-    title: remoteMessage.notification?.title || 'New Notification',
-    body: remoteMessage.notification?.body || '',
-    data: remoteMessage.data, // Important: keep the data payload for deep linking!
+    title: remoteMessage.notification?.title || remoteMessage.data?.title || 'New Notification',
+    body: remoteMessage.notification?.body || remoteMessage.data?.body || '',
+    data: remoteMessage.data,
     android: {
       channelId,
-      smallIcon: 'ic_launcher', // make sure this exists in res/drawable
+      smallIcon: 'ic_launcher',
       color: '#4f46e5',
       pressAction: {
         id: 'default',
       },
       sound: 'default',
       importance: AndroidImportance.HIGH,
+      vibrationPattern: [300, 500],
     },
   });
 };
 
 export const setupForegroundHandler = () => {
   return messaging().onMessage(async remoteMessage => {
-    console.log('A new FCM message arrived!', JSON.stringify(remoteMessage));
+    console.log('FCM foreground message received:', remoteMessage.messageId);
     await displayNotification(remoteMessage);
+    // Invalidate cache so the in-app Notifications list updates immediately
+    invalidateNotificationsCache();
   });
 };

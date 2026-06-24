@@ -64,6 +64,12 @@ const FeesScreen = ({ navigation }) => {
   
   const payments = data?.payments || [];
 
+  const formatCompactNumber = (number) => {
+    if (number < 1000) return number.toString();
+    if (number < 100000) return (number / 1000).toFixed(number % 1000 === 0 ? 0 : 1) + 'K';
+    return (number / 100000).toFixed(number % 100000 === 0 ? 0 : 1) + 'L';
+  };
+
   const generateChartData = (duesArray) => {
     if (!duesArray || duesArray.length === 0) return [];
     const monthMap = {};
@@ -94,9 +100,9 @@ const FeesScreen = ({ navigation }) => {
            topLabelComponent: () => {
              if (balance === 0) return null;
              return (
-               <View style={{ alignItems: 'center', marginBottom: 2 }}>
-                 <Text style={{ color: colors.success, fontSize: 11, fontWeight: 'bold' }}>
-                   ₹{balance.toLocaleString()}
+               <View style={{ width: 50, marginLeft: -19, alignItems: 'center', marginBottom: 2 }}>
+                 <Text style={{ color: colors.success, fontSize: 10, fontWeight: 'bold' }} numberOfLines={1} adjustsFontSizeToFit>
+                   ₹{formatCompactNumber(balance)}
                  </Text>
                </View>
              );

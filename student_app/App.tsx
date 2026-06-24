@@ -9,15 +9,34 @@ import RootNavigator from './src/navigation/RootNavigator';
 import SplashScreen from './src/features/splash/SplashScreen';
 import { colors } from './src/theme/colors';
 import notifee from '@notifee/react-native';
-import { handleNotificationEvent, setupForegroundHandler } from './src/utils/notificationHandler';
+import {
+  handleNotificationEvent,
+  setupForegroundHandler,
+  requestUserPermission,
+  getFCMToken,
+} from './src/utils/notificationHandler';
+import { Platform } from 'react-native';
 
 const App = () => {
   const [showSplash, setShowSplash] = useState(true);
 
   useEffect(() => {
+    // 1. Set up foreground notification handlers
     const unsubscribeNotifee = notifee.onForegroundEvent(handleNotificationEvent);
     const unsubscribeFCM = setupForegroundHandler();
-    
+
+    // 2. Request notification permissions at startup (needed for Android 13+)
+    const initNotifications = async () => {
+      try {
+        await requestUserPermission();
+        // Also ensure notifee has display permission
+        await notifee.requestPermission();
+      } catch (e) {
+        console.warn('Notification permission request failed:', e);
+      }
+    };
+    initNotifications();
+
     return () => {
       unsubscribeNotifee();
       if (unsubscribeFCM) unsubscribeFCM();

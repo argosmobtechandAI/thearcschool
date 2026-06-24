@@ -8,7 +8,10 @@ import { colors, shadows } from '../../theme/colors';
 import { format } from 'date-fns';
 
 const NotificationsScreen = ({ navigation }) => {
-  const { data, isLoading, refetch, isFetching } = useGetNotificationsQuery();
+  const { data, isLoading, refetch, isFetching } = useGetNotificationsQuery(undefined, {
+    pollingInterval: 30000, // safety net: auto-refetch every 30s
+    refetchOnMountOrArgChange: true,
+  });
   const [markAsRead] = useMarkNotificationReadMutation();
 
   const notifications = data?.data || [];
