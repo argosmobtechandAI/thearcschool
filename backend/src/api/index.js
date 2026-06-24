@@ -35,7 +35,9 @@ router.use("/course", courseRouter);
 router.use("/user", userRoutes);
 router.use("/communication", communicationRouter);
 router.use("/attendance", attendanceRouter);
+import liveChatRouter from "./shared/live_chat/routes.js";
 router.use("/upload", uploadRouter);
 router.use("/rooms", roomRouter);
+router.use("/live_chat", liveChatRouter);
 
 export default router;

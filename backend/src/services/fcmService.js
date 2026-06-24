@@ -61,8 +61,8 @@ export const FCMService = {
       const historyPayload = userIds.map(uid => ({
         user_id: uid,
         title,
-        body,
-        data
+        message: body,
+        type: data?.type || 'general',
       }));
       await supabase.from('notifications').insert(historyPayload);
 

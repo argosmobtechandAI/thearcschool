@@ -1,0 +1,59 @@
+export const getLiveChatsList = async (req, res) => {
+  const currentUserId = req.user?.id;
+  if (!currentUserId) return res.status(401).json({ success: false, message: "Unauthorized" });
+
+  try {
+    const { data: chats, error } = await supabase
+      .from("communication")
+      .select("firstPerson, secondPerson, message, created_at")
+      .eq("type", "live_chat")
+      .or(`firstPerson.eq.${currentUserId},secondPerson.cs.{${currentUserId}}`)
+      .order("created_at", { ascending: false });
+
+    if (error) throw error;
+
+    // We need to find unique users that the current user has chatted with.
+    const userMap = new Map();
+    const userIdsToFetch = new Set();
+
+    for (const chat of chats) {
+      const otherId = chat.firstPerson === currentUserId ? chat.secondPerson[0] : chat.firstPerson;
+      if (!otherId) continue;
+      
+      if (!userMap.has(otherId)) {
+        userMap.set(otherId, {
+          id: otherId,
+          lastMessage: chat.message,
+          time: chat.created_at,
+          unread: 0 // Placeholder
+        });
+        userIdsToFetch.add(otherId);
+      }
+    }
+
+    if (userIdsToFetch.size > 0) {
+      const { data: usersData, error: usersError } = await supabase
+        .from("user")
+        .select("id, name, avatar, role")
+        .in("id", Array.from(userIdsToFetch));
+
+      if (!usersError && usersData) {
+        for (const u of usersData) {
+          if (userMap.has(u.id)) {
+            const mapped = userMap.get(u.id);
+            mapped.name = u.name;
+            mapped.avatar = u.avatar;
+            mapped.role = u.role;
+          }
+        }
+      }
+    }
+
+    return res.status(200).json({
+      success: true,
+      chats: Array.from(userMap.values())
+    });
+  } catch (e) {
+    return res.status(500).json({ success: false, message: e.message });
+  }
+};

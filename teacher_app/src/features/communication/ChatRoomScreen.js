@@ -1,106 +1,132 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, FlatList, KeyboardAvoidingView, Platform } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { View, Text, StyleSheet, TextInput, TouchableOpacity, FlatList, KeyboardAvoidingView, Platform, ActivityIndicator } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/Feather';
 import { useSelector } from 'react-redux';
-import socket from '../../api/socket';
+import io from 'socket.io-client';
+import { SOCKET_URL } from '@env';
+import { useGetLiveChatHistoryQuery } from '../../store/apiSlice';
 import { colors } from '../../theme/colors';
 
 const ChatRoomScreen = ({ route, navigation }) => {
   const { chatId, chatName } = route.params;
   const { user } = useSelector((state) => state.auth);
+  const insets = useSafeAreaInsets();
   
   const [messages, setMessages] = useState([]);
   const [inputText, setInputText] = useState('');
   const flatListRef = useRef();
+  const socketRef = useRef(null);
+
+  // Fetch initial history
+  const { data: historyData, isLoading } = useGetLiveChatHistoryQuery(chatId, { refetchOnMountOrArgChange: true });
+  const historyChats = historyData?.chats || [];
 
   useEffect(() => {
-    // Join the specific room
-    // socket.emit('joinRoom', { roomId: chatId });
+    socketRef.current = io(SOCKET_URL);
 
-    // Remove mock initial messages
-    setMessages([]);
+    socketRef.current.on('connect', () => {
+      socketRef.current.emit('identify', user.id);
+      socketRef.current.emit('join_chat', { senderId: user.id, receiverId: chatId });
+    });
 
-    // Listen for new messages
-    // socket.on('receiveMessage', (message) => {
-    //   setMessages((prev) => [...prev, message]);
-    // });
+    socketRef.current.on('receive_message', (newChat) => {
+      setMessages((prev) => [...prev, newChat]);
+      setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
+    });
 
     return () => {
-      // socket.emit('leaveRoom', { roomId: chatId });
-      // socket.off('receiveMessage');
+      if (socketRef.current) {
+        socketRef.current.disconnect();
+      }
     };
-  }, [chatId, user]);
+  }, [user.id, chatId]);
+
+  // Combine history with live messages
+  const allMessages = [...historyChats];
+  const historyIds = new Set(historyChats.map(c => c.id));
+  const uniqueLive = messages.filter(m => !historyIds.has(m.id));
+  
+  const displayMessages = [...allMessages, ...uniqueLive].sort(
+    (a, b) => new Date(a.created_at) - new Date(b.created_at)
+  );
 
   const handleSend = () => {
     if (!inputText.trim()) return;
 
-    const newMessage = {
-      id: Date.now().toString(),
-      text: inputText,
-      senderId: user?.id || 'me',
-      roomId: chatId,
-      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    const payload = {
+      sender_id: user.id,
+      receiver_id: chatId,
+      message: inputText.trim(),
+      type: 'live_chat'
     };
 
-    // Emit to server
-    // socket.emit('sendMessage', newMessage);
-    
-    // Optimistic UI update
-    setMessages((prev) => [...prev, newMessage]);
+    socketRef.current.emit('send_message', payload);
     setInputText('');
+    setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
   };
 
   const renderMessage = ({ item }) => {
-    const isMe = item.senderId === (user?.id || 'me');
+    const isMe = item.sender_id === user.id;
 
     return (
       <View style={[styles.messageBubble, isMe ? styles.messageBubbleMe : styles.messageBubbleOther]}>
         <Text style={[styles.messageText, isMe ? styles.messageTextMe : styles.messageTextOther]}>
-          {item.text}
+          {item.message}
         </Text>
         <Text style={[styles.messageTime, isMe ? styles.messageTimeMe : styles.messageTimeOther]}>
-          {item.time}
+          {item.created_at ? new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Now'}
         </Text>
       </View>
     );
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <View style={styles.container}>
+      {/* Top Safe Area */}
+      <View style={{ height: insets.top, backgroundColor: colors.primary }} />
+
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-          <Icon name="arrow-left" size={24} color={colors.text} />
+        <TouchableOpacity style={styles.headerBtn} onPress={() => navigation.goBack()}>
+          <Icon name="arrow-left" size={22} color="#fff" />
         </TouchableOpacity>
         <View style={styles.headerInfo}>
-          <Text style={styles.chatName} numberOfLines={1}>{chatName}</Text>
+          <Text style={styles.headerTitle} numberOfLines={1}>{chatName}</Text>
           <Text style={styles.statusText}>Online</Text>
         </View>
-        <TouchableOpacity style={styles.infoButton}>
-          <Icon name="more-vertical" size={24} color={colors.text} />
-        </TouchableOpacity>
+        <View style={{ width: 34 }} />
       </View>
 
       {/* Messages */}
       <KeyboardAvoidingView 
         style={styles.keyboardAvoid} 
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'padding'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 90}
       >
-        <FlatList
-          ref={flatListRef}
-          data={messages}
-          keyExtractor={(item) => item.id}
-          renderItem={renderMessage}
-          contentContainerStyle={styles.messagesList}
-          onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
-        />
+        {isLoading ? (
+          <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+            <ActivityIndicator size="large" color={colors.primary} />
+          </View>
+        ) : (
+          <FlatList
+            ref={flatListRef}
+            data={displayMessages}
+            keyExtractor={(item, index) => item.id || `live-${index}`}
+            renderItem={renderMessage}
+            contentContainerStyle={styles.messagesList}
+            onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
+            ListEmptyComponent={
+              <View style={{ alignItems: 'center', marginTop: 100 }}>
+                <Icon name="message-square" size={48} color={colors.textMuted} />
+                <Text style={{ color: colors.textMuted, marginTop: 12 }}>No messages yet.</Text>
+              </View>
+            }
+          />
+        )}
 
         {/* Input Area */}
-        <View style={styles.inputContainer}>
-          <TouchableOpacity style={styles.attachButton}>
-            <Icon name="paperclip" size={20} color={colors.textMuted} />
-          </TouchableOpacity>
+        <View style={[styles.inputContainer, { paddingBottom: Platform.OS === 'ios' ? 24 : 12 }]}>
           <TextInput
             style={styles.input}
             placeholder="Type a message..."
@@ -118,26 +144,25 @@ const ChatRoomScreen = ({ route, navigation }) => {
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
-    </SafeAreaView>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   header: {
+    backgroundColor: colors.primary,
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+    paddingHorizontal: 20,
+    paddingVertical: 14,
   },
-  backButton: { marginRight: 16, padding: 8 },
+  headerBtn: { padding: 6, backgroundColor: 'rgba(255,255,255,0.15)', borderRadius: 10, marginRight: 16 },
   headerInfo: { flex: 1 },
-  chatName: { fontSize: 18, fontWeight: 'bold', color: colors.text },
-  statusText: { fontSize: 12, color: colors.success },
-  infoButton: { padding: 8 },
+  headerTitle: { fontSize: 18, fontWeight: '700', color: '#fff' },
+  statusText: { fontSize: 12, color: 'rgba(255,255,255,0.8)' },
   keyboardAvoid: { flex: 1 },
-  messagesList: { padding: 16 },
+  messagesList: { padding: 16, paddingBottom: 32 },
   messageBubble: {
     maxWidth: '80%',
     padding: 12,
@@ -170,7 +195,6 @@ const styles = StyleSheet.create({
     borderTopColor: colors.border,
     backgroundColor: colors.background,
   },
-  attachButton: { padding: 12, marginRight: 8 },
   input: {
     flex: 1,
     backgroundColor: colors.surface,

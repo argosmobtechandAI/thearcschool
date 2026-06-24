@@ -76,8 +76,18 @@ export const apiSlice = createApi({
       invalidatesTags: ['Exams'],
     }),
     getChats: builder.query({
-      query: () => '/teacher_app/communication/getChat/general',
+      query: () => '/live_chat/list',
       providesTags: ['Chats'],
+    }),
+    getLiveChatHistory: builder.query({
+      query: (userId) => `/live_chat/history/${userId}`,
+      providesTags: (result, error, id) => [{ type: 'Chats', id }],
+    }),
+    getStudents: builder.query({
+      query: () => '/live_chat/students',
+    }),
+    getPrincipal: builder.query({
+      query: () => '/live_chat/principal',
     }),
     getComplaints: builder.query({
       query: (studentId) => `/teacher_app/complaints${studentId ? `?studentId=${studentId}` : ''}`,
@@ -129,6 +139,7 @@ export const {
   useGetCoursesQuery,
   useGetEventsQuery,
   useGetAttendanceQuery,
+  useChangePasswordMutation,
   useSubmitBulkAttendanceMutation,
   useSubmitBulkGradesMutation,
   useGetChatsQuery,
@@ -140,4 +151,7 @@ export const {
   useGetNotificationsQuery,
   useMarkNotificationReadMutation,
   useGetClassPerformanceQuery,
+  useGetLiveChatHistoryQuery,
+  useGetStudentsQuery,
+  useGetPrincipalQuery,
 } = apiSlice;

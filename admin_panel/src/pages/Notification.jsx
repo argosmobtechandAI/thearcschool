@@ -80,6 +80,13 @@ export default function Notifications() {
 
   useEffect(() => {
     fetchHistory();
+    
+    // Auto-mark notifications as read when opening the page
+    import("../services/api").then(({ markNotificationsAsRead }) => {
+      markNotificationsAsRead().then(() => {
+        window.dispatchEvent(new Event('notificationsRead'));
+      }).catch(e => console.error("Failed to mark notifications as read:", e));
+    });
   }, []);
 
   const uniqueSections = useMemo(() => {
@@ -88,7 +95,8 @@ export default function Notifications() {
   }, [classes]);
 
   const filteredNotifications = useMemo(() => {
-    let filtered = notifications;
+    // Hide private live chat messages from the generic notifications history
+    let filtered = notifications.filter(n => n.type !== 'live_chat');
     
     if (roleFilter !== "all") {
       filtered = filtered.filter(n => n.user?.type?.toLowerCase() === roleFilter);

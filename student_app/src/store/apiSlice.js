@@ -18,7 +18,7 @@ export const apiSlice = createApi({
       return headers;
     },
   }),
-  tagTypes: ['Dashboard', 'Academics', 'Attendance', 'Notifications', 'Chats', 'Quote', 'Rewards', 'Timetable', 'CourseWork', 'Events', 'Fees'],
+  tagTypes: ['Dashboard', 'Academics', 'Attendance', 'Notifications', 'Chats', 'LiveChat', 'Quote', 'Rewards', 'Timetable', 'CourseWork', 'Events', 'Fees'],
   endpoints: (builder) => ({
     // Auth endpoints
     login: builder.mutation({
@@ -26,6 +26,14 @@ export const apiSlice = createApi({
         url: '/user/loginUser',
         method: 'POST',
         body: { data: credentials },
+      }),
+    }),
+    
+    changePassword: builder.mutation({
+      query: (data) => ({
+        url: '/student_app/auth/change-password',
+        method: 'POST',
+        body: data,
       }),
     }),
     
@@ -101,6 +109,22 @@ export const apiSlice = createApi({
       invalidatesTags: ['Chats'],
     }),
 
+    getLiveChatHistory: builder.query({
+      query: (teacherId) => `/live_chat/history/${teacherId}`,
+      providesTags: (result, error, id) => [{ type: 'LiveChat', id }],
+    }),
+
+    getTeachers: builder.query({
+      query: () => '/live_chat/teachers',
+    }),
+    getPrincipal: builder.query({
+      query: () => '/live_chat/principal',
+    }),
+    getLiveChatsList: builder.query({
+      query: () => '/live_chat/list',
+      providesTags: ['LiveChat'],
+    }),
+
     // Notifications
     registerFcmToken: builder.mutation({
       query: ({ fcm_token, device_type }) => ({
@@ -127,6 +151,7 @@ export const apiSlice = createApi({
 
 export const {
   useLoginMutation,
+  useChangePasswordMutation,
   useGetDashboardQuery,
   useGetAcademicsQuery,
   useGetAttendanceQuery,
@@ -141,5 +166,8 @@ export const {
   useRegisterFcmTokenMutation,
   useGetNotificationsQuery,
   useMarkNotificationReadMutation,
+  useGetLiveChatHistoryQuery,
+  useGetTeachersQuery,
+  useGetPrincipalQuery,
+  useGetLiveChatsListQuery,
 } = apiSlice;
-

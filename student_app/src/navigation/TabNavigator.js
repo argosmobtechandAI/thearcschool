@@ -35,6 +35,7 @@ const iconMap = {
   Home:    'grid',
   Class:   'calendar',
   Result:  'award',
+  Communication: 'message-circle',
   Profile: 'user',
 };
 
@@ -67,12 +68,12 @@ const TabNavigator = () => {
     >
       <Tab.Screen name="Home"    component={DashboardScreen} />
       <Tab.Screen name="Class"   component={TimetableScreen} />
+      <Tab.Screen name="Communication" component={CommunicationScreen} options={{ title: 'Connect' }} />
       <Tab.Screen name="Result"  component={ResultScreen} />
       <Tab.Screen name="Profile" component={ProfileScreen} />
       
       {/* Hidden Tabs (Screens that keep the bottom bar but have no icon in it) */}
       <Tab.Screen name="Rewards" component={RewardsScreen} options={{ tabBarItemStyle: { display: 'none' } }} />
-      <Tab.Screen name="Communication" component={CommunicationScreen} options={{ tabBarItemStyle: { display: 'none' } }} />
       <Tab.Screen name="Attendance" component={AttendanceScreen} options={{ tabBarItemStyle: { display: 'none' } }} />
       <Tab.Screen name="AcademicCalendar" component={AcademicCalendarScreen} options={{ tabBarItemStyle: { display: 'none' } }} />
       <Tab.Screen name="DateSheet" component={DateSheetScreen} options={{ tabBarItemStyle: { display: 'none' } }} />

@@ -307,10 +307,12 @@ const DashboardScreen = ({ navigation }) => {
           <GridItem icon="user" label="Profile" color={colors.pink} onPress={() => navigation.navigate('Profile')} />
           <GridItem icon="check-square" label="Attendance" color={colors.primary} onPress={() => navigation.navigate('Attend')} />
           <GridItem icon="edit-3" label="Grades" color={colors.warning} onPress={() => navigation.navigate('Work', { screen: 'ExamsList' })} />
-          <GridItem icon="calendar" label="Academic Planner" color={colors.primaryLight} onPress={() => navigation.navigate('AnnualPlanner')} />
+          <GridItem icon="calendar" label="Timetable" color={colors.purple} onPress={() => navigation.navigate('Timetable')} />
           <GridItem icon="clock" label="Date Sheet" color={colors.info || '#17a2b8'} onPress={() => navigation.navigate('DateSheetScreen')} />
           <GridItem icon="users" label="Students" color={colors.success} onPress={() => navigation.navigate('StudentsList')} />
           <GridItem icon="award" label="Results" color={colors.danger} onPress={() => navigation.navigate('Work', { screen: 'ResultsHome' })} />
+          <GridItem icon="calendar" label="Academic Planner" color={colors.primaryLight} onPress={() => navigation.navigate('AnnualPlanner')} />
+          <View style={{ width: '31%' }} />
         </View>
 
         {activeClassId && topPerformers.length > 0 && (
@@ -338,6 +340,7 @@ const DashboardScreen = ({ navigation }) => {
           <GridItem icon="book" label="Study Material" color={colors.success} onPress={() => navigation.navigate('ComingSoon', { moduleName: 'Study Material' })} />
           <GridItem icon="dollar-sign" label="Payroll" color={colors.info || '#17a2b8'} onPress={() => navigation.navigate('PayrollScreen')} />
           <GridItem icon="calendar" label="Leaves" color={colors.warning} onPress={() => navigation.navigate('LeavesScreen')} />
+          <View style={{ width: '31%' }} />
         </View>
 
       </ScrollView>

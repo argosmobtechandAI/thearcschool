@@ -28,6 +28,7 @@ import LeavesScreen from '../features/dashboard/LeavesScreen';
 import ProfileScreen from '../features/profile/ProfileScreen';
 import ChangePasswordScreen from '../features/profile/ChangePasswordScreen';
 import AnnualPlannerScreen from '../features/planning/AnnualPlannerScreen';
+import TimetableScreen from '../features/timetable/TimeTableScreen';
 
 // Attendance
 import AttendanceHomeScreen from '../features/attendance/AttendanceHomeScreen';
@@ -54,6 +55,7 @@ const DashboardStack = () => (
   <Stack.Navigator screenOptions={{ headerShown: false }}>
     <Stack.Screen name="DashboardHome" component={DashboardScreen} />
     <Stack.Screen name="AnnualPlanner" component={AnnualPlannerScreen} />
+    <Stack.Screen name="Timetable" component={TimetableScreen} />
     <Stack.Screen name="ComingSoon" component={ComingSoonScreen} />
     <Stack.Screen name="PayrollScreen" component={PayrollScreen} />
     <Stack.Screen name="LeavesScreen" component={LeavesScreen} />
@@ -118,7 +120,7 @@ const MainTabs = () => {
         let activeColor = colors.primary;
         if (route.name === 'Home') activeColor = colors.primary;
         else if (route.name === 'Attend') activeColor = colors.success;
-        else if (route.name === 'Complaint') activeColor = colors.warning;
+        else if (route.name === 'Connect') activeColor = colors.primary;
         else if (route.name === 'Work') activeColor = colors.secondary;
         else if (route.name === 'Profile') activeColor = colors.purple;
 
@@ -133,8 +135,8 @@ const MainTabs = () => {
             } else if (route.name === 'Attend') {
               iconName = 'check-square';
               iconColor = focused ? activeColor : colors.textMuted;
-            } else if (route.name === 'Complaint') {
-              iconName = 'alert-triangle';
+            } else if (route.name === 'Connect') {
+              iconName = 'message-circle';
               iconColor = focused ? activeColor : colors.textMuted;
             } else if (route.name === 'Work') {
               iconName = 'book-open';
@@ -171,7 +173,7 @@ const MainTabs = () => {
     >
       <Tab.Screen name="Home" component={DashboardStack} />
       <Tab.Screen name="Attend" component={AttendanceStack} />
-      <Tab.Screen name="Complaint" component={CommunicationStack} />
+      <Tab.Screen name="Connect" component={CommunicationStack} />
       <Tab.Screen name="Work" component={GradingStack} />
       <Tab.Screen name="Profile" component={ProfileScreen} />
     </Tab.Navigator>

@@ -1,153 +1,289 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import React, { useState } from 'react';
+import {
+  View, Text, StyleSheet, FlatList, TouchableOpacity,
+  ActivityIndicator, RefreshControl, TextInput, ScrollView
+} from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/Feather';
-import api from '../../api';
-import socket from '../../api/socket';
-import { useSelector } from 'react-redux';
-import { useGetChatsQuery } from '../../store/apiSlice';
-import { colors } from '../../theme/colors';
+import { colors, shadows } from '../../theme/colors';
+import { useGetStudentsQuery, useGetPrincipalQuery, useGetChatsQuery } from '../../store/apiSlice';
+
+const formatTime = (dateString) => {
+  if (!dateString) return '';
+  const date = new Date(dateString);
+  const now = new Date();
+  if (date.toDateString() === now.toDateString()) {
+    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  }
+  return date.toLocaleDateString([], { month: 'short', day: 'numeric' });
+};
 
 const ChatListScreen = ({ navigation }) => {
-  const { user } = useSelector((state) => state.auth);
-  
-  const { data: chatData, isLoading: loading } = useGetChatsQuery(undefined, { 
-    skip: !user 
-  });
-  const chats = chatData?.chats || [];
+  const insets = useSafeAreaInsets();
+  const [activeTab, setActiveTab] = useState('history');
+  const [searchQuery, setSearchQuery] = useState('');
 
-  useEffect(() => {
-    // Socket connection disabled for now
-    // if (!socket.connected && user) {
-    //   socket.auth = { userId: user.id }; 
-    //   socket.connect();
-    // }
+  const { data: studentsData, isLoading: studentsLoading, refetch: refetchStudents, isFetching: studentsFetching } = useGetStudentsQuery(undefined, { pollingInterval: 60000 });
+  const { data: principalData, isLoading: principalLoading, refetch: refetchPrincipal, isFetching: principalFetching } = useGetPrincipalQuery();
+  const { data: historyData, isLoading: historyLoading, refetch: refetchHistory, isFetching: historyFetching } = useGetChatsQuery(undefined, { pollingInterval: 10000 });
 
-    return () => {
-    };
-  }, [user]);
+  const students = studentsData?.students || [];
+  const principal = principalData?.principal;
+  const historyList = historyData?.chats || [];
 
-  const handleOpenChat = (chat) => {
-    navigation.navigate('ChatRoomScreen', { chatId: chat.id, chatName: chat.name });
+  const filteredStudents = students.filter(t => 
+    t.name.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  const handleOpenChat = (user) => {
+    navigation.navigate('ChatRoomScreen', { 
+      chatId: user.id, 
+      chatName: user.name, 
+      chatAvatar: user.avatar 
+    });
   };
 
-  const renderIcon = (role) => {
-    switch(role) {
-      case 'admin': return <Icon name="shield" size={20} color={colors.primary} />;
-      case 'parent': return <Icon name="user" size={20} color={colors.warning} />;
-      case 'group': return <Icon name="users" size={20} color={colors.success} />;
-      default: return <Icon name="message-circle" size={20} color={colors.textMuted} />;
-    }
-  };
+  const renderUserCard = ({ item }) => (
+    <TouchableOpacity style={styles.userCard} onPress={() => handleOpenChat(item)}>
+      <View style={styles.avatar}>
+        <Text style={styles.avatarText}>{item.name ? item.name.substring(0, 1).toUpperCase() : 'U'}</Text>
+      </View>
+      <View style={styles.userInfo}>
+        <Text style={styles.userName}>{item.name}</Text>
+        <Text style={styles.userEmail}>{item.email || item.type}</Text>
+      </View>
+      <Icon name="message-circle" size={20} color={colors.primary} />
+    </TouchableOpacity>
+  );
+
+  const renderHistoryCard = ({ item }) => (
+    <TouchableOpacity style={styles.userCard} onPress={() => handleOpenChat(item)}>
+      <View style={styles.avatar}>
+        <Text style={styles.avatarText}>{item.name ? item.name.substring(0, 1).toUpperCase() : 'U'}</Text>
+      </View>
+      <View style={styles.userInfo}>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+          <Text style={styles.userName}>{item.name || 'Unknown'}</Text>
+          <Text style={{ fontSize: 12, color: colors.textMuted }}>{formatTime(item.time)}</Text>
+        </View>
+        <Text style={{ fontSize: 14, color: colors.textMuted }} numberOfLines={1}>{item.lastMessage}</Text>
+      </View>
+    </TouchableOpacity>
+  );
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <View style={styles.container}>
+      {/* Top Safe Area */}
+      <View style={{ height: insets.top, backgroundColor: colors.primary }} />
+
+      {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.title}>Messages</Text>
-        <Text style={styles.subtitle}>Connect with Parents & Admin</Text>
+        <View style={styles.headerBtnPlaceholder} />
+        <Text style={styles.headerTitle}>Connect</Text>
+        <TouchableOpacity style={styles.headerBtn} onPress={() => {
+          if (activeTab === 'history') refetchHistory();
+          else if (activeTab === 'students') refetchStudents();
+          else refetchPrincipal();
+        }}>
+          <Icon name="refresh-cw" size={20} color="#fff" />
+        </TouchableOpacity>
       </View>
 
-      <ScrollView contentContainerStyle={styles.scrollContent}>
-        {loading ? (
-          <ActivityIndicator color={colors.purple} style={{ marginTop: 20 }} />
-        ) : chats.length === 0 ? (
-          <View style={styles.emptyState}>
-            <Icon name="message-square" size={32} color={colors.textMuted} />
-            <Text style={styles.emptyText}>No messages yet.</Text>
-          </View>
+      {/* Segmented Control / Tabs */}
+      <View style={styles.tabContainer}>
+        <TouchableOpacity 
+          style={[styles.tabBtn, activeTab === 'history' && styles.tabBtnActive]}
+          onPress={() => setActiveTab('history')}
+        >
+          <Text style={[styles.tabText, activeTab === 'history' && styles.tabTextActive]}>History</Text>
+        </TouchableOpacity>
+        <TouchableOpacity 
+          style={[styles.tabBtn, activeTab === 'students' && styles.tabBtnActive]}
+          onPress={() => setActiveTab('students')}
+        >
+          <Text style={[styles.tabText, activeTab === 'students' && styles.tabTextActive]}>Students</Text>
+        </TouchableOpacity>
+        <TouchableOpacity 
+          style={[styles.tabBtn, activeTab === 'principal' && styles.tabBtnActive]}
+          onPress={() => {
+            if (principal) {
+              handleOpenChat(principal);
+            } else {
+              setActiveTab('principal');
+            }
+          }}
+        >
+          <Text style={[styles.tabText, activeTab === 'principal' && styles.tabTextActive]}>Principal</Text>
+        </TouchableOpacity>
+      </View>
+
+      <View style={styles.content}>
+        {activeTab === 'history' ? (
+          historyLoading ? (
+            <View style={styles.center}>
+              <ActivityIndicator size="large" color={colors.primary} />
+            </View>
+          ) : (
+            <FlatList
+              data={historyList}
+              keyExtractor={item => item.id}
+              renderItem={renderHistoryCard}
+              contentContainerStyle={[styles.listContent, { paddingBottom: Math.max(insets.bottom, 16) }]}
+              refreshControl={<RefreshControl refreshing={historyFetching} onRefresh={refetchHistory} colors={[colors.primary]} />}
+              ListEmptyComponent={
+                <View style={styles.emptyState}>
+                  <Icon name="message-square" size={48} color={colors.textMuted} />
+                  <Text style={styles.emptyTitle}>No Chats Yet</Text>
+                  <Text style={styles.emptyText}>Find a student or the principal in the directories to start a chat.</Text>
+                </View>
+              }
+            />
+          )
+        ) : activeTab === 'students' ? (
+          <>
+            {/* Search Bar */}
+            <View style={styles.searchContainer}>
+              <Icon name="search" size={20} color={colors.textMuted} style={styles.searchIcon} />
+              <TextInput
+                style={styles.searchInput}
+                placeholder="Search students..."
+                placeholderTextColor={colors.textMuted}
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+              />
+              {searchQuery.length > 0 && (
+                <TouchableOpacity onPress={() => setSearchQuery('')}>
+                  <Icon name="x" size={18} color={colors.textMuted} />
+                </TouchableOpacity>
+              )}
+            </View>
+
+            {/* Students List */}
+            {studentsLoading ? (
+              <View style={styles.center}>
+                <ActivityIndicator size="large" color={colors.primary} />
+              </View>
+            ) : (
+              <FlatList
+                data={filteredStudents}
+                keyExtractor={item => item.id}
+                renderItem={renderUserCard}
+                contentContainerStyle={[styles.listContent, { paddingBottom: Math.max(insets.bottom, 16) }]}
+                refreshControl={<RefreshControl refreshing={studentsFetching} onRefresh={refetchStudents} colors={[colors.primary]} />}
+                ListEmptyComponent={
+                  <View style={styles.emptyState}>
+                    <Icon name="users" size={48} color={colors.textMuted} />
+                    <Text style={styles.emptyTitle}>No Students Found</Text>
+                    <Text style={styles.emptyText}>
+                      {searchQuery ? "No students match your search." : "You currently have no students available to chat."}
+                    </Text>
+                  </View>
+                }
+              />
+            )}
+          </>
         ) : (
-          chats.map((chat) => (
-            <TouchableOpacity key={chat.id} style={styles.chatCard} onPress={() => handleOpenChat(chat)}>
-              <View style={styles.avatar}>
-                {renderIcon(chat.role)}
+          /* Principal Tab */
+          <View style={{ flex: 1 }}>
+            {principalLoading ? (
+              <View style={styles.center}>
+                <ActivityIndicator size="large" color={colors.primary} />
               </View>
-              <View style={styles.chatInfo}>
-                <View style={styles.chatHeader}>
-                  <Text style={styles.chatName} numberOfLines={1}>{chat.name}</Text>
-                  <Text style={styles.chatTime}>{chat.time}</Text>
-                </View>
-                <View style={styles.chatFooter}>
-                  <Text style={[styles.lastMessage, chat.unread > 0 && styles.lastMessageUnread]} numberOfLines={1}>
-                    {chat.lastMessage}
-                  </Text>
-                  {chat.unread > 0 && (
-                    <View style={styles.unreadBadge}>
-                      <Text style={styles.unreadText}>{chat.unread}</Text>
-                    </View>
-                  )}
-                </View>
+            ) : principal ? (
+              <ScrollView contentContainerStyle={[styles.listContent, { paddingBottom: Math.max(insets.bottom, 16) }]} refreshControl={<RefreshControl refreshing={principalFetching} onRefresh={refetchPrincipal} colors={[colors.primary]} />}>
+                {renderUserCard({ item: principal })}
+              </ScrollView>
+            ) : (
+              <View style={styles.emptyState}>
+                <Icon name="user" size={48} color={colors.textMuted} />
+                <Text style={styles.emptyTitle}>No Principal Found</Text>
+                <Text style={styles.emptyText}>The principal's profile is not available at this moment.</Text>
               </View>
-            </TouchableOpacity>
-          ))
+            )}
+          </View>
         )}
-      </ScrollView>
-      
-      <TouchableOpacity style={styles.fab}>
-        <Icon name="edit-2" size={24} color={colors.background} />
-      </TouchableOpacity>
-    </SafeAreaView>
+      </View>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
-  header: { padding: 24, paddingBottom: 16 },
-  title: { fontSize: 28, fontWeight: 'bold', color: colors.text, marginBottom: 4 },
-  subtitle: { fontSize: 14, color: colors.textMuted },
-  scrollContent: { paddingHorizontal: 24, paddingBottom: 80 },
-  emptyState: { alignItems: 'center', padding: 32 },
-  emptyText: { color: colors.textMuted, marginTop: 12 },
-  chatCard: {
+  content: { flex: 1, backgroundColor: colors.background },
+  center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  header: {
+    backgroundColor: colors.primary,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingHorizontal: 20, paddingVertical: 14,
+  },
+  headerTitle: { color: '#fff', fontSize: 18, fontWeight: '700' },
+  headerBtn: { padding: 6, backgroundColor: 'rgba(255,255,255,0.15)', borderRadius: 10 },
+  headerBtnPlaceholder: { width: 32, height: 32 },
+  
+  tabContainer: {
+    flexDirection: 'row',
+    backgroundColor: colors.primary,
+    paddingHorizontal: 16,
+    paddingBottom: 12,
+  },
+  tabBtn: {
+    flex: 1,
+    paddingVertical: 10,
+    alignItems: 'center',
+    borderRadius: 8,
+  },
+  tabBtnActive: {
+    backgroundColor: 'rgba(255,255,255,0.2)',
+  },
+  tabText: {
+    color: 'rgba(255,255,255,0.7)',
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  tabTextActive: {
+    color: '#fff',
+    fontWeight: '700',
+  },
+
+  searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-  },
-  avatar: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
     backgroundColor: colors.surface,
-    justifyContent: 'center',
-    alignItems: 'center',
+    marginHorizontal: 16,
+    marginTop: 16,
+    borderRadius: 12,
+    paddingHorizontal: 12,
     borderWidth: 1,
     borderColor: colors.border,
+    height: 44,
+  },
+  searchIcon: { marginRight: 8 },
+  searchInput: {
+    flex: 1,
+    fontSize: 15,
+    color: colors.text,
+  },
+
+  listContent: { padding: 16 },
+  userCard: {
+    flexDirection: 'row', alignItems: 'center',
+    backgroundColor: colors.surface,
+    padding: 16, borderRadius: 12, marginBottom: 12,
+    ...shadows.card,
+  },
+  avatar: {
+    width: 48, height: 48, borderRadius: 24,
+    backgroundColor: colors.primary + '20',
+    justifyContent: 'center', alignItems: 'center',
     marginRight: 16,
   },
-  chatInfo: { flex: 1 },
-  chatHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 },
-  chatName: { fontSize: 16, fontWeight: 'bold', color: colors.text, flex: 1, marginRight: 8 },
-  chatTime: { fontSize: 12, color: colors.textMuted },
-  chatFooter: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  lastMessage: { fontSize: 14, color: colors.textMuted, flex: 1, marginRight: 8 },
-  lastMessageUnread: { color: colors.text, fontWeight: '600' },
-  unreadBadge: {
-    backgroundColor: colors.primary,
-    borderRadius: 12,
-    minWidth: 24,
-    height: 24,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 6,
-  },
-  unreadText: { color: colors.background, fontSize: 12, fontWeight: 'bold' },
-  fab: {
-    position: 'absolute',
-    bottom: 24,
-    right: 24,
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: colors.purple,
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: colors.purple,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 6,
-  },
+  avatarText: { color: colors.primary, fontSize: 18, fontWeight: '700' },
+  userInfo: { flex: 1 },
+  userName: { fontSize: 16, fontWeight: '600', color: colors.text, marginBottom: 4 },
+  userEmail: { fontSize: 14, color: colors.textMuted },
+  emptyState: { alignItems: 'center', marginTop: 100, gap: 12 },
+  emptyTitle: { fontSize: 18, fontWeight: '700', color: colors.text },
+  emptyText: { fontSize: 14, color: colors.textMuted, textAlign: 'center', paddingHorizontal: 40 },
 });
 
 export default ChatListScreen;

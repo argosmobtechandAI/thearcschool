@@ -51,7 +51,7 @@ const NotificationsScreen = ({ navigation }) => {
       }
     }
 
-    if (routeScreen) {
+    if (routeScreen || item.type === 'live_chat') {
       try {
         const parsedParams = routeParams 
           ? (typeof routeParams === 'string' ? JSON.parse(routeParams) : routeParams)
@@ -61,7 +61,14 @@ const NotificationsScreen = ({ navigation }) => {
         let targetStack = null;
         let actualScreen = routeScreen;
 
-        if (routeScreen === 'AttendanceHome') {
+        if (item.type === 'live_chat' || routeScreen === 'ChatRoomScreen' || routeScreen === 'LiveChatScreen') {
+          targetStack = 'Connect';
+          if (parsedParams?.chatId || parsedParams?.teacherId) {
+            actualScreen = 'ChatRoomScreen'; // Navigate directly to the specific chat room
+          } else {
+            actualScreen = 'ChatList'; // Fallback to list for older notifications
+          }
+        } else if (routeScreen === 'AttendanceHome') {
           targetStack = 'Attend';
         } else if (routeScreen === 'ExamsList') {
           targetStack = 'Work';
@@ -98,23 +105,54 @@ const NotificationsScreen = ({ navigation }) => {
     }
   };
 
-  const renderItem = ({ item }) => (
-    <TouchableOpacity 
-      style={[styles.notificationCard, !item.is_read && styles.unreadCard]}
-      onPress={() => handlePress(item)}
-      activeOpacity={0.8}
-    >
-      <View style={[styles.iconContainer, { backgroundColor: !item.is_read ? colors.primary + '20' : colors.textMuted + '15' }]}>
-        <Icon name="bell" size={20} color={!item.is_read ? colors.primary : colors.textMuted} />
-      </View>
-      <View style={styles.contentContainer}>
-        <Text style={[styles.title, !item.is_read && styles.unreadText]}>{item.title}</Text>
-        <Text style={styles.body} numberOfLines={2}>{getCleanMessage(item.message || item.body)}</Text>
-        <Text style={styles.time}>{formatTime(item.created_at)}</Text>
-      </View>
-      {!item.is_read && <View style={styles.unreadDot} />}
-    </TouchableOpacity>
-  );
+  const getCategory = (item) => {
+    const type = item.type || '';
+    const title = (item.title || '').toLowerCase();
+    
+    if (type === 'live_chat' || title.includes('message') || title.includes('chat')) {
+      return { label: 'Messages', color: colors.primary, icon: 'message-circle' };
+    }
+    if (type === 'system_monitor' || title.includes('system') || title.includes('alert')) {
+      return { label: 'Alerts', color: colors.danger, icon: 'alert-triangle' };
+    }
+    if (title.includes('exam') || title.includes('result') || title.includes('grade') || title.includes('academic') || title.includes('date sheet')) {
+      return { label: 'Academics', color: colors.warning || '#ffc107', icon: 'book-open' };
+    }
+    if (title.includes('attend') || title.includes('leave')) {
+      return { label: 'Attendance', color: colors.success, icon: 'calendar' };
+    }
+    if (title.includes('payroll') || title.includes('salary')) {
+      return { label: 'Payroll', color: colors.secondary || '#6c757d', icon: 'dollar-sign' };
+    }
+    return { label: 'General', color: '#17a2b8', icon: 'bell' };
+  };
+
+  const renderItem = ({ item }) => {
+    const category = getCategory(item);
+    
+    return (
+      <TouchableOpacity 
+        style={[styles.notificationCard, !item.is_read && styles.unreadCard]}
+        onPress={() => handlePress(item)}
+        activeOpacity={0.8}
+      >
+        <View style={[styles.iconContainer, { backgroundColor: category.color + '15' }]}>
+          <Icon name={category.icon} size={20} color={category.color} />
+        </View>
+        <View style={styles.contentContainer}>
+          <View style={styles.headerRow}>
+            <Text style={[styles.title, !item.is_read && styles.unreadText]} numberOfLines={1}>{item.title}</Text>
+            <View style={[styles.categoryBadge, { backgroundColor: category.color + '15' }]}>
+              <Text style={[styles.categoryText, { color: category.color }]}>{category.label}</Text>
+            </View>
+          </View>
+          <Text style={styles.body} numberOfLines={2}>{getCleanMessage(item.message || item.body)}</Text>
+          <Text style={styles.time}>{formatTime(item.created_at)}</Text>
+        </View>
+        {!item.is_read && <View style={styles.unreadDot} />}
+      </TouchableOpacity>
+    );
+  };
 
   return (
     <SafeAreaView style={styles.container} edges={['bottom']}>
@@ -220,6 +258,23 @@ const styles = StyleSheet.create({
     marginTop: 8,
     fontSize: 14,
     color: colors.textMuted,
+  },
+  headerRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  categoryBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    marginLeft: 8,
+  },
+  categoryText: {
+    fontSize: 10,
+    fontWeight: '700',
+    textTransform: 'uppercase',
   },
 });
 

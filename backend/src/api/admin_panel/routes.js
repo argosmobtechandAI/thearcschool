@@ -80,4 +80,8 @@ router.delete("/grading-scales/:id", deleteGradingScale);
 // --- Notifications ---
 router.use("/notifications", notificationsRouter);
 
+// --- Communication (Admin Monitoring) ---
+import adminCommunicationRouter from "./communication/routes.js";
+router.use("/communication", adminCommunicationRouter);
+
 export default router;

@@ -112,6 +112,14 @@ const ProfileScreen = ({ navigation }) => {
               <Text style={styles.actionLabel}>Notifications</Text>
               <Icon name="chevron-right" size={16} color={colors.textMuted} />
             </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.actionRow}
+              onPress={() => navigation.navigate('ChangePassword')}
+            >
+              <Icon name="lock" size={18} color={colors.textMuted} />
+              <Text style={styles.actionLabel}>Change Password</Text>
+              <Icon name="chevron-right" size={16} color={colors.textMuted} />
+            </TouchableOpacity>
           </View>
 
           {/* Logout */}

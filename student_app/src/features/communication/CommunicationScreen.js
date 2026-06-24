@@ -1,155 +1,220 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState } from 'react';
 import {
-  View, Text, StyleSheet, FlatList, TextInput, TouchableOpacity,
-  KeyboardAvoidingView, Platform, ActivityIndicator, RefreshControl
+  View, Text, StyleSheet, FlatList, TouchableOpacity,
+  ActivityIndicator, RefreshControl, TextInput, ScrollView
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/Feather';
 import { colors, shadows } from '../../theme/colors';
-import { useGetChatsQuery, useCreateChatMutation } from '../../store/apiSlice';
-import { useSelector } from 'react-redux';
+import { useGetTeachersQuery, useGetPrincipalQuery, useGetLiveChatsListQuery } from '../../store/apiSlice';
 import { useDrawer } from '../../navigation/DrawerContext';
+
+const formatTime = (dateString) => {
+  if (!dateString) return '';
+  const date = new Date(dateString);
+  const now = new Date();
+  if (date.toDateString() === now.toDateString()) {
+    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  }
+  return date.toLocaleDateString([], { month: 'short', day: 'numeric' });
+};
 
 const CommunicationScreen = ({ navigation }) => {
   const { openDrawer } = useDrawer();
-  const [message, setMessage] = useState('');
-  const [refreshing, setRefreshing] = useState(false);
-  const flatListRef = useRef();
-  
-  const user = useSelector(state => state.auth.user);
-  
-  // 'teacher' is the type, could also be 'school'
-  const { data, isLoading, refetch } = useGetChatsQuery('teacher', { pollingInterval: 5000 });
-  const [createChat, { isLoading: isSending }] = useCreateChatMutation();
+  const insets = useSafeAreaInsets();
+  const [activeTab, setActiveTab] = useState('history');
+  const [searchQuery, setSearchQuery] = useState('');
 
-  const chats = data?.chats || [];
+  const { data: teachersData, isLoading: teachersLoading, refetch: refetchTeachers, isFetching: teachersFetching } = useGetTeachersQuery(undefined, { pollingInterval: 60000 });
+  const { data: principalData, isLoading: principalLoading, refetch: refetchPrincipal, isFetching: principalFetching } = useGetPrincipalQuery();
+  const { data: historyData, isLoading: historyLoading, refetch: refetchHistory, isFetching: historyFetching } = useGetLiveChatsListQuery(undefined, { pollingInterval: 10000 });
 
-  // Sort chats by created_at chronologically
-  const sortedChats = [...chats].sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+  const teachers = teachersData?.teachers || [];
+  const principal = principalData?.principal;
+  const historyList = historyData?.chats || [];
 
-  const onRefresh = useCallback(async () => {
-    setRefreshing(true);
-    await refetch();
-    setRefreshing(false);
-  }, [refetch]);
+  const filteredTeachers = teachers.filter(t => 
+    t.name.toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
-  const handleSend = async () => {
-    if (!message.trim()) return;
-    
-    try {
-      await createChat({
-        type: 'teacher',
-        firstPerson: user?.id,
-        secondPerson: ['admin'], // or specific teacher ID
-        message: message.trim(),
-        senderName: user?.name || 'Student',
-      }).unwrap();
-      
-      setMessage('');
-      setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
-      refetch();
-    } catch (err) {
-      console.error('Failed to send message:', err);
-    }
+  const handleOpenChat = (user) => {
+    navigation.navigate('LiveChatScreen', { 
+      teacherId: user.id, 
+      teacherName: user.name, 
+      teacherAvatar: user.avatar 
+    });
   };
 
-  const renderMessage = ({ item }) => {
-    // Determine if the message was sent by the current student
-    const isMe = item.firstPerson === user?.id;
-
-    return (
-      <View style={[styles.msgContainer, isMe ? styles.msgMe : styles.msgThem]}>
-        {!isMe && (
-          <View style={styles.avatar}>
-            <Text style={styles.avatarText}>{item.senderName ? item.senderName.substring(0, 1) : 'T'}</Text>
-          </View>
-        )}
-        <View style={[styles.bubble, isMe ? styles.bubbleMe : styles.bubbleThem]}>
-          {!isMe && <Text style={styles.senderName}>{item.senderName || 'Teacher'}</Text>}
-          <Text style={[styles.msgText, isMe ? styles.msgTextMe : styles.msgTextThem]}>
-            {item.message}
-          </Text>
-          <Text style={[styles.timestamp, isMe ? styles.timestampMe : styles.timestampThem]}>
-            {new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-          </Text>
-        </View>
+  const renderUserCard = ({ item }) => (
+    <TouchableOpacity style={styles.userCard} onPress={() => handleOpenChat(item)}>
+      <View style={styles.avatar}>
+        <Text style={styles.avatarText}>{item.name ? item.name.substring(0, 1) : 'U'}</Text>
       </View>
-    );
-  };
+      <View style={styles.userInfo}>
+        <Text style={styles.userName}>{item.name}</Text>
+        <Text style={styles.userEmail}>{item.email || item.type}</Text>
+      </View>
+      <Icon name="message-circle" size={20} color={colors.primary} />
+    </TouchableOpacity>
+  );
+
+  const renderHistoryCard = ({ item }) => (
+    <TouchableOpacity style={styles.userCard} onPress={() => handleOpenChat(item)}>
+      <View style={styles.avatar}>
+        <Text style={styles.avatarText}>{item.name ? item.name.substring(0, 1).toUpperCase() : 'U'}</Text>
+      </View>
+      <View style={styles.userInfo}>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+          <Text style={styles.userName}>{item.name || 'Unknown'}</Text>
+          <Text style={{ fontSize: 12, color: colors.textMuted }}>{formatTime(item.time)}</Text>
+        </View>
+        <Text style={{ fontSize: 14, color: colors.textMuted }} numberOfLines={1}>{item.lastMessage}</Text>
+      </View>
+    </TouchableOpacity>
+  );
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={['top']}>
+    <View style={styles.container}>
+      {/* Top Safe Area */}
+      <View style={{ height: insets.top, backgroundColor: colors.primary }} />
+
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={openDrawer} style={styles.headerBtn}>
           <Icon name="menu" size={22} color="#fff" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Teacher Chat</Text>
-        <TouchableOpacity style={styles.headerBtn} onPress={refetch}>
+        <Text style={styles.headerTitle}>Connect</Text>
+        <TouchableOpacity style={styles.headerBtn} onPress={() => {
+          if (activeTab === 'history') refetchHistory();
+          else if (activeTab === 'teachers') refetchTeachers();
+          else refetchPrincipal();
+        }}>
           <Icon name="refresh-cw" size={20} color="#fff" />
         </TouchableOpacity>
       </View>
 
-      <KeyboardAvoidingView 
-        style={styles.container} 
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      >
-        {isLoading ? (
-          <View style={styles.center}>
-            <ActivityIndicator size="large" color={colors.primary} />
-          </View>
-        ) : (
-          <FlatList
-            ref={flatListRef}
-            data={sortedChats}
-            keyExtractor={item => item.id}
-            renderItem={renderMessage}
-            contentContainerStyle={styles.listContent}
-            showsVerticalScrollIndicator={false}
-            onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
-            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[colors.primary]} />}
-            ListEmptyComponent={
-              <View style={styles.emptyState}>
-                <Icon name="message-circle" size={48} color={colors.textMuted} />
-                <Text style={styles.emptyTitle}>No Messages</Text>
-                <Text style={styles.emptyText}>Send a message to your teachers to start the conversation.</Text>
-              </View>
+      {/* Segmented Control / Tabs */}
+      <View style={styles.tabContainer}>
+        <TouchableOpacity 
+          style={[styles.tabBtn, activeTab === 'history' && styles.tabBtnActive]}
+          onPress={() => setActiveTab('history')}
+        >
+          <Text style={[styles.tabText, activeTab === 'history' && styles.tabTextActive]}>History</Text>
+        </TouchableOpacity>
+        <TouchableOpacity 
+          style={[styles.tabBtn, activeTab === 'teachers' && styles.tabBtnActive]}
+          onPress={() => setActiveTab('teachers')}
+        >
+          <Text style={[styles.tabText, activeTab === 'teachers' && styles.tabTextActive]}>Teachers</Text>
+        </TouchableOpacity>
+        <TouchableOpacity 
+          style={[styles.tabBtn, activeTab === 'principal' && styles.tabBtnActive]}
+          onPress={() => {
+            if (principal) {
+              handleOpenChat(principal);
+            } else {
+              setActiveTab('principal');
             }
-          />
-        )}
+          }}
+        >
+          <Text style={[styles.tabText, activeTab === 'principal' && styles.tabTextActive]}>Principal</Text>
+        </TouchableOpacity>
+      </View>
 
-        {/* Input Area */}
-        <View style={styles.inputArea}>
-          <TextInput
-            style={styles.input}
-            value={message}
-            onChangeText={setMessage}
-            placeholder="Type a message..."
-            placeholderTextColor={colors.textMuted}
-            multiline
-          />
-          <TouchableOpacity 
-            style={[styles.sendBtn, !message.trim() && styles.sendBtnDisabled]} 
-            onPress={handleSend}
-            disabled={!message.trim() || isSending}
-          >
-            {isSending ? (
-              <ActivityIndicator size="small" color="#fff" />
+      <View style={styles.content}>
+        {activeTab === 'history' ? (
+          historyLoading ? (
+            <View style={styles.center}>
+              <ActivityIndicator size="large" color={colors.primary} />
+            </View>
+          ) : (
+            <FlatList
+              data={historyList}
+              keyExtractor={item => item.id}
+              renderItem={renderHistoryCard}
+              contentContainerStyle={[styles.listContent, { paddingBottom: Math.max(insets.bottom, 16) }]}
+              refreshControl={<RefreshControl refreshing={historyFetching} onRefresh={refetchHistory} colors={[colors.primary]} />}
+              ListEmptyComponent={
+                <View style={styles.emptyState}>
+                  <Icon name="message-square" size={48} color={colors.textMuted} />
+                  <Text style={styles.emptyTitle}>No Chats Yet</Text>
+                  <Text style={styles.emptyText}>Find a teacher or the principal in the directories to start a chat.</Text>
+                </View>
+              }
+            />
+          )
+        ) : activeTab === 'teachers' ? (
+          <>
+            {/* Search Bar */}
+            <View style={styles.searchContainer}>
+              <Icon name="search" size={20} color={colors.textMuted} style={styles.searchIcon} />
+              <TextInput
+                style={styles.searchInput}
+                placeholder="Search teachers..."
+                placeholderTextColor={colors.textMuted}
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+              />
+              {searchQuery.length > 0 && (
+                <TouchableOpacity onPress={() => setSearchQuery('')}>
+                  <Icon name="x" size={18} color={colors.textMuted} />
+                </TouchableOpacity>
+              )}
+            </View>
+
+            {/* Teachers List */}
+            {teachersLoading ? (
+              <View style={styles.center}>
+                <ActivityIndicator size="large" color={colors.primary} />
+              </View>
             ) : (
-              <Icon name="send" size={20} color="#fff" />
+              <FlatList
+                data={filteredTeachers}
+                keyExtractor={item => item.id}
+                renderItem={renderUserCard}
+                contentContainerStyle={[styles.listContent, { paddingBottom: Math.max(insets.bottom, 16) }]}
+                refreshControl={<RefreshControl refreshing={teachersFetching} onRefresh={refetchTeachers} colors={[colors.primary]} />}
+                ListEmptyComponent={
+                  <View style={styles.emptyState}>
+                    <Icon name="users" size={48} color={colors.textMuted} />
+                    <Text style={styles.emptyTitle}>No Teachers Found</Text>
+                    <Text style={styles.emptyText}>
+                      {searchQuery ? "No teachers match your search." : "You currently have no teachers available to chat."}
+                    </Text>
+                  </View>
+                }
+              />
             )}
-          </TouchableOpacity>
-        </View>
-      </KeyboardAvoidingView>
-    </SafeAreaView>
+          </>
+        ) : (
+          /* Principal Tab */
+          <View style={{ flex: 1 }}>
+            {principalLoading ? (
+              <View style={styles.center}>
+                <ActivityIndicator size="large" color={colors.primary} />
+              </View>
+            ) : principal ? (
+              <ScrollView contentContainerStyle={[styles.listContent, { paddingBottom: Math.max(insets.bottom, 16) }]} refreshControl={<RefreshControl refreshing={principalFetching} onRefresh={refetchPrincipal} colors={[colors.primary]} />}>
+                {renderUserCard({ item: principal })}
+              </ScrollView>
+            ) : (
+              <View style={styles.emptyState}>
+                <Icon name="user" size={48} color={colors.textMuted} />
+                <Text style={styles.emptyTitle}>No Principal Found</Text>
+                <Text style={styles.emptyText}>The principal's profile is not available at this moment.</Text>
+              </View>
+            )}
+          </View>
+        )}
+      </View>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: colors.primary },
   container: { flex: 1, backgroundColor: colors.background },
+  content: { flex: 1, backgroundColor: colors.background },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-
   header: {
     backgroundColor: colors.primary,
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
@@ -157,64 +222,71 @@ const styles = StyleSheet.create({
   },
   headerTitle: { color: '#fff', fontSize: 18, fontWeight: '700' },
   headerBtn: { padding: 6, backgroundColor: 'rgba(255,255,255,0.15)', borderRadius: 10 },
-
-  listContent: { padding: 16, paddingBottom: 32 },
-
-  msgContainer: { flexDirection: 'row', marginBottom: 16, maxWidth: '85%' },
-  msgMe: { alignSelf: 'flex-end', justifyContent: 'flex-end' },
-  msgThem: { alignSelf: 'flex-start', justifyContent: 'flex-start' },
-
-  avatar: {
-    width: 32, height: 32, borderRadius: 16,
+  
+  tabContainer: {
+    flexDirection: 'row',
     backgroundColor: colors.primary,
-    justifyContent: 'center', alignItems: 'center',
-    marginRight: 8, alignSelf: 'flex-end',
+    paddingHorizontal: 16,
+    paddingBottom: 12,
   },
-  avatarText: { color: '#fff', fontSize: 14, fontWeight: '700' },
+  tabBtn: {
+    flex: 1,
+    paddingVertical: 10,
+    alignItems: 'center',
+    borderRadius: 8,
+  },
+  tabBtnActive: {
+    backgroundColor: 'rgba(255,255,255,0.2)',
+  },
+  tabText: {
+    color: 'rgba(255,255,255,0.7)',
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  tabTextActive: {
+    color: '#fff',
+    fontWeight: '700',
+  },
 
-  bubble: {
-    padding: 12, borderRadius: 16,
+  searchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.surface,
+    marginHorizontal: 16,
+    marginTop: 16,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    borderWidth: 1,
+    borderColor: colors.border,
+    height: 44,
+  },
+  searchIcon: { marginRight: 8 },
+  searchInput: {
+    flex: 1,
+    fontSize: 15,
+    color: colors.text,
+  },
+
+  listContent: { padding: 16 },
+  userCard: {
+    flexDirection: 'row', alignItems: 'center',
+    backgroundColor: colors.surface,
+    padding: 16, borderRadius: 12, marginBottom: 12,
     ...shadows.card,
   },
-  bubbleMe: { backgroundColor: colors.primary, borderBottomRightRadius: 4 },
-  bubbleThem: { backgroundColor: colors.surface, borderBottomLeftRadius: 4 },
-
-  senderName: { fontSize: 12, color: colors.primary, fontWeight: '700', marginBottom: 4 },
-  
-  msgText: { fontSize: 15, lineHeight: 22 },
-  msgTextMe: { color: '#fff' },
-  msgTextThem: { color: colors.text },
-
-  timestamp: { fontSize: 10, marginTop: 4, alignSelf: 'flex-end' },
-  timestampMe: { color: 'rgba(255,255,255,0.7)' },
-  timestampThem: { color: colors.textMuted },
-
+  avatar: {
+    width: 48, height: 48, borderRadius: 24,
+    backgroundColor: colors.primary + '20',
+    justifyContent: 'center', alignItems: 'center',
+    marginRight: 16,
+  },
+  avatarText: { color: colors.primary, fontSize: 18, fontWeight: '700' },
+  userInfo: { flex: 1 },
+  userName: { fontSize: 16, fontWeight: '600', color: colors.text, marginBottom: 4 },
+  userEmail: { fontSize: 14, color: colors.textMuted },
   emptyState: { alignItems: 'center', marginTop: 100, gap: 12 },
   emptyTitle: { fontSize: 18, fontWeight: '700', color: colors.text },
   emptyText: { fontSize: 14, color: colors.textMuted, textAlign: 'center', paddingHorizontal: 40 },
-
-  inputArea: {
-    flexDirection: 'row', alignItems: 'flex-end',
-    padding: 12, paddingBottom: Platform.OS === 'ios' ? 24 : 12,
-    backgroundColor: colors.surface,
-    borderTopWidth: 1, borderTopColor: colors.border,
-  },
-  input: {
-    flex: 1,
-    backgroundColor: colors.background,
-    borderRadius: 20,
-    paddingHorizontal: 16, paddingVertical: 12,
-    paddingTop: 12, // For multiline centering
-    fontSize: 15, color: colors.text,
-    maxHeight: 100,
-  },
-  sendBtn: {
-    width: 44, height: 44, borderRadius: 22,
-    backgroundColor: colors.primary,
-    justifyContent: 'center', alignItems: 'center',
-    marginLeft: 12,
-  },
-  sendBtnDisabled: { opacity: 0.5 },
 });
 
 export default CommunicationScreen;

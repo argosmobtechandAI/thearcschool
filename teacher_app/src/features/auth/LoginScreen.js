@@ -126,10 +126,6 @@ const LoginScreen = () => {
 
             {error ? <Text style={styles.errorText}>{error}</Text> : null}
 
-            <TouchableOpacity style={styles.forgotPassword}>
-              <Text style={styles.forgotPasswordText}>Forgot Password?</Text>
-            </TouchableOpacity>
-
             <TouchableOpacity 
               style={[styles.loginButton, loading && styles.loginButtonDisabled]} 
               onPress={handleLogin}
@@ -166,15 +162,13 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.background,
   },
-  topAccent: {
+    topAccent: {
     position: 'absolute',
     top: 0,
     left: 0,
     right: 0,
     height: 300,
     backgroundColor: colors.primary,
-    borderBottomLeftRadius: 40,
-    borderBottomRightRadius: 40,
   },
   content: {
     flex: 1,
@@ -247,16 +241,13 @@ const styles = StyleSheet.create({
   eyeIcon: {
     padding: 8,
   },
-  forgotPassword: {
-    alignSelf: 'flex-end',
-    marginBottom: 32,
-  },
-  forgotPasswordText: {
-    color: colors.primary,
-    fontSize: 14,
-    fontWeight: '700',
-  },
   loginButton: {
+    backgroundColor: colors.primary,
+    height: 60,
+    borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 16,
     backgroundColor: colors.primary,
     height: 60,
     borderRadius: 16,

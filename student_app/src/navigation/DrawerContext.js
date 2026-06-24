@@ -42,10 +42,15 @@ const DrawerItem = ({ icon, label, onPress, color = colors.textMuted, badgeCount
 
 // ─── Drawer Content (rendered inside Modal) ──────────────────────────────────
 
+import { useGetNotificationsQuery } from '../store/apiSlice';
+
 const DrawerContent = ({ close }) => {
   const { user } = useSelector(state => state.auth);
   const dispatch = useDispatch();
   const insets = useSafeAreaInsets();
+
+  const { data: notificationsData } = useGetNotificationsQuery();
+  const unreadCount = notificationsData?.data?.filter(n => !n.is_read)?.length || 0;
 
   const initials = user?.name
     ? user.name.split(' ').map(p => p[0]).slice(0, 2).join('').toUpperCase()
@@ -96,7 +101,7 @@ const DrawerContent = ({ close }) => {
         <DrawerItem icon="file-text"      label="Academic Calendar"    color="#06B6D4" onPress={() => go('AcademicCalendar')} />
         <DrawerItem icon="edit-3"         label="Date Sheet"    color="#F97316" onPress={() => go('DateSheet')} />
         <DrawerItem icon="award"          label="My Grades"     color="#EAB308" onPress={() => go('Result')} />
-        <DrawerItem icon="bell"           label="Announcements" color="#F43F5E" badgeCount={2} onPress={() => go('Notifications')} />
+        <DrawerItem icon="bell"           label="Announcements" color="#F43F5E" badgeCount={unreadCount} onPress={() => go('Notifications')} />
         <DrawerItem icon="message-square" label="Communication" color="#14B8A6" onPress={() => go('Communication')} />
         <DrawerItem icon="star"           label="My Rewards"    color="#F59E0B" onPress={() => go('Rewards')} />
         <DrawerItem icon="user"           label="My Profile"    color="#64748B" onPress={() => go('Profile')} />

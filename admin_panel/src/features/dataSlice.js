@@ -129,6 +129,16 @@ export const fetchCommunication = createAsyncThunk('data/fetchCommunication', as
     return response.data;
 });
 
+export const fetchSystemMonitorList = createAsyncThunk('data/fetchSystemMonitorList', async (_, { rejectWithValue }) => {
+    try {
+        const { getSystemMonitorList } = await import('../services/api');
+        const response = await getSystemMonitorList();
+        return response.data.chats || [];
+    } catch (error) {
+        return rejectWithValue(error.response?.data || "Network Error");
+    }
+});
+
 export const fetchInfo = createAsyncThunk('data/fetchInfo', async () => {
     const response = await getInfo();
     return response.data;
@@ -156,6 +166,7 @@ const initialState = {
   gradingScales: [],
   communication: null,
   chats: [],
+  monitorChats: [],
   results: [],
   infoSettings: null,
   infoChampions: [],
@@ -309,6 +320,18 @@ export const dataSlice = createSlice({
           state.chats = action.payload.chats || [];
       })
       .addCase(fetchCommunication.rejected, (state, action) => {
+          state.loading = false;
+          state.error = action.error.message;
+      })
+      // Monitor Chats
+      .addCase(fetchSystemMonitorList.pending, (state) => {
+          state.loading = true;
+      })
+      .addCase(fetchSystemMonitorList.fulfilled, (state, action) => {
+          state.loading = false;
+          state.monitorChats = action.payload || [];
+      })
+      .addCase(fetchSystemMonitorList.rejected, (state, action) => {
           state.loading = false;
           state.error = action.error.message;
       })

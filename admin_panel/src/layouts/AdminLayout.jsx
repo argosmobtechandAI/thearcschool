@@ -1,7 +1,7 @@
 import { Outlet, useNavigate, NavLink } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
-import { useEffect } from "react";
-import { LogOut, LayoutDashboard, Users, BookOpen, UserCircle, Settings, UserCheck, IndianRupee, FileEdit, Clock, Calendar, ClipboardCheck, Bell, DollarSign, MessageSquare, Info, ShieldAlert, MapPin, ExternalLink } from "lucide-react";
+import { useEffect, useState } from "react";
+import { LogOut, LayoutDashboard, Users, BookOpen, UserCircle, Settings, UserCheck, IndianRupee, FileEdit, Clock, Calendar, ClipboardCheck, Bell, DollarSign, MessageSquare, Info, ShieldAlert, MapPin, ExternalLink, TrendingUp } from "lucide-react";
 import { toast } from "react-toastify";
 import { logout } from "../features/authSlice";
 import { messaging } from "../config/firebase";
@@ -18,18 +18,16 @@ const AdminLayout = () => {
     navigate("/login");
   };
 
+  const [unreadNotifications, setUnreadNotifications] = useState(0);
+  const [unreadChats, setUnreadChats] = useState(0);
+
   useEffect(() => {
     if (user && messaging) {
       const setupFCM = async () => {
         try {
           const permission = await Notification.requestPermission();
           if (permission === "granted") {
-            // Hardcoded the VAPID key normally, but we will leave it empty if we don't have it, 
-            // but it's recommended to have a VAPID key for web push.
-            const token = await getToken(messaging, { 
-              // vapidKey: 'YOUR_VAPID_KEY_HERE' 
-            });
-            
+            const token = await getToken(messaging);
             if (token) {
               await api.post('/notifications/register-token', {
                 fcm_token: token,
@@ -42,7 +40,23 @@ const AdminLayout = () => {
         }
       };
 
+      const fetchUnread = async () => {
+        try {
+          // Fetch admin's own notifications
+          const res = await api.get('/admin_panel/notifications');
+          if (res.data && res.data.data) {
+            const unreadNotifs = res.data.data.filter(n => !n.is_read && n.type !== 'live_chat').length;
+            const unreadChatsCount = res.data.data.filter(n => !n.is_read && n.type === 'live_chat').length;
+            setUnreadNotifications(unreadNotifs);
+            setUnreadChats(unreadChatsCount);
+          }
+        } catch (e) {
+          console.error("Error fetching unread notifications:", e);
+        }
+      };
+
       setupFCM();
+      fetchUnread();
 
       const unsubscribe = onMessage(messaging, (payload) => {
         toast.info(
@@ -51,10 +65,22 @@ const AdminLayout = () => {
             <p style={{ margin: 0 }}>{payload.notification.body}</p>
           </div>
         );
+        // Increment unread count based on type
+        if (payload.data?.type === 'live_chat') {
+          setUnreadChats(prev => prev + 1);
+        } else {
+          setUnreadNotifications(prev => prev + 1);
+        }
       });
+
+      const handleNotificationsRead = () => {
+        setUnreadNotifications(0);
+      };
+      window.addEventListener('notificationsRead', handleNotificationsRead);
 
       return () => {
         unsubscribe();
+        window.removeEventListener('notificationsRead', handleNotificationsRead);
       };
     }
   }, [user]);
@@ -131,8 +157,12 @@ const AdminLayout = () => {
               <NavLink to="/timetable" style={navLinkStyle}><Clock size={16} /> Timetable</NavLink>
               <NavLink to="/attendance" style={navLinkStyle}><UserCheck size={16} /> Attendance</NavLink>
               <NavLink to="/exams" style={navLinkStyle}><ClipboardCheck size={16} /> Exams & Grading</NavLink>
-              <NavLink to="/communication/inbox" style={navLinkStyle}><MessageSquare size={16} /> Communication</NavLink>
-              <NavLink to="/notification" style={navLinkStyle}><Bell size={16} /> Notifications</NavLink>
+              <NavLink to="/communication/inbox" style={navLinkStyle}>
+                <MessageSquare size={16} /> Communication
+              </NavLink>
+              <NavLink to="/notification" style={navLinkStyle}>
+                <Bell size={16} /> Notifications
+              </NavLink>
               <NavLink to="/school-info" style={navLinkStyle}><Info size={16} /> School Info</NavLink>
             </>
           )}
@@ -148,6 +178,7 @@ const AdminLayout = () => {
                 </>
               )}
               <NavLink to="/fees" style={navLinkStyle}><IndianRupee size={16} /> Fees</NavLink>
+              <NavLink to="/pnl" style={navLinkStyle}><TrendingUp size={16} /> Profit & Loss</NavLink>
               {user?.type === "admin" && (
                 <NavLink to="/complaints" style={navLinkStyle}><ShieldAlert size={16} /> Complaints</NavLink>
               )}
@@ -157,10 +188,10 @@ const AdminLayout = () => {
           {user?.type === "admin" && (
             <>
               <NavGroup title="Portals" />
-              <a href="http://localhost:5175/dashboard" style={{ ...navLinkStyle({ isActive: false }), color: "var(--text-secondary)" }}>
+              <a href="https://admission.thearcschool.in" target="_blank" rel="noopener noreferrer" style={{ ...navLinkStyle({ isActive: false }), color: "var(--text-secondary)" }}>
                 <ExternalLink size={16} /> Admission Portal
               </a>
-              <a href="http://localhost:5176/dashboard" style={{ ...navLinkStyle({ isActive: false }), color: "var(--text-secondary)" }}>
+              <a href="https://finance.thearcschool.in" target="_blank" rel="noopener noreferrer" style={{ ...navLinkStyle({ isActive: false }), color: "var(--text-secondary)" }}>
                 <ExternalLink size={16} /> Finance Portal
               </a>
             </>

@@ -49,6 +49,8 @@ export const deleteFee = (id) => api.delete(`/finance_panel/deleteFee/${id}`);
 // Communication & Chat API
 export const createCommunication = (data) => api.post('/communication/createChat', data);
 export const getCommunication = (type) => api.get(`/communication/getChat/${type}`);
+export const getSystemMonitorList = () => api.get('/admin_panel/communication/monitor');
+export const getSystemMonitorHistory = (user1, user2) => api.get(`/admin_panel/communication/history/${user1}/${user2}`);
 
 // School Info API
 export const getInfo = () => api.get('/admin_panel/info/getAll');
@@ -70,6 +72,7 @@ export const deleteNewsletter = (id) => api.delete(`/admin_panel/info/newsletter
 export const updateNotification = (id) => api.put(`/user/updateNotification/${id}`);
 export const sendBroadcastNotification = (data) => api.post('/admin_panel/notifications/broadcast', data);
 export const getAllNotifications = (params) => api.get('/admin_panel/notifications/all', { params });
+export const markNotificationsAsRead = () => api.patch('/admin_panel/notifications/all/read');
 
 // File Upload API (proxied through backend — NO direct Supabase access)
 export const uploadFile = async (file, bucket = "school") => {

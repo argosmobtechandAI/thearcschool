@@ -113,7 +113,7 @@ const ProfileScreen = ({ navigation }) => {
         <View style={styles.actionsContainer}>
           <TouchableOpacity 
             style={styles.changePasswordButton} 
-            onPress={() => navigation.navigate('ChangePassword')}
+            onPress={() => navigation.navigate('Home', { screen: 'ChangePassword' })}
           >
             <Icon name="lock" size={20} color={colors.primary} style={{ marginRight: 8 }} />
             <Text style={styles.changePasswordText}>Change Password</Text>

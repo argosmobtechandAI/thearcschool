@@ -47,5 +47,8 @@ studentRouter.get("/rewards", getRewards);
 // Chat
 studentRouter.use("/communication", communicationRouter);
 
-export default studentRouter;
+// Auth
+import { changePassword } from "../teacher_app/passwordController.js";
+studentRouter.post("/auth/change-password", changePassword);
 
+export default studentRouter;

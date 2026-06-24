@@ -360,12 +360,21 @@ export const getStudentTimetable = async (req, res) => {
 export const getTeacherTimetable = async (req, res) => {
   try {
     const userId = req.user.id;
+    const { classId } = req.query;
 
-    // Fetch timetable where teacher_id matches
-    const { data: timetables, error } = await supabase
+    let query = supabase
       .from("timetable")
-      .select("*, class(name, section)")
-      .eq("teacher_id", userId);
+      .select("*, class(name, section), user(name)");
+      
+    if (classId) {
+      // If a specific class is selected, show the full timetable for that class
+      query = query.eq("class_id", classId);
+    } else {
+      // Otherwise, show the teacher's personal timetable across all classes
+      query = query.eq("teacher_id", userId);
+    }
+
+    const { data: timetables, error } = await query;
 
     if (error) throw error;
 
@@ -395,6 +404,7 @@ export const getTeacherTimetable = async (req, res) => {
       groupedData[cId].dates[dateStr].push({
           id: row.id,
           teacher: row.teacher_id,
+          teacherName: row.user?.name || null,
           time: row.time_slot,
           subject: row.subject,
           isBreak: row.is_break,

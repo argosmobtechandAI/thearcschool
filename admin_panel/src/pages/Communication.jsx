@@ -1,28 +1,76 @@
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo, useEffect, useRef } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { fetchUsers, fetchCommunication } from "../features/dataSlice";
-import api from "../services/api";
+import { fetchUsers, fetchCommunication, fetchSystemMonitorList } from "../features/dataSlice";
+import api, { getSystemMonitorHistory, createCommunication } from "../services/api";
 import { toast } from "react-toastify";
-import { Search, Send, Megaphone, PenSquare, MessageSquare } from "lucide-react";
+import { Search, Send, Megaphone, PenSquare, MessageSquare, Activity, Filter } from "lucide-react";
 import DateRangePicker from "../components/DateRangePicker";
+import { io } from "socket.io-client";
 
 const Communication = () => {
     const dispatch = useDispatch();
-    const [activeTab, setActiveTab] = useState("inbox");
+    const socketRef = useRef(null);
+    const [activeTab, setActiveTab] = useState("my_chats");
     const [searchInboxQuery, setSearchInboxQuery] = useState("");
-    const { users, chats } = useSelector((state) => state.data);
+    const [searchMyChats, setSearchMyChats] = useState("");
+    const [searchMonitor, setSearchMonitor] = useState("");
+    const { users, chats, monitorChats } = useSelector((state) => state.data);
     const [content, setContent] = useState("");
     const [selectedRole, setSelectedRole] = useState("all");
     const [selectedChatUser, setSelectedChatUser] = useState(null);
+    const [selectedMonitorChat, setSelectedMonitorChat] = useState(null);
+    const [monitorHistory, setMonitorHistory] = useState([]);
     const [showNewChat, setShowNewChat] = useState(false);
     const [dateRange, setDateRange] = useState({ start: "", end: "" });
+    const [showFilters, setShowFilters] = useState(false);
 
     useEffect(() => {
         if (!users || users.length === 0) dispatch(fetchUsers());
-        dispatch(fetchCommunication(activeTab));
+    }, [dispatch, users]);
+
+    useEffect(() => {
+        if (activeTab === "my_chats") {
+            dispatch(fetchCommunication('live_chat'));
+        } else if (activeTab === "system_monitor") {
+            dispatch(fetchSystemMonitorList());
+        } else {
+            dispatch(fetchCommunication(activeTab));
+        }
     }, [dispatch, activeTab]);
 
-    const myself = users?.find(u => u.type === 'admin') || null;
+    const myself = (() => {
+        try {
+            return JSON.parse(localStorage.getItem('adminUser')) || users?.find(u => u.type === 'admin') || null;
+        } catch(e) {
+            return users?.find(u => u.type === 'admin') || null;
+        }
+    })();
+
+    useEffect(() => {
+        if (!myself?.id) return;
+        
+        const SOCKET_URL = (import.meta.env.VITE_API_URL || "http://localhost:3002/api").replace('/api', '');
+        socketRef.current = io(SOCKET_URL);
+
+        socketRef.current.on('connect', () => {
+            socketRef.current.emit('identify', myself.id);
+        });
+
+        socketRef.current.on('receive_message', (newChat) => {
+            dispatch(fetchCommunication('live_chat'));
+            dispatch(fetchSystemMonitorList());
+        });
+
+        return () => {
+            if (socketRef.current) socketRef.current.disconnect();
+        };
+    }, [myself?.id, dispatch]);
+
+    useEffect(() => {
+        if (socketRef.current && myself?.id && selectedChatUser?.id) {
+            socketRef.current.emit('join_chat', { senderId: myself.id, receiverId: selectedChatUser.id });
+        }
+    }, [selectedChatUser?.id, myself?.id]);
 
     const filteredUsers = users?.filter((user) => 
         user.name?.toLowerCase().includes(searchInboxQuery?.toLowerCase())
@@ -36,30 +84,42 @@ const Communication = () => {
     const handleSend = async () => {
         if (!content.trim()) return showToast("Message cannot be empty", "error");
 
-        let secondPersonIds = [];
+        let payload = null;
 
         if (activeTab === "broadcast") {
-            secondPersonIds = users.map((u) => u.id);
+            const secondPersonIds = users.map((u) => u.id);
+            payload = {
+                sender_id: myself?.id,
+                message: content,
+                type: activeTab,
+                secondPerson: secondPersonIds
+            };
         } else if (activeTab === "post") {
             const filtered = selectedRole === "all" ? users : users.filter((u) => u.type === selectedRole);
-            secondPersonIds = filtered.map((u) => u.id);
-        } else if (activeTab === "inbox" && selectedChatUser) {
-            secondPersonIds = [selectedChatUser.id];
+            const secondPersonIds = filtered.map((u) => u.id);
+            payload = {
+                sender_id: myself?.id,
+                message: content,
+                type: activeTab,
+                secondPerson: secondPersonIds
+            };
+        } else if (activeTab === "my_chats" && selectedChatUser) {
+            payload = {
+                sender_id: myself?.id,
+                receiver_id: selectedChatUser.id,
+                message: content,
+                type: 'live_chat',
+                secondPerson: [selectedChatUser.id]
+            };
         } else {
             return showToast("Please select a recipient", "error");
         }
 
-        const payload = {
-            firstPerson: myself?.id,
-            title: content,
-            type: activeTab,
-            secondPerson: secondPersonIds,
-        };
-
         try {
-            await api.createCommunication(payload);
+            await createCommunication(payload);
             setContent("");
-            dispatch(fetchCommunication(activeTab));
+            if (activeTab === "my_chats") dispatch(fetchCommunication('live_chat'));
+            else dispatch(fetchCommunication(activeTab));
             showToast("Message sent successfully!", "success");
             setShowNewChat(false);
         } catch (error) {
@@ -71,7 +131,7 @@ const Communication = () => {
         let list = chats?.filter((c) => c.type === "broadcast");
         if (dateRange.start || dateRange.end) {
             list = list?.filter(msg => {
-                const msgDate = new Date(msg.createdAt);
+                const msgDate = new Date(msg.createdAt || msg.created_at);
                 if (dateRange.start && dateRange.end) {
                     return msgDate >= new Date(dateRange.start) && msgDate <= new Date(dateRange.end);
                 } else if (dateRange.start) {
@@ -86,10 +146,10 @@ const Communication = () => {
     }, [chats, dateRange]);
 
     const postList = useMemo(() => {
-        let list = chats?.filter((c) => c.type === "post" && c.firstPerson == myself?.id);
+        let list = chats?.filter((c) => c.type === "post" && (c.firstPerson == myself?.id || c.sender_id == myself?.id));
         if (dateRange.start || dateRange.end) {
             list = list?.filter(msg => {
-                const msgDate = new Date(msg.createdAt);
+                const msgDate = new Date(msg.createdAt || msg.created_at);
                 if (dateRange.start && dateRange.end) {
                     return msgDate >= new Date(dateRange.start) && msgDate <= new Date(dateRange.end);
                 } else if (dateRange.start) {
@@ -103,261 +163,573 @@ const Communication = () => {
         return list;
     }, [chats, myself, dateRange]);
 
-    const inboxUsers = useMemo(() => {
+    const myChatUsers = useMemo(() => {
         if (!chats || !myself || !users) return [];
         const uniqueUsers = new Map();
         
-        chats.filter(c => c.type === "inbox" && (c.firstPerson == myself.id || c.secondPerson?.includes(myself.id)))
+        const sortedChats = [...chats].sort((a, b) => new Date(b.created_at || b.createdAt) - new Date(a.created_at || a.createdAt));
+
+        sortedChats.filter(c => c.type === "live_chat" && (c.sender_id == myself.id || c.receiver_id == myself.id))
              .forEach(c => {
-                 const otherId = c.firstPerson == myself.id ? c.secondPerson[0] : c.firstPerson;
+                 const otherId = c.sender_id == myself.id ? c.receiver_id : c.sender_id;
                  const user = users.find(u => u.id == otherId);
                  if (user && !uniqueUsers.has(otherId)) {
-                     uniqueUsers.set(otherId, user);
+                     uniqueUsers.set(otherId, { ...user, lastMessageTime: c.created_at || c.createdAt, lastMessage: c.message || c.title });
                  }
              });
         return Array.from(uniqueUsers.values());
     }, [chats, users, myself]);
 
-    const selectedChatMessages = useMemo(() => {
-        if (!selectedChatUser || !chats || !myself) return [];
-        return chats.filter(c => c.type === "inbox" && 
-            ((c.firstPerson == myself.id && c.secondPerson?.includes(`${selectedChatUser.id}`)) ||
-             (c.firstPerson == selectedChatUser.id && c.secondPerson?.includes(`${myself.id}`)))
+    const filteredMyChatUsers = useMemo(() => {
+        return myChatUsers.filter(u => u.name?.toLowerCase().includes(searchMyChats.toLowerCase()));
+    }, [myChatUsers, searchMyChats]);
+
+    const filteredMonitorChats = useMemo(() => {
+        return monitorChats?.filter(c => 
+            c.user1_id != myself?.id && 
+            c.user2_id != myself?.id && 
+            (c.user1.name.toLowerCase().includes(searchMonitor.toLowerCase()) || c.user2.name.toLowerCase().includes(searchMonitor.toLowerCase()))
         );
+    }, [monitorChats, searchMonitor, myself]);
+
+    const myChatMessages = useMemo(() => {
+        if (!selectedChatUser || !chats || !myself) return [];
+        return chats.filter(c => c.type === "live_chat" && 
+            ((c.sender_id == myself.id && c.receiver_id == selectedChatUser.id) ||
+             (c.sender_id == selectedChatUser.id && c.receiver_id == myself.id))
+        ).sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
     }, [chats, selectedChatUser, myself]);
 
     const getUserName = (id) => users?.find(usr => usr.id == id)?.name || "Unknown";
 
-    return (
-        <div className="space-y-6">
+    const loadMonitorHistory = async (chatPair) => {
+        setSelectedMonitorChat(chatPair);
+        try {
+            const response = await getSystemMonitorHistory(chatPair.user1_id, chatPair.user2_id);
+            setMonitorHistory(response.data.chats || []);
+        } catch (error) {
+            showToast("Failed to load chat history", "error");
+        }
+    };
 
-            {/* Header & Tabs */}
-            <div className="flex flex-col sm:flex-row justify-between gap-4 items-center">
+    return (
+        <div className="animate-fade-in" style={{ padding: "0 1rem" }}>
+            <style>
+                {`
+                .comm-header {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 1.5rem;
+                    margin-bottom: 1.5rem;
+                }
+                @media (min-width: 768px) {
+                    .comm-header {
+                        flex-direction: row;
+                        justify-content: space-between;
+                        align-items: center;
+                    }
+                }
+                .tabs-container {
+                    display: flex;
+                    gap: 0.5rem;
+                    background: var(--bg-secondary);
+                    padding: 0.35rem;
+                    border-radius: var(--radius-lg);
+                    border: 1px solid var(--glass-border);
+                    overflow-x: auto;
+                }
+                .tab-btn {
+                    padding: 0.5rem 1rem;
+                    border-radius: var(--radius-md);
+                    font-weight: 600;
+                    font-size: 0.85rem;
+                    display: flex;
+                    align-items: center;
+                    gap: 0.5rem;
+                    cursor: pointer;
+                    transition: var(--transition);
+                    border: none;
+                    background: transparent;
+                    color: var(--text-secondary);
+                    white-space: nowrap;
+                }
+                .tab-btn:hover {
+                    color: var(--text-primary);
+                    background: rgba(0,0,0,0.03);
+                }
+                .tab-btn.active {
+                    background: var(--accent-light);
+                    color: var(--accent-primary);
+                    box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+                }
+                
+                .split-panel {
+                    display: flex;
+                    flex-direction: column;
+                    background: var(--glass-bg);
+                    border: 1px solid var(--glass-border);
+                    border-radius: var(--radius-lg);
+                    overflow: hidden;
+                    height: 600px;
+                }
+                @media (min-width: 768px) {
+                    .split-panel { flex-direction: row; }
+                }
+                
+                .sidebar-area {
+                    width: 100%;
+                    border-bottom: 1px solid var(--glass-border);
+                    display: flex;
+                    flex-direction: column;
+                    background: #f8fafc;
+                }
+                @media (min-width: 768px) {
+                    .sidebar-area { width: 320px; border-bottom: none; border-right: 1px solid var(--glass-border); }
+                }
+                
+                .content-area {
+                    flex: 1;
+                    display: flex;
+                    flex-direction: column;
+                    background: #ffffff;
+                }
+                
+                .sidebar-item {
+                    padding: 1rem;
+                    border-bottom: 1px solid var(--glass-border);
+                    cursor: pointer;
+                    transition: var(--transition);
+                    display: flex;
+                    align-items: center;
+                    gap: 0.75rem;
+                }
+                .sidebar-item:hover {
+                    background: #ffffff;
+                }
+                .sidebar-item.active {
+                    background: #ffffff;
+                    border-left: 4px solid var(--accent-primary);
+                }
+                
+                .chat-bubble {
+                    max-width: 75%;
+                    padding: 0.75rem 1rem;
+                    border-radius: 1rem;
+                    font-size: 0.9rem;
+                    box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+                    line-height: 1.4;
+                }
+                .chat-bubble.mine {
+                    background: var(--accent-primary);
+                    color: white;
+                    border-bottom-right-radius: 0.25rem;
+                }
+                .chat-bubble.theirs {
+                    background: #f1f5f9;
+                    color: var(--text-primary);
+                    border: 1px solid var(--glass-border);
+                    border-bottom-left-radius: 0.25rem;
+                }
+                
+                .modal-overlay {
+                    position: fixed;
+                    top: 0; left: 0; right: 0; bottom: 0;
+                    background: rgba(15, 23, 42, 0.4);
+                    backdrop-filter: blur(4px);
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    z-index: 50;
+                    padding: 1rem;
+                }
+                .modal-card {
+                    background: white;
+                    border-radius: var(--radius-lg);
+                    width: 100%;
+                    max-width: 400px;
+                    box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1);
+                    overflow: hidden;
+                    animation: slideUp 0.3s ease-out;
+                }
+                
+                .filter-panel {
+                    background: var(--bg-secondary);
+                    padding: 1rem;
+                    border-radius: var(--radius-md);
+                    border: 1px solid var(--glass-border);
+                    display: flex;
+                    flex-direction: column;
+                    gap: 1rem;
+                    margin-bottom: 1.5rem;
+                    animation: fadeIn 0.2s ease-out;
+                }
+                @media (min-width: 640px) {
+                    .filter-panel { flex-direction: row; align-items: center; justify-content: space-between; }
+                }
+                `}
+            </style>
+
+            {/* Header */}
+            <div className="comm-header">
                 <div>
-                    <h1 className="text-2xl font-bold text-slate-900">Communication Center</h1>
-                    <p className="text-slate-600 text-sm">Manage messages, announcements, and posts.</p>
+                    <h1 style={{ fontSize: "1.875rem", fontWeight: "700", color: "var(--text-primary)", marginBottom: "0.25rem" }}>Communication Center</h1>
+                    <p style={{ color: "var(--text-secondary)" }}>Manage messages, announcements, and monitor system chats.</p>
                 </div>
-                <div className="flex gap-2 p-1 bg-slate-100 rounded-xl">
-                    <button onClick={() => setActiveTab('inbox')} className={`px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-all ${activeTab === 'inbox' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/50'}`}>
-                        <MessageSquare size={16} /> Inbox
-                    </button>
-                    <button onClick={() => setActiveTab('broadcast')} className={`px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-all ${activeTab === 'broadcast' ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/50'}`}>
-                        <Megaphone size={16} /> Broadcasts
-                    </button>
-                    <button onClick={() => setActiveTab('post')} className={`px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-all ${activeTab === 'post' ? 'bg-white text-purple-600 shadow-sm' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/50'}`}>
-                        <PenSquare size={16} /> Posts
-                    </button>
-                </div>
-                <div>
-                    <DateRangePicker onRangeChange={setDateRange} />
+                
+                <div style={{ display: "flex", gap: "1rem", alignItems: "center" }}>
+                    {/* Tabs */}
+                    <div className="tabs-container">
+                        <button onClick={() => setActiveTab('my_chats')} className={`tab-btn ${activeTab === 'my_chats' ? 'active' : ''}`}>
+                            <MessageSquare size={16} /> My Chats
+                        </button>
+                        <button onClick={() => setActiveTab('system_monitor')} className={`tab-btn ${activeTab === 'system_monitor' ? 'active' : ''}`}>
+                            <Activity size={16} /> System Monitor
+                        </button>
+                        <button onClick={() => setActiveTab('broadcast')} className={`tab-btn ${activeTab === 'broadcast' ? 'active' : ''}`}>
+                            <Megaphone size={16} /> Broadcasts
+                        </button>
+                        <button onClick={() => setActiveTab('post')} className={`tab-btn ${activeTab === 'post' ? 'active' : ''}`}>
+                            <PenSquare size={16} /> Posts
+                        </button>
+                    </div>
+
+                    {(activeTab === 'broadcast' || activeTab === 'post') && (
+                        <button onClick={() => setShowFilters(!showFilters)} className="btn btn-ghost" style={{ padding: "0.6rem" }}>
+                            <Filter size={18} color={showFilters ? "var(--accent-primary)" : "var(--text-secondary)"} />
+                        </button>
+                    )}
                 </div>
             </div>
 
-            {/* BROADCAST */}
-            {activeTab === "broadcast" && (
-                <div className="bg-white/70 backdrop-blur-md rounded-2xl shadow-sm border border-slate-200 overflow-hidden flex flex-col md:flex-row">
-                    <div className="p-6 border-b md:border-b-0 md:border-r border-slate-200 md:w-1/3 bg-emerald-50/30">
-                        <h2 className="text-lg font-bold text-slate-900 mb-2">New Broadcast</h2>
-                        <p className="text-sm text-slate-600 mb-4">Send a mass announcement to all users in the system.</p>
-                        <textarea
-                            value={content}
-                            onChange={(e) => setContent(e.target.value)}
-                            placeholder="Write broadcast message..."
-                            className="w-full border border-slate-300 rounded-xl p-4 focus:ring-4 focus:ring-emerald-100 focus:border-emerald-500 outline-none transition-all resize-none h-32"
-                        />
-                        <button onClick={handleSend} className="mt-4 w-full bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-3 rounded-xl font-medium shadow-md shadow-emerald-500/20 transition-all active:scale-95 flex justify-center items-center gap-2">
-                            <Send size={18} /> Send Broadcast
-                        </button>
+            {/* Filter Panel (Only for Broadcasts/Posts) */}
+            {(activeTab === 'broadcast' || activeTab === 'post') && showFilters && (
+                <div className="filter-panel">
+                    <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                        <Filter size={16} color="var(--accent-primary)" />
+                        <span style={{ fontWeight: "600", color: "var(--text-primary)" }}>Filter by Date</span>
                     </div>
-                    <div className="p-6 md:w-2/3 bg-white">
-                        <h3 className="font-semibold text-slate-800 mb-4">Recent Broadcasts</h3>
-                        <div className="space-y-4 max-h-[500px] overflow-y-auto pr-2">
-                            {broadcastList?.map((msg) => {
-                                const isMe = msg.firstPerson == myself?.id;
-                                return (
-                                    <div key={msg.id} className="p-5 bg-white border border-slate-200 rounded-2xl shadow-sm hover:shadow-md transition-all">
-                                        <div className="flex justify-between items-start mb-2">
-                                            <h3 className="text-base font-medium text-slate-800">{msg.title}</h3>
-                                            <span className="text-xs text-slate-400 whitespace-nowrap bg-slate-100 px-2 py-1 rounded-md">{new Date(msg.createdAt).toLocaleString()}</span>
-                                        </div>
-                                        <div className="flex justify-between items-center mt-4 pt-3 border-t border-slate-100">
-                                            <div className="text-sm text-slate-500">
-                                                Sent By <span className={`font-medium ${isMe ? "text-emerald-600" : "text-slate-700"}`}>{isMe ? "You" : getUserName(msg.firstPerson)}</span>
-                                            </div>
-                                            {isMe && <span className="px-2 py-1 text-[10px] uppercase tracking-wider rounded-full bg-emerald-100 text-emerald-700 font-bold">Your Broadcast</span>}
-                                        </div>
-                                    </div>
-                                );
-                            })}
-                            {broadcastList?.length === 0 && <div className="text-center p-8 text-slate-500 bg-slate-50 rounded-xl border border-dashed border-slate-300">No broadcasts found.</div>}
-                        </div>
+                    <div style={{ background: "#f8fafc", padding: "0.25rem", borderRadius: "8px", border: "1px solid var(--glass-border)" }}>
+                        <DateRangePicker onRangeChange={setDateRange} />
                     </div>
                 </div>
             )}
 
-            {/* POST */}
-            {activeTab === "post" && (
-                <div className="bg-white/70 backdrop-blur-md rounded-2xl shadow-sm border border-slate-200 overflow-hidden flex flex-col md:flex-row">
-                    <div className="p-6 border-b md:border-b-0 md:border-r border-slate-200 md:w-1/3 bg-purple-50/30">
-                        <h2 className="text-lg font-bold text-slate-900 mb-2">Create Post</h2>
-                        <p className="text-sm text-slate-600 mb-4">Publish a post targeted to specific user groups.</p>
+            {/* BROADCAST & POSTS */}
+            {(activeTab === "broadcast" || activeTab === "post") && (
+                <div className="split-panel">
+                    <div className="sidebar-area" style={{ padding: "1.5rem", background: "white" }}>
+                        <h2 style={{ fontSize: "1.125rem", fontWeight: "700", marginBottom: "0.5rem" }}>
+                            {activeTab === 'broadcast' ? "New Broadcast" : "Create Post"}
+                        </h2>
+                        <p style={{ color: "var(--text-secondary)", fontSize: "0.85rem", marginBottom: "1.5rem" }}>
+                            {activeTab === 'broadcast' ? "Send a mass announcement to all users in the system." : "Publish a post targeted to specific user groups."}
+                        </p>
                         
-                        <label className="block text-sm font-medium text-slate-700 mb-1">Target Audience</label>
-                        <select value={selectedRole} onChange={(e) => setSelectedRole(e.target.value)} className="w-full mb-4 border border-slate-300 p-3 rounded-xl focus:ring-4 focus:ring-purple-100 focus:border-purple-500 outline-none transition-all bg-white">
-                            <option value="all">Everyone</option>
-                            <option value="teacher">Teachers Only</option>
-                            <option value="student">Students Only</option>
-                            <option value="parent">Parents Only</option>
-                        </select>
+                        {activeTab === "post" && (
+                            <div style={{ marginBottom: "1rem" }}>
+                                <label style={{ display: "block", fontSize: "0.85rem", fontWeight: "600", marginBottom: "0.5rem", color: "var(--text-primary)" }}>Target Audience</label>
+                                <select value={selectedRole} onChange={(e) => setSelectedRole(e.target.value)} className="input-glass">
+                                    <option value="all">Everyone</option>
+                                    <option value="teacher">Teachers Only</option>
+                                    <option value="student">Students Only</option>
+                                    <option value="parent">Parents Only</option>
+                                </select>
+                            </div>
+                        )}
 
                         <textarea
                             value={content}
                             onChange={(e) => setContent(e.target.value)}
-                            placeholder="Write your post content..."
-                            className="w-full border border-slate-300 rounded-xl p-4 focus:ring-4 focus:ring-purple-100 focus:border-purple-500 outline-none transition-all resize-none h-32"
+                            placeholder={activeTab === 'broadcast' ? "Write broadcast message..." : "Write your post content..."}
+                            className="input-glass"
+                            style={{ height: "150px", resize: "none", marginBottom: "1rem" }}
                         />
-                        <button onClick={handleSend} className="mt-4 w-full bg-purple-600 hover:bg-purple-700 text-white px-6 py-3 rounded-xl font-medium shadow-md shadow-purple-500/20 transition-all active:scale-95 flex justify-center items-center gap-2">
-                            <PenSquare size={18} /> Publish Post
+                        <button onClick={handleSend} className="btn btn-primary" style={{ width: "100%", padding: "0.75rem" }}>
+                            <Send size={16} /> {activeTab === 'broadcast' ? "Send Broadcast" : "Publish Post"}
                         </button>
                     </div>
-                    <div className="p-6 md:w-2/3 bg-white">
-                        <h3 className="font-semibold text-slate-800 mb-4">Your Posts</h3>
-                        <div className="space-y-4 max-h-[500px] overflow-y-auto pr-2">
-                            {postList?.map((post) => {
-                                const isMe = post.firstPerson == myself?.id;
+
+                    <div className="content-area" style={{ padding: "1.5rem", background: "#f8fafc", overflowY: "auto" }}>
+                        <h3 style={{ fontWeight: "600", color: "var(--text-primary)", marginBottom: "1rem" }}>
+                            {activeTab === 'broadcast' ? "Recent Broadcasts" : "Your Posts"}
+                        </h3>
+                        
+                        <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+                            {activeTab === "broadcast" && broadcastList?.map((msg) => {
+                                const senderId = msg.firstPerson || msg.sender_id;
+                                const isMe = senderId == myself?.id;
                                 return (
-                                    <div key={post.id} className="p-5 bg-white border border-slate-200 rounded-2xl shadow-sm hover:shadow-md transition-all">
-                                        <div className="flex justify-between items-start mb-2">
-                                            <h3 className="text-base font-medium text-slate-800">{post.title}</h3>
-                                            <span className="text-xs text-slate-400 whitespace-nowrap bg-slate-100 px-2 py-1 rounded-md">{new Date(post.createdAt).toLocaleString()}</span>
+                                    <div key={msg.id} className="glass-card">
+                                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "0.5rem" }}>
+                                            <h4 style={{ fontWeight: "600", fontSize: "1rem" }}>{msg.title || msg.message}</h4>
+                                            <span style={{ fontSize: "0.75rem", color: "var(--text-secondary)", background: "#f1f5f9", padding: "2px 8px", borderRadius: "10px" }}>
+                                                {new Date(msg.createdAt || msg.created_at).toLocaleString()}
+                                            </span>
                                         </div>
-                                        <div className="flex justify-between items-center mt-4 pt-3 border-t border-slate-100">
-                                            <div className="text-sm text-slate-500">
-                                                Posted By <span className={`font-medium ${isMe ? "text-purple-600" : "text-slate-700"}`}>{isMe ? "You" : getUserName(post.firstPerson)}</span>
-                                            </div>
-                                            {isMe && <span className="px-2 py-1 text-[10px] uppercase tracking-wider rounded-full bg-purple-100 text-purple-700 font-bold">Your Post</span>}
+                                        <div style={{ fontSize: "0.85rem", color: "var(--text-secondary)", display: "flex", justifyContent: "space-between", alignItems: "center", borderTop: "1px solid var(--glass-border)", paddingTop: "0.75rem", marginTop: "0.75rem" }}>
+                                            <span>Sent by <strong style={{ color: isMe ? "var(--accent-primary)" : "inherit" }}>{isMe ? "You" : getUserName(senderId)}</strong></span>
+                                            {isMe && <span style={{ background: "var(--accent-light)", color: "var(--accent-primary)", padding: "2px 8px", borderRadius: "4px", fontSize: "0.7rem", fontWeight: "700", textTransform: "uppercase" }}>Your Broadcast</span>}
                                         </div>
                                     </div>
                                 );
                             })}
-                            {postList?.length === 0 && <div className="text-center p-8 text-slate-500 bg-slate-50 rounded-xl border border-dashed border-slate-300">No posts published yet.</div>}
+                            {activeTab === "broadcast" && broadcastList?.length === 0 && <div style={{ textAlign: "center", padding: "3rem", color: "var(--text-secondary)" }}>No broadcasts found.</div>}
+
+                            {activeTab === "post" && postList?.map((post) => {
+                                const senderId = post.firstPerson || post.sender_id;
+                                const isMe = senderId == myself?.id;
+                                return (
+                                    <div key={post.id} className="glass-card">
+                                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "0.5rem" }}>
+                                            <h4 style={{ fontWeight: "600", fontSize: "1rem" }}>{post.title || post.message}</h4>
+                                            <span style={{ fontSize: "0.75rem", color: "var(--text-secondary)", background: "#f1f5f9", padding: "2px 8px", borderRadius: "10px" }}>
+                                                {new Date(post.createdAt || post.created_at).toLocaleString()}
+                                            </span>
+                                        </div>
+                                        <div style={{ fontSize: "0.85rem", color: "var(--text-secondary)", display: "flex", justifyContent: "space-between", alignItems: "center", borderTop: "1px solid var(--glass-border)", paddingTop: "0.75rem", marginTop: "0.75rem" }}>
+                                            <span>Posted by <strong style={{ color: isMe ? "var(--accent-primary)" : "inherit" }}>{isMe ? "You" : getUserName(senderId)}</strong></span>
+                                            {isMe && <span style={{ background: "rgba(168, 85, 247, 0.1)", color: "#a855f7", padding: "2px 8px", borderRadius: "4px", fontSize: "0.7rem", fontWeight: "700", textTransform: "uppercase" }}>Your Post</span>}
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                            {activeTab === "post" && postList?.length === 0 && <div style={{ textAlign: "center", padding: "3rem", color: "var(--text-secondary)" }}>No posts found.</div>}
                         </div>
                     </div>
                 </div>
             )}
 
-            {/* INBOX */}
-            {activeTab === "inbox" && (
-                <div className="flex h-[600px] border border-slate-200 rounded-2xl overflow-hidden bg-white/80 backdrop-blur-md shadow-sm">
-                    {/* Sidebar */}
-                    <div className="w-1/3 border-r border-slate-200 bg-slate-50/50 flex flex-col">
-                        <div className="p-4 flex justify-between items-center border-b border-slate-200 bg-white">
-                            <h2 className="font-bold text-slate-800">Messages</h2>
-                            <button onClick={() => setShowNewChat(true)} className="text-sm bg-blue-600 text-white px-3 py-1.5 rounded-lg hover:bg-blue-700 transition shadow-sm active:scale-95">
-                                + New
+            {/* MY CHATS */}
+            {activeTab === "my_chats" && (
+                <div className="split-panel">
+                    <div className="sidebar-area">
+                        <div style={{ padding: "1rem", borderBottom: "1px solid var(--glass-border)", background: "white", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                            <h2 style={{ fontWeight: "700", fontSize: "1.1rem" }}>Messages</h2>
+                            <button className="btn btn-primary" onClick={() => setShowNewChat(true)} style={{ padding: "0.4rem 0.8rem", fontSize: "0.8rem" }}>
+                                + New Chat
                             </button>
                         </div>
-                        <div className="flex-1 overflow-y-auto">
-                            {inboxUsers?.map((user) => (
-                                <div key={user?.id} onClick={() => setSelectedChatUser(user)} className={`p-4 cursor-pointer border-b border-slate-100 hover:bg-white transition-colors flex items-center gap-3 ${selectedChatUser?.id === user.id ? "bg-white border-l-4 border-l-blue-600 shadow-sm" : "border-l-4 border-l-transparent"}`}>
-                                    <div className="h-10 w-10 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-bold text-sm">
+                        <div style={{ padding: "0.75rem", borderBottom: "1px solid var(--glass-border)", background: "white" }}>
+                            <div style={{ position: "relative" }}>
+                                <Search size={14} color="var(--text-secondary)" style={{ position: "absolute", left: "10px", top: "10px" }} />
+                                <input 
+                                    type="text" 
+                                    placeholder="Search chats..." 
+                                    value={searchMyChats}
+                                    onChange={(e) => setSearchMyChats(e.target.value)} 
+                                    className="input-glass"
+                                    style={{ paddingLeft: "2rem", padding: "0.5rem 0.5rem 0.5rem 2rem", fontSize: "0.85rem", height: "auto" }}
+                                />
+                            </div>
+                        </div>
+                        <div style={{ overflowY: "auto", flex: 1 }}>
+                            {filteredMyChatUsers?.map((user) => (
+                                <div key={user?.id} onClick={() => setSelectedChatUser(user)} className={`sidebar-item ${selectedChatUser?.id === user.id ? 'active' : ''}`}>
+                                    <div style={{ width: "40px", height: "40px", borderRadius: "50%", background: "var(--accent-light)", color: "var(--accent-primary)", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: "bold", flexShrink: 0 }}>
                                         {user?.name?.charAt(0).toUpperCase()}
                                     </div>
-                                    <div className="flex-1 min-w-0">
-                                        <p className="font-semibold text-slate-800 text-sm truncate">{user?.name}</p>
-                                        <p className="text-xs text-slate-500 truncate">{user?.type}</p>
+                                    <div style={{ overflow: "hidden", flex: 1 }}>
+                                        <div style={{ fontWeight: "600", fontSize: "0.9rem", color: "var(--text-primary)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{user?.name}</div>
+                                        <div style={{ fontSize: "0.75rem", color: "var(--text-secondary)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{user?.lastMessage}</div>
+                                    </div>
+                                    <div style={{ fontSize: "0.7rem", color: "var(--text-secondary)", alignSelf: "flex-start", marginTop: "0.2rem", whiteSpace: "nowrap" }}>
+                                        {user?.lastMessageTime ? new Date(user.lastMessageTime).toLocaleDateString([], { month: 'short', day: 'numeric' }) : ''}
                                     </div>
                                 </div>
                             ))}
-                            {inboxUsers?.length === 0 && <div className="p-6 text-center text-slate-400 text-sm">No active conversations.</div>}
+                            {filteredMyChatUsers?.length === 0 && <div style={{ padding: "2rem", textAlign: "center", color: "var(--text-secondary)" }}>No active conversations.</div>}
                         </div>
                     </div>
 
-                    {/* Chat Area */}
-                    <div className="flex-1 flex flex-col bg-white">
+                    <div className="content-area">
                         {selectedChatUser ? (
                             <>
-                                <div className="p-4 border-b border-slate-200 bg-white flex items-center gap-3 shadow-sm z-10">
-                                    <div className="h-10 w-10 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-bold">
+                                <div style={{ padding: "1rem", borderBottom: "1px solid var(--glass-border)", display: "flex", alignItems: "center", gap: "1rem", zIndex: 10, background: "white" }}>
+                                    <div style={{ width: "40px", height: "40px", borderRadius: "50%", background: "var(--accent-light)", color: "var(--accent-primary)", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: "bold" }}>
                                         {selectedChatUser.name?.charAt(0).toUpperCase()}
                                     </div>
                                     <div>
-                                        <h3 className="font-bold text-slate-800">{selectedChatUser.name}</h3>
-                                        <p className="text-xs text-slate-500 capitalize">{selectedChatUser.type}</p>
+                                        <h3 style={{ fontWeight: "700", fontSize: "1rem" }}>{selectedChatUser.name}</h3>
+                                        <p style={{ fontSize: "0.75rem", color: "var(--text-secondary)", textTransform: "capitalize" }}>{selectedChatUser.type}</p>
                                     </div>
                                 </div>
-                                <div className="flex-1 overflow-y-auto p-6 space-y-4 bg-slate-50">
-                                    {selectedChatMessages?.map((msg) => {
-                                        const isMe = msg.firstPerson == myself?.id;
+                                
+                                <div style={{ flex: 1, overflowY: "auto", padding: "1.5rem", display: "flex", flexDirection: "column", gap: "1rem", background: "#f8fafc" }}>
+                                    {myChatMessages?.map((msg) => {
+                                        const isMe = msg.sender_id == myself?.id;
                                         return (
-                                            <div key={msg.id} className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}>
-                                                <div className={`max-w-[70%] px-4 py-2.5 rounded-2xl text-sm shadow-sm ${isMe ? "bg-blue-600 text-white rounded-br-sm" : "bg-white border border-slate-200 text-slate-800 rounded-bl-sm"}`}>
-                                                    <p>{msg.title}</p>
-                                                    <span className={`text-[10px] block mt-1 ${isMe ? 'text-blue-200' : 'text-slate-400'}`}>
-                                                        {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                                    </span>
+                                            <div key={msg.id} style={{ display: "flex", justifyContent: isMe ? "flex-end" : "flex-start" }}>
+                                                <div className={`chat-bubble ${isMe ? 'mine' : 'theirs'}`}>
+                                                    <div style={{ whiteSpace: "pre-wrap" }}>{msg.message || msg.title}</div>
+                                                    <div style={{ fontSize: "0.7rem", marginTop: "0.25rem", textAlign: isMe ? "right" : "left", opacity: 0.8 }}>
+                                                        {new Date(msg.created_at || msg.createdAt).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                                                    </div>
                                                 </div>
                                             </div>
                                         );
                                     })}
-                                    {selectedChatMessages?.length === 0 && <div className="h-full flex items-center justify-center text-slate-400">Say hello to {selectedChatUser.name}!</div>}
+                                    {myChatMessages?.length === 0 && <div style={{ textAlign: "center", color: "var(--text-secondary)", marginTop: "2rem" }}>Say hello to {selectedChatUser.name}!</div>}
                                 </div>
-                                <div className="p-4 bg-white border-t border-slate-200">
-                                    <div className="flex gap-2 bg-slate-50 p-1.5 rounded-xl border border-slate-200 focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-100 transition-all">
+                                
+                                <div style={{ padding: "1rem", borderTop: "1px solid var(--glass-border)", background: "white" }}>
+                                    <div style={{ display: "flex", gap: "0.5rem", background: "#f1f5f9", padding: "0.3rem", borderRadius: "var(--radius-md)" }}>
                                         <input
                                             value={content}
                                             onChange={(e) => setContent(e.target.value)}
                                             onKeyDown={(e) => e.key === 'Enter' && handleSend()}
-                                            className="flex-1 bg-transparent px-3 py-2 focus:outline-none text-sm text-slate-700"
+                                            className="input-glass"
+                                            style={{ background: "transparent", border: "none", boxShadow: "none" }}
                                             placeholder="Type a message..."
                                         />
-                                        <button onClick={handleSend} className="bg-blue-600 text-white p-2.5 rounded-lg hover:bg-blue-700 transition-all shadow-sm active:scale-95">
-                                            <Send size={18} />
+                                        <button onClick={handleSend} className="btn btn-primary" style={{ padding: "0.5rem 1rem" }}>
+                                            <Send size={16} />
                                         </button>
                                     </div>
                                 </div>
                             </>
                         ) : (
-                            <div className="flex-1 flex flex-col items-center justify-center text-slate-400 bg-slate-50">
-                                <MessageSquare size={48} className="text-slate-300 mb-4" />
-                                <h3 className="text-lg font-medium text-slate-600">Your Messages</h3>
-                                <p className="text-sm mt-1">Select a chat to start messaging or start a new one.</p>
+                            <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", color: "var(--text-secondary)" }}>
+                                <MessageSquare size={48} style={{ opacity: 0.2, marginBottom: "1rem" }} />
+                                <h3 style={{ fontSize: "1.2rem", fontWeight: "600", color: "var(--text-primary)" }}>Your Messages</h3>
+                                <p style={{ fontSize: "0.85rem" }}>Select a chat to start messaging or start a new one.</p>
                             </div>
                         )}
                     </div>
+                </div>
+            )}
 
-                    {/* New Chat Modal */}
-                    {showNewChat && (
-                        <div onClick={() => setShowNewChat(false)} className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-                            <div onClick={(e) => e.stopPropagation()} className="bg-white w-full max-w-md rounded-2xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200 border border-slate-200">
-                                <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50">
-                                    <h2 className="text-lg font-bold text-slate-900">Start New Chat</h2>
-                                    <button onClick={() => setShowNewChat(false)} className="text-slate-400 hover:text-slate-600 transition bg-white p-1 rounded-md border border-slate-200 hover:bg-slate-100">✕</button>
-                                </div>
-                                <div className="px-6 py-4 border-b border-slate-100 bg-white">
-                                    <div className="relative">
-                                        <input type="text" placeholder="Search users by name..." onChange={(e) => setSearchInboxQuery(e.target.value)} className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-4 focus:ring-blue-100 focus:border-blue-500 text-sm bg-slate-50 transition-all" />
-                                        <Search size={16} className="absolute left-3.5 top-3 text-slate-400" />
-                                    </div>
-                                </div>
-                                <div className="max-h-[350px] overflow-y-auto bg-white">
-                                    {filteredUsers?.length > 0 ? (
-                                        filteredUsers.map((user) => (
-                                            <div key={user.id} onClick={() => { setSelectedChatUser(user); setSearchInboxQuery(""); setShowNewChat(false); }} className="flex items-center gap-3 px-6 py-3 cursor-pointer transition-colors hover:bg-blue-50 border-b border-slate-50">
-                                                <div className="h-10 w-10 flex items-center justify-center rounded-full bg-blue-100 text-blue-600 font-bold text-sm shadow-sm">{user.name?.charAt(0).toUpperCase()}</div>
-                                                <div>
-                                                    <p className="text-sm font-semibold text-slate-800">{user.name}</p>
-                                                    <p className="text-xs text-slate-500">{user.email} • <span className="capitalize">{user.type}</span></p>
-                                                </div>
-                                            </div>
-                                        ))
-                                    ) : (
-                                        <div className="py-10 text-center text-slate-400 text-sm">No users found</div>
-                                    )}
-                                </div>
+            {/* SYSTEM MONITOR */}
+            {activeTab === "system_monitor" && (
+                <div className="split-panel">
+                    <div className="sidebar-area">
+                        <div style={{ padding: "1rem", borderBottom: "1px solid var(--glass-border)", background: "white" }}>
+                            <h2 style={{ fontWeight: "700", fontSize: "1.1rem", display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                                <Activity size={18} color="#ef4444" /> All Conversations
+                            </h2>
+                        </div>
+                        <div style={{ padding: "0.75rem", borderBottom: "1px solid var(--glass-border)", background: "white" }}>
+                            <div style={{ position: "relative" }}>
+                                <Search size={14} color="var(--text-secondary)" style={{ position: "absolute", left: "10px", top: "10px" }} />
+                                <input 
+                                    type="text" 
+                                    placeholder="Search users..." 
+                                    value={searchMonitor}
+                                    onChange={(e) => setSearchMonitor(e.target.value)} 
+                                    className="input-glass"
+                                    style={{ paddingLeft: "2rem", padding: "0.5rem 0.5rem 0.5rem 2rem", fontSize: "0.85rem", height: "auto" }}
+                                />
                             </div>
                         </div>
-                    )}
+                        <div style={{ overflowY: "auto", flex: 1 }}>
+                            {filteredMonitorChats?.map((chat) => (
+                                <div key={chat.id} onClick={() => loadMonitorHistory(chat)} className={`sidebar-item ${selectedMonitorChat?.id === chat.id ? 'active' : ''}`} style={{ borderLeftColor: "#ef4444", alignItems: "flex-start" }}>
+                                    <div style={{ flex: 1, overflow: "hidden" }}>
+                                        <div style={{ fontWeight: "600", fontSize: "0.9rem", color: "var(--text-primary)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                                            {chat.user1.name} <span style={{ fontWeight: "normal", fontSize: "0.75rem", color: "var(--text-secondary)" }}>({chat.user1.role})</span>
+                                        </div>
+                                        <div style={{ margin: "0.1rem 0", color: "var(--text-secondary)", fontSize: "0.8rem" }}>↔</div>
+                                        <div style={{ fontWeight: "600", fontSize: "0.9rem", color: "var(--text-primary)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                                            {chat.user2.name} <span style={{ fontWeight: "normal", fontSize: "0.75rem", color: "var(--text-secondary)" }}>({chat.user2.role})</span>
+                                        </div>
+                                        <div style={{ fontSize: "0.75rem", color: "var(--text-secondary)", marginTop: "0.4rem", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                                            {chat.lastMessage}
+                                        </div>
+                                    </div>
+                                    <div style={{ fontSize: "0.7rem", color: "var(--text-secondary)", marginTop: "0.2rem", whiteSpace: "nowrap" }}>
+                                        {chat.time ? new Date(chat.time).toLocaleDateString([], { month: 'short', day: 'numeric' }) : ''}
+                                    </div>
+                                </div>
+                            ))}
+                            {filteredMonitorChats?.length === 0 && <div style={{ padding: "2rem", textAlign: "center", color: "var(--text-secondary)" }}>No active system conversations.</div>}
+                        </div>
+                    </div>
+
+                    <div className="content-area">
+                        {selectedMonitorChat ? (
+                            <>
+                                <div style={{ padding: "1rem", borderBottom: "1px solid var(--glass-border)", display: "flex", justifyContent: "space-between", alignItems: "center", background: "white" }}>
+                                    <div>
+                                        <h3 style={{ fontWeight: "700", fontSize: "1rem" }}>Chat History</h3>
+                                        <p style={{ fontSize: "0.75rem", color: "var(--text-secondary)" }}>{selectedMonitorChat.user1.name} & {selectedMonitorChat.user2.name}</p>
+                                    </div>
+                                    <span style={{ background: "rgba(239, 68, 68, 0.1)", color: "#ef4444", padding: "4px 8px", borderRadius: "4px", fontSize: "0.7rem", fontWeight: "700", textTransform: "uppercase" }}>
+                                        Read Only
+                                    </span>
+                                </div>
+                                <div style={{ flex: 1, overflowY: "auto", padding: "1.5rem", display: "flex", flexDirection: "column", gap: "1rem", background: "#f8fafc" }}>
+                                    {monitorHistory?.map((msg) => {
+                                        const isUser1 = msg.sender_id === selectedMonitorChat.user1_id;
+                                        const senderName = isUser1 ? selectedMonitorChat.user1.name : selectedMonitorChat.user2.name;
+                                        return (
+                                            <div key={msg.id} style={{ display: "flex", justifyContent: isUser1 ? "flex-end" : "flex-start" }}>
+                                                <div style={{ display: "flex", flexDirection: "column", alignItems: isUser1 ? "flex-end" : "flex-start", maxWidth: "75%" }}>
+                                                    <span style={{ fontSize: "0.7rem", color: "var(--text-secondary)", marginBottom: "0.2rem" }}>{senderName}</span>
+                                                    <div className={`chat-bubble ${isUser1 ? 'mine' : 'theirs'}`} style={isUser1 ? { background: "#ef4444" } : {}}>
+                                                        <div style={{ whiteSpace: "pre-wrap" }}>{msg.message}</div>
+                                                        <div style={{ fontSize: "0.7rem", marginTop: "0.25rem", textAlign: isUser1 ? "right" : "left", opacity: 0.8 }}>
+                                                            {new Date(msg.created_at).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                    {monitorHistory?.length === 0 && <div style={{ textAlign: "center", color: "var(--text-secondary)", marginTop: "2rem" }}>Loading history...</div>}
+                                </div>
+                            </>
+                        ) : (
+                            <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", color: "var(--text-secondary)" }}>
+                                <Activity size={48} style={{ opacity: 0.2, marginBottom: "1rem" }} />
+                                <h3 style={{ fontSize: "1.2rem", fontWeight: "600", color: "var(--text-primary)" }}>System Monitor</h3>
+                                <p style={{ fontSize: "0.85rem" }}>Select a conversation to view its history.</p>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            )}
+
+            {/* New Chat Modal */}
+            {showNewChat && (
+                <div className="modal-overlay" onClick={() => setShowNewChat(false)}>
+                    <div className="modal-card" onClick={(e) => e.stopPropagation()}>
+                        <div style={{ padding: "1.25rem", borderBottom: "1px solid var(--glass-border)", display: "flex", justifyContent: "space-between", alignItems: "center", background: "#f8fafc" }}>
+                            <h2 style={{ fontWeight: "700", fontSize: "1.1rem" }}>Start New Chat</h2>
+                            <button onClick={() => setShowNewChat(false)} className="btn btn-ghost" style={{ padding: "0.25rem" }}>✕</button>
+                        </div>
+                        <div style={{ padding: "1.25rem", borderBottom: "1px solid var(--glass-border)" }}>
+                            <div style={{ position: "relative" }}>
+                                <Search size={16} color="var(--text-secondary)" style={{ position: "absolute", left: "12px", top: "12px" }} />
+                                <input 
+                                    type="text" 
+                                    placeholder="Search users by name..." 
+                                    onChange={(e) => setSearchInboxQuery(e.target.value)} 
+                                    className="input-glass"
+                                    style={{ paddingLeft: "2.5rem" }}
+                                />
+                            </div>
+                        </div>
+                        <div style={{ maxHeight: "300px", overflowY: "auto" }}>
+                            {filteredUsers?.length > 0 ? (
+                                filteredUsers.map((user) => (
+                                    <div key={user.id} onClick={() => { setSelectedChatUser(user); setSearchInboxQuery(""); setShowNewChat(false); }} 
+                                        style={{ display: "flex", alignItems: "center", gap: "1rem", padding: "1rem 1.25rem", cursor: "pointer", borderBottom: "1px solid #f1f5f9", transition: "var(--transition)" }}
+                                        onMouseEnter={(e) => e.currentTarget.style.background = "#f8fafc"}
+                                        onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}
+                                    >
+                                        <div style={{ width: "36px", height: "36px", borderRadius: "50%", background: "var(--accent-light)", color: "var(--accent-primary)", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: "bold", fontSize: "0.85rem" }}>
+                                            {user.name?.charAt(0).toUpperCase()}
+                                        </div>
+                                        <div>
+                                            <p style={{ fontWeight: "600", fontSize: "0.9rem", color: "var(--text-primary)" }}>{user.name}</p>
+                                            <p style={{ fontSize: "0.75rem", color: "var(--text-secondary)" }}>{user.email} • <span style={{ textTransform: "capitalize" }}>{user.type}</span></p>
+                                        </div>
+                                    </div>
+                                ))
+                            ) : (
+                                <div style={{ padding: "2rem", textAlign: "center", color: "var(--text-secondary)" }}>No users found</div>
+                            )}
+                        </div>
+                    </div>
                 </div>
             )}
         </div>

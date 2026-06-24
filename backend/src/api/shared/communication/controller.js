@@ -1,25 +1,47 @@
 import { supabase } from "../../../config/supabaseClient.js";
+import { getIO } from "../../../sockets/chatHandler.js";
 
 export const createCommunication = async (req, res) => {
-  const { data } = req.body;
+  const payload = req.body.data || req.body;
 
   try {
+    // Map legacy payload (firstPerson, title) to current schema (sender_id, message)
+    const dbPayload = {
+      sender_id: payload.firstPerson || payload.sender_id,
+      message: payload.title || payload.message,
+      type: payload.type,
+      // For broadcasts/posts, receiver_id might be null or handled differently
+      receiver_id: payload.receiver_id || null
+    };
+
     // 1️⃣ Insert Chat / Communication
     const { data: chat, error: insertError } = await supabase
       .from("communication")
-      .insert([data])
+      .insert([dbPayload])
       .select();
 
     if (insertError || !chat || chat.length === 0) {
+      console.error("Communication Insert Error:", insertError, "Payload:", dbPayload);
       return res.status(400).json({
         success: false,
         message: insertError ? insertError.message : "Could not send",
       });
     }
 
+    // Emit live chat socket event if this is a one-on-one message
+    if (dbPayload.receiver_id && dbPayload.sender_id) {
+      try {
+        const io = getIO();
+        const room = [dbPayload.sender_id, dbPayload.receiver_id].sort().join('_');
+        io.to(room).to(dbPayload.sender_id).to(dbPayload.receiver_id).to("admin_monitor").emit("receive_message", chat[0]);
+      } catch (socketErr) {
+        console.error("Socket error during API createCommunication:", socketErr);
+      }
+    }
+
     // 2️⃣ Get Receiver IDs from data.secondPerson
-    const receiverIds = Array.isArray(data.secondPerson)
-      ? data.secondPerson
+    const receiverIds = Array.isArray(payload.secondPerson)
+      ? payload.secondPerson
       : [];
 
     if (receiverIds.length > 0) {
@@ -33,8 +55,8 @@ export const createCommunication = async (req, res) => {
         const notificationInserts = users.map(user => ({
             user_id: user.id,
             title: "New Message",
-            message: `You got a new ${data?.type}`,
-            type: data?.type || "communication",
+            message: `You got a new ${payload?.type}`,
+            type: payload?.type || "communication",
             is_read: false
         }));
 
