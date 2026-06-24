@@ -18,7 +18,7 @@ export const apiSlice = createApi({
       return headers;
     },
   }),
-  tagTypes: ['Dashboard', 'Academics', 'Attendance', 'Notifications', 'Chats', 'LiveChat', 'Quote', 'Rewards', 'Timetable', 'CourseWork', 'Events', 'Fees'],
+  tagTypes: ['Dashboard', 'Academics', 'Attendance', 'Notifications', 'Chats', 'LiveChat', 'Quote', 'Rewards', 'Timetable', 'CourseWork', 'Events', 'Fees', 'Consents'],
   endpoints: (builder) => ({
     // Auth endpoints
     login: builder.mutation({
@@ -146,6 +146,20 @@ export const apiSlice = createApi({
       }),
       invalidatesTags: ['Notifications'],
     }),
+    // Consents
+    getConsents: builder.query({
+      query: () => '/student_app/consents/student',
+      providesTags: ['Consents'],
+    }),
+    updateConsentStatus: builder.mutation({
+      query: ({ id, status }) => ({
+        url: `/student_app/consents/student/${id}/status`,
+        method: 'PUT',
+        body: { status },
+      }),
+      invalidatesTags: ['Consents'],
+    }),
+
   }),
 });
 
@@ -170,4 +184,6 @@ export const {
   useGetTeachersQuery,
   useGetPrincipalQuery,
   useGetLiveChatsListQuery,
+  useGetConsentsQuery,
+  useUpdateConsentStatusMutation,
 } = apiSlice;

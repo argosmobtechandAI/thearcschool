@@ -51,4 +51,8 @@ studentRouter.use("/communication", communicationRouter);
 import { changePassword } from "../teacher_app/passwordController.js";
 studentRouter.post("/auth/change-password", changePassword);
 
+// Consents
+import consentRouter from "../shared/consents/routes.js";
+studentRouter.use("/consents", consentRouter);
+
 export default studentRouter;

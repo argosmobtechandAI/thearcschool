@@ -199,3 +199,27 @@ tr:hover {
   overflow-y: auto;
   animation: slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
+
+/* Print Styles */
+@media print {
+  aside {
+    display: none !important;
+  }
+  main {
+    padding: 0 !important;
+    height: auto !important;
+    overflow: visible !important;
+  }
+  .btn-ghost, button {
+    display: none !important;
+  }
+  .glass-panel {
+    box-shadow: none !important;
+    border: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+  body {
+    background: white !important;
+  }
+}

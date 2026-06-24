@@ -229,7 +229,7 @@ const DashboardScreen = ({ navigation }) => {
 
           <TouchableOpacity 
             style={[styles.actionCard, { backgroundColor: '#A855F7' }]}
-            onPress={() => navigation.navigate('Tabs', { screen: 'Result' })}
+            onPress={() => navigation.navigate('Result')}
             activeOpacity={0.8}
           >
             <View style={styles.actionCardIconBox}>
@@ -242,36 +242,21 @@ const DashboardScreen = ({ navigation }) => {
             <Icon name="trending-up" size={64} color="rgba(255,255,255,0.15)" style={styles.actionCardWatermark} />
           </TouchableOpacity>
         </View>
-
-        {/* 4. Reward: Trophy Cabinet */}
-        {hasBadges && (
-          <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>My Trophy Cabinet</Text>
-              <TouchableOpacity onPress={() => navigation.navigate('Rewards')}>
-                <Text style={styles.sectionLink}>View All</Text>
-              </TouchableOpacity>
+        <View style={styles.actionCardsRow}>
+          <TouchableOpacity 
+            style={[styles.actionCard, { backgroundColor: '#10B981' }]}
+            onPress={() => navigation.navigate('Consents')}
+            activeOpacity={0.8}
+          >
+            <View style={styles.actionCardIconBox}>
+              <Icon name="file-text" size={18} color="#10B981" />
             </View>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 12 }}>
-              {attendanceBadge && attendanceBadge.level !== 'none' && (
-                <View style={[styles.badgeCard, { borderColor: attendanceBadge.color }]}>
-                  <View style={[styles.badgeIconBg, { backgroundColor: attendanceBadge.color + '20' }]}>
-                    <Icon name="shield" size={24} color={attendanceBadge.color} />
-                  </View>
-                  <Text style={styles.badgeLabel}>{attendanceBadge.label}</Text>
-                </View>
-              )}
-              {academicBadge && academicBadge.level !== 'none' && (
-                <View style={[styles.badgeCard, { borderColor: academicBadge.color, marginLeft: 12 }]}>
-                  <View style={[styles.badgeIconBg, { backgroundColor: academicBadge.color + '20' }]}>
-                    <Icon name="award" size={24} color={academicBadge.color} />
-                  </View>
-                  <Text style={styles.badgeLabel}>{academicBadge.label}</Text>
-                </View>
-              )}
-            </ScrollView>
-          </View>
-        )}
+            <Text style={styles.actionCardTitle}>View{'\n'}Consents</Text>
+            <Icon name="file-text" size={64} color="rgba(255,255,255,0.15)" style={styles.actionCardWatermark} />
+          </TouchableOpacity>
+        </View>
+
+        {/* 4. Reward: Trophy Cabinet removed for now */}
 
         {/* 5. Performance: Stat Chips */}
         <View style={styles.statsRow}>

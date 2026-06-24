@@ -2,6 +2,7 @@ import React from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useSelector } from 'react-redux';
+import { colors } from '../theme/colors';
 
 import LoginScreen from '../features/auth/LoginScreen';
 import TabNavigator from './TabNavigator';
@@ -9,6 +10,7 @@ import { DrawerProvider } from './DrawerContext';
 import { navigationRef } from './navigationRef';
 import LiveChatScreen from '../features/communication/LiveChatScreen';
 import ChangePasswordScreen from '../features/profile/ChangePasswordScreen';
+import ConsentsScreen from '../features/consents/ConsentsScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -35,6 +37,17 @@ const RootNavigator = () => {
               <Stack.Screen name="Main" component={MainScreen} />
               <Stack.Screen name="LiveChatScreen" component={LiveChatScreen} />
               <Stack.Screen name="ChangePassword" component={ChangePasswordScreen} />
+              <Stack.Screen 
+                name="Consents" 
+                component={ConsentsScreen} 
+                options={{ 
+                  headerShown: true, 
+                  title: "Consents",
+                  headerStyle: { backgroundColor: colors.primary },
+                  headerTintColor: '#fff',
+                  headerTitleStyle: { fontWeight: '600' }
+                }} 
+              />
             </>
         )}
       </Stack.Navigator>

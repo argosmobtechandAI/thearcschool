@@ -10,7 +10,6 @@ import DashboardScreen from '../features/dashboard/DashboardScreen';
 import TimetableScreen from '../features/timetable/TimetableScreen';
 import ResultScreen from '../features/academics/ResultScreen';
 import ProfileScreen from '../features/profile/ProfileScreen';
-import RewardsScreen from '../features/rewards/RewardsScreen';
 import CommunicationScreen from '../features/communication/CommunicationScreen';
 import AttendanceScreen from '../features/attendance/AttendanceScreen';
 import AcademicCalendarScreen from '../features/academics/AcademicCalendarScreen';
@@ -73,7 +72,6 @@ const TabNavigator = () => {
       <Tab.Screen name="Profile" component={ProfileScreen} />
       
       {/* Hidden Tabs (Screens that keep the bottom bar but have no icon in it) */}
-      <Tab.Screen name="Rewards" component={RewardsScreen} options={{ tabBarItemStyle: { display: 'none' } }} />
       <Tab.Screen name="Attendance" component={AttendanceScreen} options={{ tabBarItemStyle: { display: 'none' } }} />
       <Tab.Screen name="AcademicCalendar" component={AcademicCalendarScreen} options={{ tabBarItemStyle: { display: 'none' } }} />
       <Tab.Screen name="DateSheet" component={DateSheetScreen} options={{ tabBarItemStyle: { display: 'none' } }} />

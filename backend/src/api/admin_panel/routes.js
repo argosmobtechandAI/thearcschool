@@ -84,4 +84,8 @@ router.use("/notifications", notificationsRouter);
 import adminCommunicationRouter from "./communication/routes.js";
 router.use("/communication", adminCommunicationRouter);
 
+// --- Consents ---
+import consentRouter from "../shared/consents/routes.js";
+router.use("/consents", consentRouter);
+
 export default router;

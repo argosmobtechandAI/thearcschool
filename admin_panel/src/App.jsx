@@ -22,6 +22,7 @@ import Communication from './pages/Communication';
 import Notification from './pages/Notification';
 import SchoolInfo from './pages/SchoolInfo';
 import Complaints from './pages/Complaints';
+import Consents from './pages/Consents';
 import SubjectManagement from './pages/SubjectManagement';
 import SubjectTeachers from './pages/SubjectTeachers';
 import RoomManagement from './pages/RoomManagement';
@@ -31,6 +32,7 @@ import StudentProfile from './pages/StudentProfile';
 import TeacherProfile from './pages/TeacherProfile';
 import ClassProfile from './pages/ClassProfile';
 import StaffRoles from './pages/StaffRoles';
+import ProfitLoss from './pages/ProfitLoss';
 
 const ProtectedRoute = ({ children, allowedRoles }) => {
   const { isAuthenticated, user } = useSelector((state) => state.auth);
@@ -82,6 +84,7 @@ function App() {
           <Route path="notification" element={<ProtectedRoute allowedRoles={["admin"]}><Notification /></ProtectedRoute>} />
           <Route path="school-info" element={<ProtectedRoute allowedRoles={["admin"]}><SchoolInfo /></ProtectedRoute>} />
           <Route path="complaints" element={<ProtectedRoute allowedRoles={["admin"]}><Complaints /></ProtectedRoute>} />
+          <Route path="consents" element={<ProtectedRoute allowedRoles={["admin", "principal"]}><Consents /></ProtectedRoute>} />
           <Route path="staff-roles" element={<ProtectedRoute allowedRoles={["admin"]}><StaffRoles /></ProtectedRoute>} />
           
           {/* Shared Admin / Teachers / etc (if applicable, but mainly admin for these) */}
@@ -94,6 +97,7 @@ function App() {
           
           {/* Finance Only Routes */}
           <Route path="fees" element={<ProtectedRoute allowedRoles={["admin", "finance"]}><FeeManagement /></ProtectedRoute>} />
+          <Route path="pnl" element={<ProtectedRoute allowedRoles={["admin", "finance"]}><ProfitLoss /></ProtectedRoute>} />
         </Route>
         
         <Route path="*" element={<Navigate to="/" replace />} />

@@ -85,4 +85,11 @@ export const uploadFile = async (file, bucket = "school") => {
   return response.data.url;
 };
 
+// Consents API
+export const createConsent = (data) => api.post('/admin_panel/consents', data);
+export const getConsents = (params) => api.get('/admin_panel/consents/admin', { params });
+export const getConsentReport = (id) => api.get(`/admin_panel/consents/admin/${id}/report`);
+export const updateConsent = (id, data) => api.put(`/admin_panel/consents/admin/${id}`, data);
+export const deleteConsent = (id) => api.delete(`/admin_panel/consents/admin/${id}`);
+
 export default api;

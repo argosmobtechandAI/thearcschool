@@ -15,8 +15,9 @@ const DateRangePicker = ({
   defaultRange = 'mtd',
   initialPreset
 }) => {
-  const actualStartDate = value?.start || startDate;
-  const actualEndDate = value?.end || endDate;
+  const [internalDates, setInternalDates] = useState({ start: '', end: '' });
+  const actualStartDate = value?.start || startDate || internalDates.start;
+  const actualEndDate = value?.end || endDate || internalDates.end;
   const [selectedRange, setSelectedRange] = useState(initialPreset || defaultRange);
 
   const ranges = {
@@ -89,6 +90,7 @@ const DateRangePicker = ({
       if (range === 'custom') return;
       const dates = getRangeDates(range);
       if (dates) {
+        setInternalDates(dates);
         if (typeof onRangeChange === 'function') {
           onRangeChange(dates);
         } else {
@@ -102,6 +104,7 @@ const DateRangePicker = ({
     if (!actualStartDate && !actualEndDate && selectedRange !== 'custom') {
       const dates = getRangeDates(initialPreset || defaultRange);
       if (dates) {
+        setInternalDates(dates);
         if (typeof onRangeChange === 'function') {
           onRangeChange(dates);
         } else {
@@ -125,7 +128,7 @@ const DateRangePicker = ({
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [actualStartDate, actualEndDate]);
+  }, [value, startDate, endDate]);
 
   const handleRangeChange = (e) => {
     const val = e.target.value;
@@ -135,9 +138,14 @@ const DateRangePicker = ({
 
   const handleDateChange = (type, val) => {
     setSelectedRange('custom');
+    const newDates = type === 'start' 
+      ? { start: val, end: actualEndDate } 
+      : { start: actualStartDate, end: val };
+    
+    setInternalDates(newDates);
+
     if (typeof onRangeChange === 'function') {
-      if (type === 'start') onRangeChange({ start: val, end: actualEndDate });
-      else onRangeChange({ start: actualStartDate, end: val });
+      onRangeChange(newDates);
     } else {
       if (type === 'start' && typeof setStartDate === 'function') setStartDate(val);
       if (type === 'end' && typeof setEndDate === 'function') setEndDate(val);
@@ -157,24 +165,22 @@ const DateRangePicker = ({
         ))}
       </select>
 
-      <div style={{ position: "relative", flex: 1, minWidth: "120px" }}>
-        <Calendar size={14} style={{ position: "absolute", left: "0.5rem", top: "50%", transform: "translateY(-50%)", color: "var(--text-secondary)" }} />
+      <div style={{ flex: 1, minWidth: "120px" }}>
         <input
           type="date"
           className="input-glass"
-          style={{ width: "100%", fontSize: "0.85rem", padding: "0.4rem 0.2rem 0.4rem 1.8rem" }}
+          style={{ width: "100%", fontSize: "0.85rem", padding: "0.4rem 0.5rem" }}
           value={actualStartDate || ""}
           onChange={(e) => handleDateChange('start', e.target.value)}
           title="Start Date"
         />
       </div>
       <span style={{ color: "var(--text-secondary)", fontSize: "0.85rem" }}>to</span>
-      <div style={{ position: "relative", flex: 1, minWidth: "120px" }}>
-        <Calendar size={14} style={{ position: "absolute", left: "0.5rem", top: "50%", transform: "translateY(-50%)", color: "var(--text-secondary)" }} />
+      <div style={{ flex: 1, minWidth: "120px" }}>
         <input
           type="date"
           className="input-glass"
-          style={{ width: "100%", fontSize: "0.85rem", padding: "0.4rem 0.2rem 0.4rem 1.8rem" }}
+          style={{ width: "100%", fontSize: "0.85rem", padding: "0.4rem 0.5rem" }}
           value={actualEndDate || ""}
           onChange={(e) => handleDateChange('end', e.target.value)}
           title="End Date"

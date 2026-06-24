@@ -1,7 +1,7 @@
 import { Outlet, useNavigate, NavLink } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import { useEffect, useState } from "react";
-import { LogOut, LayoutDashboard, Users, BookOpen, UserCircle, Settings, UserCheck, IndianRupee, FileEdit, Clock, Calendar, ClipboardCheck, Bell, DollarSign, MessageSquare, Info, ShieldAlert, MapPin, ExternalLink, TrendingUp } from "lucide-react";
+import { LogOut, LayoutDashboard, Users, BookOpen, UserCircle, Settings, UserCheck, IndianRupee, FileEdit, Clock, Calendar, ClipboardCheck, Bell, DollarSign, MessageSquare, Info, ShieldAlert, MapPin, ExternalLink, TrendingUp, FileSignature } from "lucide-react";
 import { toast } from "react-toastify";
 import { logout } from "../features/authSlice";
 import { messaging } from "../config/firebase";
@@ -164,6 +164,7 @@ const AdminLayout = () => {
                 <Bell size={16} /> Notifications
               </NavLink>
               <NavLink to="/school-info" style={navLinkStyle}><Info size={16} /> School Info</NavLink>
+              <NavLink to="/consents" style={navLinkStyle}><FileSignature size={16} /> Consents</NavLink>
             </>
           )}
 
