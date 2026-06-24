@@ -41,7 +41,7 @@ const ChatListScreen = ({ navigation }) => {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.header}>
         <Text style={styles.title}>Messages</Text>
         <Text style={styles.subtitle}>Connect with Parents & Admin</Text>

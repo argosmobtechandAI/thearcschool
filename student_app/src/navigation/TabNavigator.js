@@ -1,6 +1,7 @@
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, Platform } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/Feather';
 import { colors } from '../theme/colors';
 
@@ -38,6 +39,7 @@ const iconMap = {
 };
 
 const TabNavigator = () => {
+  const insets = useSafeAreaInsets();
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
@@ -54,9 +56,9 @@ const TabNavigator = () => {
           shadowOffset: { width: 0, height: -4 },
           shadowOpacity: 0.08,
           shadowRadius: 8,
-          paddingBottom: 6,
+          paddingBottom: Platform.OS === 'ios' ? insets.bottom : 8,
           paddingTop: 6,
-          height: 64,
+          height: Platform.OS === 'ios' ? 64 + insets.bottom : 64,
         },
         tabBarIcon: ({ color, focused }) => (
           <TabIcon name={iconMap[route.name] || 'circle'} color={color} focused={focused} />

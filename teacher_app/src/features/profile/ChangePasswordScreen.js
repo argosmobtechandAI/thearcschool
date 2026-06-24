@@ -62,7 +62,7 @@ const ChangePasswordScreen = ({ navigation }) => {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['bottom']}>
       <CustomHeader title="Change Password" showBack={true} />
       
       <KeyboardAvoidingView 

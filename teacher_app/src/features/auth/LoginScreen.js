@@ -74,7 +74,7 @@ const LoginScreen = () => {
   };
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       <StatusBar barStyle="light-content" backgroundColor={colors.primary} />
       <KeyboardDismissView>
         <View style={styles.topAccent} />
@@ -157,7 +157,7 @@ const LoginScreen = () => {
         onPrimaryPress={() => setModalState(prev => ({ ...prev, visible: false }))}
         onClose={() => setModalState(prev => ({ ...prev, visible: false }))}
       />
-    </View>
+    </SafeAreaView>
   );
 };
 
