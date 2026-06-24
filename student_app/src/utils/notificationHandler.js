@@ -6,6 +6,8 @@ import { navigate } from '../navigation/navigationRef';
 // Invalidate the RTK Query notifications cache so the in-app list auto-refreshes
 const invalidateNotificationsCache = () => {
   try {
+    const { DeviceEventEmitter } = require('react-native');
+    DeviceEventEmitter.emit('onNotificationReceived');
     const { store } = require('../store');
     const { apiSlice } = require('../store/apiSlice');
     store.dispatch(apiSlice.util.invalidateTags(['Notifications', 'Dashboard']));

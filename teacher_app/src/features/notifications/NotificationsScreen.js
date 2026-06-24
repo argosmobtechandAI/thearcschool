@@ -13,6 +13,14 @@ const NotificationsScreen = ({ navigation }) => {
   });
   const [markAsRead] = useMarkNotificationReadMutation();
 
+  React.useEffect(() => {
+    const { DeviceEventEmitter } = require('react-native');
+    const sub = DeviceEventEmitter.addListener('onNotificationReceived', () => {
+      refetch();
+    });
+    return () => sub.remove();
+  }, [refetch]);
+
   const notifications = data?.data || [];
 
   const handlePress = async (item) => {
@@ -109,7 +117,7 @@ const NotificationsScreen = ({ navigation }) => {
   );
 
   return (
-    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+    <SafeAreaView style={styles.container} edges={['bottom']}>
       <CustomHeader title="Notifications" showBack />
       
       {isLoading ? (
