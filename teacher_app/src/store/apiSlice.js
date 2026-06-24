@@ -30,7 +30,7 @@ export const apiSlice = createApi({
       providesTags: ['Students'],
     }),
     getTimetable: builder.query({
-      query: () => '/teacher_app/timetable',
+      query: (classId) => `/teacher_app/timetable${classId ? `?classId=${classId}` : ''}`,
       providesTags: ['Timetable'],
     }),
     getExams: builder.query({
@@ -38,11 +38,11 @@ export const apiSlice = createApi({
       providesTags: ['Exams'],
     }),
     getCourses: builder.query({
-      query: () => '/teacher_app/course',
+      query: (classId) => `/teacher_app/course${classId ? `?classId=${classId}` : ''}`,
       providesTags: ['Courses'],
     }),
     getEvents: builder.query({
-      query: () => '/teacher_app/events',
+      query: (classId) => `/teacher_app/events${classId ? `?classId=${classId}` : ''}`,
       providesTags: ['Events'],
     }),
     getAttendance: builder.query({

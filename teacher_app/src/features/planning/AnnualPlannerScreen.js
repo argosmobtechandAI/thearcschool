@@ -7,9 +7,12 @@ import CustomHeader from '../../components/CustomHeader';
 import CustomModal from '../../components/CustomModal';
 import { exportToPDF } from '../../utils/exportUtils';
 
+import { useSelector } from 'react-redux';
+
 const AnnualPlannerScreen = ({ navigation }) => {
-  const { data: eventsData, isLoading: loadingEvents, refetch: refetchEvents, isFetching: fetchingEvents } = useGetEventsQuery();
-  const { data: examsData, isLoading: loadingExams, refetch: refetchExams, isFetching: fetchingExams } = useGetExamsQuery();
+  const activeClassId = useSelector(state => state.app.activeClassId);
+  const { data: eventsData, isLoading: loadingEvents, refetch: refetchEvents, isFetching: fetchingEvents } = useGetEventsQuery(activeClassId, { skip: !activeClassId });
+  const { data: examsData, isLoading: loadingExams, refetch: refetchExams, isFetching: fetchingExams } = useGetExamsQuery(activeClassId, { skip: !activeClassId });
   
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [selectedYear, setSelectedYear] = useState(null);

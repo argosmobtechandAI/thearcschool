@@ -14,10 +14,10 @@ const DashboardScreen = ({ navigation }) => {
   const dispatch = useDispatch();
 
 
-  const { data: examsData, refetch: refetchExams, isFetching: fetchingExams } = useGetExamsQuery();
-  const { data: coursesData, refetch: refetchCourses, isFetching: fetchingCourses } = useGetCoursesQuery();
+  const { data: examsData, refetch: refetchExams, isFetching: fetchingExams } = useGetExamsQuery(activeClassId, { skip: !activeClassId });
+  const { data: coursesData, refetch: refetchCourses, isFetching: fetchingCourses } = useGetCoursesQuery(activeClassId, { skip: !activeClassId });
   const { data: classesData, refetch: refetchClasses, isFetching: fetchingClasses } = useGetTeacherClassesQuery();
-  const { data: timetableData, refetch: refetchTimetable, isFetching: fetchingTimetable } = useGetTimetableQuery();
+  const { data: timetableData, refetch: refetchTimetable, isFetching: fetchingTimetable } = useGetTimetableQuery(activeClassId, { skip: !activeClassId });
 
   useEffect(() => {
     if (classesData?.classes) {
@@ -40,7 +40,7 @@ const DashboardScreen = ({ navigation }) => {
     { skip: !activeClassId }
   );
 
-  const { data: eventsData, refetch: refetchEvents, isFetching: fetchingEvents } = useGetEventsQuery();
+  const { data: eventsData, refetch: refetchEvents, isFetching: fetchingEvents } = useGetEventsQuery(activeClassId, { skip: !activeClassId });
 
   const { data: performanceResponse, refetch: refetchPerformance, isFetching: fetchingPerformance } = useGetClassPerformanceQuery(activeClassId, { skip: !activeClassId });
   const performanceData = performanceResponse?.data || [];
