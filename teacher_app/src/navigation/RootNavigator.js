@@ -156,8 +156,8 @@ const MainTabs = () => {
             shadowOffset: { width: 0, height: -4 },
             shadowOpacity: 0.05,
             shadowRadius: 10,
-            height: Platform.OS === 'ios' ? 65 + insets.bottom : 65,
-            paddingBottom: Platform.OS === 'ios' ? insets.bottom : 10,
+            height: 65 + insets.bottom,
+            paddingBottom: insets.bottom + 10,
             paddingTop: 10,
           },
           tabBarLabelStyle: {
