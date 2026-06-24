@@ -103,7 +103,7 @@ export const getFCMToken = async () => {
 
 export const displayNotification = async (remoteMessage) => {
   const channelId = await notifee.createChannel({
-    id: 'high_importance_channel',
+    id: 'high_importance_channel_v2',
     name: 'High Importance Notifications',
     importance: AndroidImportance.HIGH,
     sound: 'default',
