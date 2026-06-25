@@ -40,9 +40,12 @@ export const createCommunication = async (req, res) => {
     }
 
     // 2️⃣ Get Receiver IDs from data.secondPerson
-    const receiverIds = Array.isArray(payload.secondPerson)
+    let receiverIds = Array.isArray(payload.secondPerson)
       ? payload.secondPerson
       : [];
+
+    // Never send notifications to the sender
+    receiverIds = receiverIds.filter(id => id !== dbPayload.sender_id);
 
     if (receiverIds.length > 0) {
       const { data: users, error: usersError } = await supabase
@@ -61,6 +64,37 @@ export const createCommunication = async (req, res) => {
         }));
 
         await supabase.from("notifications").insert(notificationInserts);
+
+        // 4️⃣ Send Push Notifications to Receivers
+        try {
+          const { FCMService } = await import("../../../services/fcmService.js");
+          const userIds = users.map(user => user.id);
+          const title = "New Message";
+          const body = payload.message || `You got a new ${payload?.type}`;
+          
+          let senderName = "User";
+          try {
+            const { data: sData } = await supabase.from("user").select("name").eq("id", dbPayload.sender_id).single();
+            if (sData && sData.name) senderName = sData.name;
+          } catch (e) {}
+
+          const routeData = {
+            routeScreen: "ChatRoomScreen",
+            routeParams: {
+              chatId: dbPayload.sender_id, chatName: senderName,
+              teacherId: dbPayload.sender_id, teacherName: senderName
+            }
+          };
+
+          await FCMService.sendToUsers(userIds, title, body, {
+             type: payload?.type || "live_chat",
+             sender_id: dbPayload.sender_id,
+             routeScreen: routeData.routeScreen,
+             routeParams: JSON.stringify(routeData.routeParams)
+          });
+        } catch (fcmError) {
+          console.error("Failed to send FCM push for chat:", fcmError);
+        }
       }
     }
 

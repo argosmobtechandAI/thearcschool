@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { fetchUsers, fetchClasses, fetchSubjects } from "../features/dataSlice";
-import api, { sendBroadcastNotification, getAllNotifications } from "../services/api";
+import api, { sendBroadcastNotification, getAllNotifications, markNotificationsAsRead } from "../services/api";
 import { toast } from "react-toastify";
 import { Bell, BellOff, ArrowLeft, Send, Search, Filter } from "lucide-react";
 import { useNavigate } from "react-router-dom";
@@ -82,11 +82,9 @@ export default function Notifications() {
     fetchHistory();
     
     // Auto-mark notifications as read when opening the page
-    import("../services/api").then(({ markNotificationsAsRead }) => {
-      markNotificationsAsRead().then(() => {
-        window.dispatchEvent(new Event('notificationsRead'));
-      }).catch(e => console.error("Failed to mark notifications as read:", e));
-    });
+    markNotificationsAsRead().then(() => {
+      window.dispatchEvent(new Event('notificationsRead'));
+    }).catch(e => console.error("Failed to mark notifications as read:", e));
   }, []);
 
   const uniqueSections = useMemo(() => {

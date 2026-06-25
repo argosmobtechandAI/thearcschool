@@ -51,6 +51,14 @@ export const createConsent = async (req, res) => {
           .insert(responses);
 
         if (responseError) throw responseError;
+        
+        try {
+           const { FCMService } = await import("../../../services/fcmService.js");
+           const notifTitle = "New Consent Form";
+           const message = `A new consent form "${title}" requires your response.`;
+           await FCMService.sendToUsers(validStudentIds, notifTitle, message, { type: "consent" });
+           await supabase.from("notifications").insert(validStudentIds.map(sid => ({ user_id: sid, title: notifTitle, message, type: "consent", is_read: false })));
+        } catch (notifErr) { console.error("Consent Notification Error:", notifErr); }
       }
     }
 

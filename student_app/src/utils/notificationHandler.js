@@ -54,6 +54,8 @@ export const handleNotificationEvent = async ({ type, detail }) => {
           actualScreen = 'Class';
         } else if (routeScreen === 'Home' || routeScreen === 'Dashboard') {
           actualScreen = 'Home';
+        } else if (routeScreen === 'ChatRoomScreen') {
+          actualScreen = 'LiveChatScreen';
         }
 
         navigate(actualScreen, routeParams);
@@ -70,10 +72,15 @@ export const registerBackgroundHandler = () => {
 
   notifee.onBackgroundEvent(handleNotificationEvent);
 
-  // Handle background FCM messages — display the notification AND invalidate cache
+  // Handle background FCM messages
   messaging().setBackgroundMessageHandler(async remoteMessage => {
     console.log('FCM background message received:', remoteMessage.messageId);
-    await displayNotification(remoteMessage);
+    
+    // Only display via notifee if it's a data-only payload, otherwise FCM system tray handles it automatically
+    if (!remoteMessage.notification) {
+      await displayNotification(remoteMessage);
+    }
+    
     // Invalidate cache so next app open shows the new notification immediately
     invalidateNotificationsCache();
   });
@@ -104,10 +111,10 @@ export const getFCMToken = async () => {
 
 export const displayNotification = async (remoteMessage) => {
   const channelId = await notifee.createChannel({
-    id: 'high_importance_channel_v2',
+    id: 'high_importance_channel_v4',
     name: 'High Importance Notifications',
     importance: AndroidImportance.HIGH,
-    sound: 'default',
+    sound: 'melody',
     vibration: true,
     vibrationPattern: [300, 500],
   });
@@ -122,7 +129,7 @@ export const displayNotification = async (remoteMessage) => {
       pressAction: {
         id: 'default',
       },
-      sound: 'default',
+      sound: 'melody',
       importance: AndroidImportance.HIGH,
       vibrationPattern: [300, 500],
     },

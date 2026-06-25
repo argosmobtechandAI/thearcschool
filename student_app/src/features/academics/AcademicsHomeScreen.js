@@ -2,8 +2,10 @@ import React from 'react';
 import { View, Text, StyleSheet, ScrollView, RefreshControl, ActivityIndicator, TouchableOpacity } from 'react-native';
 import { useGetAcademicsQuery } from '../../store/apiSlice';
 import Icon from 'react-native-vector-icons/Feather';
-import { colors, shadows } from '../../theme/colors';
+import { theme } from '../../theme/theme';
 import { format } from 'date-fns';
+import Card from '../../components/Card';
+import Button from '../../components/Button';
 
 const AcademicsHomeScreen = ({ navigation }) => {
   const { data, isLoading, isFetching, refetch, error } = useGetAcademicsQuery();
@@ -11,7 +13,7 @@ const AcademicsHomeScreen = ({ navigation }) => {
   if (isLoading) {
     return (
       <View style={styles.centerContainer}>
-        <ActivityIndicator size="large" color={colors.primary} />
+        <ActivityIndicator size="large" color={theme.colors.primary} />
       </View>
     );
   }
@@ -20,9 +22,7 @@ const AcademicsHomeScreen = ({ navigation }) => {
     return (
       <View style={styles.centerContainer}>
         <Text style={styles.errorText}>Failed to load academics data.</Text>
-        <TouchableOpacity style={styles.retryButton} onPress={refetch}>
-          <Text style={styles.retryText}>Retry</Text>
-        </TouchableOpacity>
+        <Button label="Retry" onPress={refetch} variant="primary" />
       </View>
     );
   }
@@ -32,7 +32,8 @@ const AcademicsHomeScreen = ({ navigation }) => {
   return (
     <ScrollView 
       style={styles.container}
-      refreshControl={<RefreshControl refreshing={isFetching} onRefresh={refetch} />}
+      refreshControl={<RefreshControl refreshing={isFetching || false} onRefresh={refetch} colors={[theme.colors.primary]} />}
+      showsVerticalScrollIndicator={false}
     >
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Academics</Text>
@@ -44,7 +45,7 @@ const AcademicsHomeScreen = ({ navigation }) => {
           <Text style={styles.sectionTitle}>Upcoming Exams</Text>
           {upcomingExams.length > 0 ? (
             upcomingExams.map((exam, index) => (
-              <View key={index} style={styles.examCard}>
+              <Card variant="elevated" key={index} style={styles.examCard}>
                 <View style={styles.dateBox}>
                   <Text style={styles.dateDay}>{format(new Date(exam.date), 'dd')}</Text>
                   <Text style={styles.dateMonth}>{format(new Date(exam.date), 'MMM')}</Text>
@@ -53,14 +54,14 @@ const AcademicsHomeScreen = ({ navigation }) => {
                   <Text style={styles.subjectText}>{exam.subject?.name}</Text>
                   <Text style={styles.timeText}>{exam.start_time.slice(0,5)} - {exam.end_time.slice(0,5)}</Text>
                 </View>
-                <Icon name="calendar" size={20} color={colors.primary} />
-              </View>
+                <Icon name="calendar" size={20} color={theme.colors.primary} />
+              </Card>
             ))
           ) : (
-            <View style={styles.emptyCard}>
-              <Icon name="check-circle" size={32} color={colors.success} style={{ marginBottom: 8 }} />
+            <Card variant="flat" style={styles.emptyCard}>
+              <Icon name="check-circle" size={32} color={theme.colors.success} style={{ marginBottom: 8 }} />
               <Text style={styles.emptyText}>No upcoming exams scheduled.</Text>
-            </View>
+            </Card>
           )}
         </View>
 
@@ -70,12 +71,12 @@ const AcademicsHomeScreen = ({ navigation }) => {
           {grades.length > 0 ? (
             grades.map((grade, index) => {
               const percentage = grade.exams?.marks > 0 ? (grade.marks / grade.exams.marks) * 100 : 0;
-              let scoreColor = colors.success;
-              if (percentage < 40) scoreColor = colors.danger;
-              else if (percentage < 70) scoreColor = colors.warning;
+              let scoreColor = theme.colors.success;
+              if (percentage < 40) scoreColor = theme.colors.danger;
+              else if (percentage < 70) scoreColor = theme.colors.warning;
 
               return (
-                <View key={index} style={styles.resultCard}>
+                <Card variant="elevated" key={index} style={styles.resultCard}>
                   <View style={styles.resultHeader}>
                     <Text style={styles.examNameText}>{grade.exams?.name}</Text>
                     <Text style={styles.examDateText}>{format(new Date(grade.exams?.date), 'MMM dd, yyyy')}</Text>
@@ -87,18 +88,18 @@ const AcademicsHomeScreen = ({ navigation }) => {
                     </View>
                     {grade.feedback && (
                       <View style={styles.feedbackBox}>
-                        <Icon name="message-circle" size={14} color={colors.textMuted} style={{ marginRight: 6 }} />
+                        <Icon name="message-circle" size={14} color={theme.colors.textMuted} style={{ marginRight: 6 }} />
                         <Text style={styles.feedbackText} numberOfLines={2}>{grade.feedback}</Text>
                       </View>
                     )}
                   </View>
-                </View>
+                </Card>
               );
             })
           ) : (
-            <View style={styles.emptyCard}>
+            <Card variant="flat" style={styles.emptyCard}>
               <Text style={styles.emptyText}>No exam results published yet.</Text>
-            </View>
+            </Card>
           )}
         </View>
       </View>
@@ -109,115 +110,111 @@ const AcademicsHomeScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: theme.colors.background,
   },
   centerContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: colors.background,
+    backgroundColor: theme.colors.background,
   },
   header: {
-    backgroundColor: colors.surface,
-    padding: 20,
-    paddingTop: 60,
+    backgroundColor: theme.colors.surface,
+    padding: theme.spacing.lg,
+    paddingTop: theme.layout.padding.screen + 40, // Account for notch
     borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+    borderBottomColor: theme.colors.borderLight,
   },
   headerTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: colors.text,
+    fontSize: theme.typography.fontSize.xxl,
+    fontFamily: theme.typography.fontFamily.heading,
+    color: theme.colors.text,
   },
   content: {
-    padding: 20,
+    padding: theme.spacing.md,
   },
   section: {
-    marginBottom: 24,
+    marginBottom: theme.spacing.xl,
   },
   sectionTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: colors.text,
-    marginBottom: 16,
+    fontSize: theme.typography.fontSize.lg,
+    fontFamily: theme.typography.fontFamily.heading,
+    color: theme.colors.text,
+    marginBottom: theme.spacing.md,
   },
   examCard: {
     flexDirection: 'row',
-    backgroundColor: colors.surface,
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
     alignItems: 'center',
-    ...shadows.card,
+    marginBottom: theme.spacing.sm,
+    padding: theme.spacing.md,
   },
   dateBox: {
-    backgroundColor: colors.primary + '15',
+    backgroundColor: theme.colors.primary + '15',
     padding: 10,
-    borderRadius: 8,
+    borderRadius: theme.layout.borderRadius.md,
     alignItems: 'center',
     width: 60,
   },
   dateDay: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: colors.primary,
+    fontSize: theme.typography.fontSize.xl,
+    fontFamily: theme.typography.fontFamily.heading,
+    color: theme.colors.primary,
   },
   dateMonth: {
     fontSize: 12,
-    color: colors.primary,
+    fontFamily: theme.typography.fontFamily.bold,
+    color: theme.colors.primary,
     textTransform: 'uppercase',
   },
   examDetails: {
     flex: 1,
-    paddingHorizontal: 16,
+    paddingHorizontal: theme.spacing.md,
   },
   subjectText: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: colors.text,
+    fontSize: theme.typography.fontSize.md,
+    fontFamily: theme.typography.fontFamily.bold,
+    color: theme.colors.text,
   },
   timeText: {
-    fontSize: 14,
-    color: colors.textMuted,
+    fontSize: theme.typography.fontSize.sm,
+    fontFamily: theme.typography.fontFamily.medium,
+    color: theme.colors.textMuted,
     marginTop: 4,
   },
   emptyCard: {
-    backgroundColor: colors.surface,
     padding: 24,
-    borderRadius: 12,
     alignItems: 'center',
     borderStyle: 'dashed',
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: theme.colors.border,
   },
   emptyText: {
-    color: colors.textMuted,
-    fontSize: 14,
+    color: theme.colors.textMuted,
+    fontSize: theme.typography.fontSize.sm,
+    fontFamily: theme.typography.fontFamily.medium,
   },
   resultCard: {
-    backgroundColor: colors.surface,
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 16,
-    ...shadows.card,
+    marginBottom: theme.spacing.md,
+    padding: theme.spacing.md,
   },
   resultHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     borderBottomWidth: 1,
-    borderBottomColor: colors.borderLight,
+    borderBottomColor: theme.colors.borderLight,
     paddingBottom: 12,
     marginBottom: 12,
   },
   examNameText: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: colors.text,
+    fontSize: theme.typography.fontSize.md,
+    fontFamily: theme.typography.fontFamily.bold,
+    color: theme.colors.text,
   },
   examDateText: {
     fontSize: 12,
-    color: colors.textMuted,
+    fontFamily: theme.typography.fontFamily.medium,
+    color: theme.colors.textMuted,
   },
   resultBody: {
     flexDirection: 'row',
@@ -230,41 +227,33 @@ const styles = StyleSheet.create({
   },
   scorePercentage: {
     fontSize: 24,
-    fontWeight: 'bold',
+    fontFamily: theme.typography.fontFamily.heading,
   },
   scoreRaw: {
     fontSize: 12,
-    color: colors.textMuted,
+    fontFamily: theme.typography.fontFamily.medium,
+    color: theme.colors.textMuted,
     marginTop: 2,
   },
   feedbackBox: {
     flex: 1,
     flexDirection: 'row',
-    backgroundColor: colors.background,
+    backgroundColor: theme.colors.background,
     padding: 10,
-    borderRadius: 8,
+    borderRadius: theme.layout.borderRadius.md,
   },
   feedbackText: {
     flex: 1,
     fontSize: 13,
-    color: colors.textMuted,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.textMuted,
     fontStyle: 'italic',
   },
   errorText: {
-    fontSize: 16,
-    color: colors.danger,
-    marginBottom: 16,
-  },
-  retryButton: {
-    backgroundColor: colors.primary,
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 8,
-  },
-  retryText: {
-    color: colors.surface,
-    fontSize: 16,
-    fontWeight: '600',
+    fontSize: theme.typography.fontSize.md,
+    fontFamily: theme.typography.fontFamily.medium,
+    color: theme.colors.danger,
+    marginBottom: theme.spacing.md,
   },
 });
 

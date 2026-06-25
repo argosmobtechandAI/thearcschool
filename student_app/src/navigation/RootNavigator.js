@@ -11,6 +11,7 @@ import { navigationRef } from './navigationRef';
 import LiveChatScreen from '../features/communication/LiveChatScreen';
 import ChangePasswordScreen from '../features/profile/ChangePasswordScreen';
 import ConsentsScreen from '../features/consents/ConsentsScreen';
+import ThoughtScreen from '../features/thoughts/ThoughtScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -34,6 +35,7 @@ const RootNavigator = () => {
           <Stack.Screen name="Login" component={LoginScreen} />
         ) : (
             <>
+              <Stack.Screen name="Thought" component={ThoughtScreen} />
               <Stack.Screen name="Main" component={MainScreen} />
               <Stack.Screen name="LiveChatScreen" component={LiveChatScreen} />
               <Stack.Screen name="ChangePassword" component={ChangePasswordScreen} />

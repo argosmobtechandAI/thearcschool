@@ -1,7 +1,7 @@
 import { Outlet, useNavigate, NavLink } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import { useEffect, useState } from "react";
-import { LogOut, LayoutDashboard, Users, BookOpen, UserCircle, Settings, UserCheck, IndianRupee, FileEdit, Clock, Calendar, ClipboardCheck, Bell, DollarSign, MessageSquare, Info, ShieldAlert, MapPin, ExternalLink, TrendingUp, FileSignature } from "lucide-react";
+import { LogOut, LayoutDashboard, Users, BookOpen, UserCircle, Settings, UserCheck, IndianRupee, FileEdit, Clock, Calendar, ClipboardCheck, Bell, DollarSign, MessageSquare, Info, ShieldAlert, MapPin, ExternalLink, TrendingUp, FileSignature, Quote, Award } from "lucide-react";
 import { toast } from "react-toastify";
 import { logout } from "../features/authSlice";
 import { messaging } from "../config/firebase";
@@ -135,7 +135,7 @@ const AdminLayout = () => {
             <LayoutDashboard size={16} /> Dashboard
           </NavLink>
           
-          {user?.type === "admin" && (
+          {(user?.type === "admin" || user?.type === "principal") && (
             <>
               <NavGroup title="People" />
               <NavLink to="/users/student" style={navLinkStyle}><Users size={16} /> Students</NavLink>
@@ -147,7 +147,7 @@ const AdminLayout = () => {
             </>
           )}
           
-          {user?.type === "admin" && (
+          {(user?.type === "admin" || user?.type === "principal") && (
             <>
               <NavGroup title="Academics" />
               <NavLink to="/admissions" style={navLinkStyle}><UserCheck size={16} /> Admissions Pipeline</NavLink>
@@ -168,25 +168,24 @@ const AdminLayout = () => {
             </>
           )}
 
-          {(user?.type === "admin" || user?.type === "finance") && (
+          {(user?.type === "admin" || user?.type === "principal" || user?.type === "finance") && (
             <>
               <NavGroup title="Management" />
-              {user?.type === "admin" && (
+              {(user?.type === "admin" || user?.type === "principal") && (
                 <>
                   <NavLink to="/annual-planner" style={navLinkStyle}><Calendar size={16} /> Annual Planner</NavLink>
                   <NavLink to="/rooms" style={navLinkStyle}><MapPin size={16} /> Rooms Management</NavLink>
                   <NavLink to="/staff-roles" style={navLinkStyle}><UserCheck size={16} /> Staff Roles</NavLink>
+                  <NavLink to="/thoughts" style={navLinkStyle}><Quote size={16} /> Thought of the Day</NavLink>
+                  <NavLink to="/student-of-week" style={navLinkStyle}><Award size={16} /> Student of the Week</NavLink>
                 </>
               )}
               <NavLink to="/fees" style={navLinkStyle}><IndianRupee size={16} /> Fees</NavLink>
               <NavLink to="/pnl" style={navLinkStyle}><TrendingUp size={16} /> Profit & Loss</NavLink>
-              {user?.type === "admin" && (
-                <NavLink to="/complaints" style={navLinkStyle}><ShieldAlert size={16} /> Complaints</NavLink>
-              )}
             </>
           )}
 
-          {user?.type === "admin" && (
+          {(user?.type === "admin" || user?.type === "principal") && (
             <>
               <NavGroup title="Portals" />
               <a href="https://admission.thearcschool.in" target="_blank" rel="noopener noreferrer" style={{ ...navLinkStyle({ isActive: false }), color: "var(--text-secondary)" }}>

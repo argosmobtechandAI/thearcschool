@@ -127,6 +127,12 @@ export const apiSlice = createApi({
       }),
       invalidatesTags: ['Notifications'],
     }),
+    getThoughtOfDay: builder.query({
+      query: () => '/thoughts/today',
+    }),
+    getStudentOfWeek: builder.query({
+      query: (classId) => `/shared/student-of-week/current${classId ? `?classId=${classId}` : ''}`,
+    }),
   }),
 });
 
@@ -154,4 +160,6 @@ export const {
   useGetLiveChatHistoryQuery,
   useGetStudentsQuery,
   useGetPrincipalQuery,
+  useGetThoughtOfDayQuery,
+  useGetStudentOfWeekQuery,
 } = apiSlice;

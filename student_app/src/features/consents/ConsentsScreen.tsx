@@ -1,12 +1,16 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, FlatList, ActivityIndicator } from 'react-native';
 import { useGetConsentsQuery, useUpdateConsentStatusMutation } from '../../store/apiSlice';
-import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
+import Icon from 'react-native-vector-icons/Feather';
 import AppModal from '../../components/AppModal';
 import MetricsFilterBar from '../../components/MetricsFilterBar';
+import { theme } from '../../theme/theme';
+import Card from '../../components/Card';
+import Button from '../../components/Button';
+import Chip from '../../components/Chip';
 
 const ConsentsScreen = () => {
-  const { data: response, isLoading, refetch } = useGetConsentsQuery(undefined);
+  const { data: response, isLoading, isFetching, refetch } = useGetConsentsQuery(undefined);
   const [updateConsentStatus, { isLoading: isUpdating }] = useUpdateConsentStatusMutation();
 
   const [searchQuery, setSearchQuery] = useState('');
@@ -48,28 +52,26 @@ const ConsentsScreen = () => {
     return sortOrder === 'desc' ? dateB - dateA : dateA - dateB;
   });
 
+
+
   const renderItem = ({ item }: { item: any }) => {
     const consentDetails = item.consent || {};
-    const statusColor = 
-      item.status === 'accepted' ? '#10B981' : 
-      item.status === 'declined' ? '#EF4444' : '#F59E0B';
 
     return (
-      <View style={styles.card}>
+      <Card variant="elevated">
         <View style={styles.headerRow}>
           <Text style={styles.title}>{consentDetails.title || 'Untitled Consent'}</Text>
-          <View style={[styles.statusBadge, { backgroundColor: statusColor + '20' }]}>
-            <Text style={[styles.statusText, { color: statusColor }]}>
-              {item.status ? item.status.toUpperCase() : 'PENDING'}
-            </Text>
-          </View>
+          <Chip 
+            label={item.status ? item.status : 'PENDING'} 
+            type={item.status === 'accepted' ? 'success' : item.status === 'declined' ? 'danger' : 'default'} // map as needed or use default
+          />
         </View>
 
         <Text style={styles.description}>{consentDetails.description}</Text>
         
         {consentDetails.event_date && (
           <View style={styles.dateRow}>
-            <Icon name="calendar" size={16} color="#6B7280" />
+            <Icon name="calendar" size={16} color={theme.colors.textMuted} />
             <Text style={styles.dateText}>
               Event Date: {new Date(consentDetails.event_date).toLocaleDateString()}
             </Text>
@@ -78,26 +80,25 @@ const ConsentsScreen = () => {
 
         {item.status === 'pending' && (
           <View style={styles.actionRow}>
-            <TouchableOpacity 
-              style={[styles.button, styles.acceptButton]}
+            <Button
+              label="Approve"
+              icon="check"
+              variant="primary"
               onPress={() => handleUpdateStatus(item.id, 'accepted')}
-              disabled={isUpdating}
-            >
-              <Icon name="check" size={20} color="#FFF" />
-              <Text style={styles.buttonText}>Approve</Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity 
-              style={[styles.button, styles.declineButton]}
+              loading={isUpdating}
+              style={{ flex: 1, marginRight: theme.spacing.sm }}
+            />
+            <Button
+              label="Decline"
+              icon="x"
+              variant="danger"
               onPress={() => handleUpdateStatus(item.id, 'declined')}
-              disabled={isUpdating}
-            >
-              <Icon name="close" size={20} color="#FFF" />
-              <Text style={styles.buttonText}>Decline</Text>
-            </TouchableOpacity>
+              loading={isUpdating}
+              style={{ flex: 1, marginLeft: theme.spacing.sm }}
+            />
           </View>
         )}
-      </View>
+      </Card>
     );
   };
 
@@ -117,7 +118,7 @@ const ConsentsScreen = () => {
 
       {isLoading && rawConsents.length === 0 ? (
         <View style={styles.centered}>
-          <ActivityIndicator size="large" color="#4F46E5" />
+          <ActivityIndicator size="large" color={theme.colors.primary} />
         </View>
       ) : (
         <FlatList
@@ -125,11 +126,11 @@ const ConsentsScreen = () => {
           keyExtractor={(item) => item.id}
           renderItem={renderItem}
           contentContainerStyle={[styles.listContainer, filteredConsents.length === 0 && { flex: 1 }]}
-          refreshing={isLoading}
+          refreshing={isFetching || false}
           onRefresh={refetch}
           ListEmptyComponent={
             <View style={styles.centered}>
-              <Icon name="file-document-outline" size={48} color="#D1D5DB" />
+              <Icon name="file-text" size={48} color={theme.colors.border} />
               <Text style={styles.emptyText}>No consents found.</Text>
             </View>
           }
@@ -141,7 +142,7 @@ const ConsentsScreen = () => {
         title={modalConfig.title}
         message={modalConfig.message}
         icon={modalConfig.type === 'success' ? 'check-circle' : 'x-circle'}
-        iconColor={modalConfig.type === 'success' ? '#10B981' : '#EF4444'}
+        iconColor={modalConfig.type === 'success' ? theme.colors.success : theme.colors.danger}
         actions={[
           { label: 'OK', onPress: () => setModalConfig({ ...modalConfig, visible: false }), style: modalConfig.type === 'success' ? 'success' : 'danger' }
         ]}
@@ -154,10 +155,10 @@ const ConsentsScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F3F4F6',
+    backgroundColor: theme.colors.background,
   },
   listContainer: {
-    padding: 16,
+    padding: theme.spacing.md,
   },
   centered: {
     flex: 1,
@@ -165,87 +166,49 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   emptyText: {
-    marginTop: 12,
-    fontSize: 16,
-    color: '#6B7280',
-    fontFamily: 'Inter-Medium',
-  },
-  card: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
+    marginTop: theme.spacing.md,
+    fontSize: theme.typography.fontSize.md,
+    color: theme.colors.textMuted,
+    fontFamily: theme.typography.fontFamily.medium,
   },
   headerRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    marginBottom: 8,
+    marginBottom: theme.spacing.sm,
   },
   title: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#111827',
+    fontSize: theme.typography.fontSize.lg,
+    fontFamily: theme.typography.fontFamily.heading,
+    color: theme.colors.text,
     flex: 1,
-    marginRight: 8,
-  },
-  statusBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  statusText: {
-    fontSize: 12,
-    fontWeight: 'bold',
+    marginRight: theme.spacing.sm,
   },
   description: {
-    fontSize: 14,
-    color: '#4B5563',
-    marginBottom: 12,
+    fontSize: theme.typography.fontSize.sm,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.textMuted,
+    marginBottom: theme.spacing.md,
     lineHeight: 20,
   },
   dateRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: theme.spacing.md,
   },
   dateText: {
-    fontSize: 14,
-    color: '#6B7280',
-    marginLeft: 6,
+    fontSize: theme.typography.fontSize.sm,
+    fontFamily: theme.typography.fontFamily.medium,
+    color: theme.colors.textMuted,
+    marginLeft: theme.spacing.xs,
   },
   actionRow: {
     flexDirection: 'row',
-    justifyContent: 'flex-end',
-    gap: 12,
-    marginTop: 8,
+    justifyContent: 'space-between',
+    marginTop: theme.spacing.sm,
     borderTopWidth: 1,
-    borderTopColor: '#F3F4F6',
-    paddingTop: 16,
-  },
-  button: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 8,
-  },
-  acceptButton: {
-    backgroundColor: '#10B981',
-  },
-  declineButton: {
-    backgroundColor: '#EF4444',
-  },
-  buttonText: {
-    color: '#FFF',
-    fontWeight: 'bold',
-    marginLeft: 6,
-    fontSize: 14,
+    borderTopColor: theme.colors.borderLight,
+    paddingTop: theme.spacing.md,
   },
 });
 

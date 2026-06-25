@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, KeyboardAvoidingView, Platform, StatusBar } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, KeyboardAvoidingView, Platform, StatusBar, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useDispatch } from 'react-redux';
 import * as Keychain from 'react-native-keychain';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import Icon from 'react-native-vector-icons/Feather';
 import { useLoginMutation } from '../../store/apiSlice';
 import { setCredentials } from '../../store/authSlice';
@@ -23,10 +24,13 @@ const LoginScreen = () => {
     }
 
     try {
+      console.log('>>> ATTEMPTING LOGIN WITH:', identifier.trim());
       const response = await login({ email: identifier.trim(), password }).unwrap();
       
       if (response.success && (response.user.type === 'student' || response.user.type === 'parent')) {
         await Keychain.setGenericPassword('token', response.token);
+        await AsyncStorage.setItem('@auth_user', JSON.stringify(response.user));
+        await AsyncStorage.setItem('@auth_token', response.token);
         dispatch(setCredentials({ user: response.user }));
 
         // Register FCM Token
@@ -45,61 +49,68 @@ const LoginScreen = () => {
         Alert.alert('Access Denied', 'Only students/parents can login here.');
       }
     } catch (err) {
-      Alert.alert('Login Failed', err?.data?.message || 'Check your credentials and try again.');
+      console.log('>>> LOGIN ERROR:', err);
+      Alert.alert('Login Failed', err?.data?.message || err?.message || 'Check your credentials and try again.');
     }
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: colors.primary }} edges={['top']}>
       <StatusBar barStyle="light-content" backgroundColor={colors.primary} />
-      <KeyboardAvoidingView 
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={styles.content}
-      >
-        <View style={styles.header}>
-          <Text style={styles.title}>Parent Portal</Text>
-          <Text style={styles.subtitle}>Sign in with your child's credentials</Text>
-        </View>
-
-        <View style={styles.form}>
-          <View style={styles.inputContainer}>
-            <Icon name="user" size={20} color={colors.textMuted} style={styles.inputIcon} />
-            <TextInput
-              style={styles.input}
-              placeholder="Admission Number or Email"
-              value={identifier}
-              onChangeText={setIdentifier}
-              autoCapitalize="none"
-              placeholderTextColor={colors.textMuted}
+      <View style={styles.container}>
+        <KeyboardAvoidingView 
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.content}
+        >
+          <View style={styles.header}>
+            <Image 
+              source={require('../../assets/images/logo.jpeg')} 
+              style={styles.logo} 
             />
+            <Text style={styles.title}>Parent Portal</Text>
+            <Text style={styles.subtitle}>Sign in with your child's credentials</Text>
           </View>
 
-          <View style={styles.inputContainer}>
-            <Icon name="lock" size={20} color={colors.textMuted} style={styles.inputIcon} />
-            <TextInput
-              style={styles.input}
-              placeholder="Password"
-              value={password}
-              onChangeText={setPassword}
-              secureTextEntry={!showPassword}
-              placeholderTextColor={colors.textMuted}
-            />
-            <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
-              <Icon name={showPassword ? "eye" : "eye-off"} size={20} color={colors.textMuted} style={styles.inputIcon} />
+          <View style={styles.form}>
+            <View style={styles.inputContainer}>
+              <Icon name="user" size={20} color={colors.textMuted} style={styles.inputIcon} />
+              <TextInput
+                style={styles.input}
+                placeholder="Admission Number or Email"
+                value={identifier}
+                onChangeText={setIdentifier}
+                autoCapitalize="none"
+                placeholderTextColor={colors.textMuted}
+              />
+            </View>
+
+            <View style={styles.inputContainer}>
+              <Icon name="lock" size={20} color={colors.textMuted} style={styles.inputIcon} />
+              <TextInput
+                style={styles.input}
+                placeholder="Password"
+                value={password}
+                onChangeText={setPassword}
+                secureTextEntry={!showPassword}
+                placeholderTextColor={colors.textMuted}
+              />
+              <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
+                <Icon name={showPassword ? "eye" : "eye-off"} size={20} color={colors.textMuted} style={styles.inputIcon} />
+              </TouchableOpacity>
+            </View>
+
+            <TouchableOpacity 
+              style={[styles.button, isLoading && styles.buttonDisabled]} 
+              onPress={handleLogin}
+              disabled={isLoading}
+            >
+              <Text style={styles.buttonText}>
+                {isLoading ? 'Signing In...' : 'Sign In'}
+              </Text>
             </TouchableOpacity>
           </View>
-
-          <TouchableOpacity 
-            style={[styles.button, isLoading && styles.buttonDisabled]} 
-            onPress={handleLogin}
-            disabled={isLoading}
-          >
-            <Text style={styles.buttonText}>
-              {isLoading ? 'Signing In...' : 'Sign In'}
-            </Text>
-          </TouchableOpacity>
-        </View>
-      </KeyboardAvoidingView>
+        </KeyboardAvoidingView>
+      </View>
     </SafeAreaView>
   );
 };
@@ -117,6 +128,12 @@ const styles = StyleSheet.create({
   header: {
     marginBottom: 40,
     alignItems: 'center',
+  },
+  logo: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    marginBottom: 16,
   },
   title: {
     fontSize: 32,

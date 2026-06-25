@@ -103,7 +103,6 @@ const DrawerContent = ({ close }) => {
         <DrawerItem icon="award"          label="My Grades"     color="#EAB308" onPress={() => go('Result')} />
         <DrawerItem icon="bell"           label="Announcements" color="#F43F5E" badgeCount={unreadCount} onPress={() => go('Notifications')} />
         <DrawerItem icon="message-square" label="Communication" color="#14B8A6" onPress={() => go('Communication')} />
-        <DrawerItem icon="star"           label="My Rewards"    color="#F59E0B" onPress={() => go('Rewards')} />
         <DrawerItem icon="user"           label="My Profile"    color="#64748B" onPress={() => go('Profile')} />
       </View>
 

@@ -2,7 +2,7 @@ import React, { useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, Animated, Dimensions, Image } from 'react-native';
 import { useDispatch } from 'react-redux';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { loginSuccess } from '../../store/authSlice';
+import { setCredentials } from '../../store/authSlice';
 import { colors } from '../../theme/colors';
 
 const { width } = Dimensions.get('window');
@@ -22,7 +22,7 @@ const SplashScreen = ({ onFinish }) => {
         const storedUser = await AsyncStorage.getItem('@auth_user');
         const storedToken = await AsyncStorage.getItem('@auth_token');
         if (storedUser && storedToken) {
-          dispatch(loginSuccess({ user: JSON.parse(storedUser), token: storedToken }));
+          dispatch(setCredentials({ user: JSON.parse(storedUser) }));
         }
       } catch (e) {
         console.error('Failed to restore login state', e);

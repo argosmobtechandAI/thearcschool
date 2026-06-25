@@ -6,23 +6,34 @@ import { useGetDashboardQuery } from '../../store/apiSlice';
 import { logout } from '../../store/authSlice';
 import * as Keychain from 'react-native-keychain';
 import Icon from 'react-native-vector-icons/Feather';
-import { colors, shadows } from '../../theme/colors';
+import { theme } from '../../theme/theme';
 import AppModal from '../../components/AppModal';
 import { useDrawer } from '../../navigation/DrawerContext';
+import Card from '../../components/Card';
+import Button from '../../components/Button';
+
+const InfoRow = ({ icon, label, value }) => (
+  <View style={styles.infoRow}>
+    <View style={styles.iconBox}>
+      <Icon name={icon} size={18} color={theme.colors.primary} />
+    </View>
+    <View style={styles.infoContent}>
+      <Text style={styles.infoLabel}>{label}</Text>
+      <Text style={styles.infoValue}>{value || 'N/A'}</Text>
+    </View>
+  </View>
+);
 
 const ProfileScreen = ({ navigation }) => {
   const { openDrawer } = useDrawer();
   const dispatch = useDispatch();
   const { user } = useSelector(state => state.auth);
-  const { data, refetch } = useGetDashboardQuery();
+  const { data, isFetching, refetch } = useGetDashboardQuery();
   const [showLogoutModal, setShowLogoutModal] = useState(false);
-  const [refreshing, setRefreshing] = useState(false);
-
+  
   const onRefresh = useCallback(async () => {
-    setRefreshing(true);
-    await refetch();
-    setRefreshing(false);
-  }, [refetch]);
+        await refetch();
+      }, [refetch]);
 
   const profile = data?.data?.profile || {};
   const classInfo = data?.data?.classInfo || {};
@@ -34,18 +45,6 @@ const ProfileScreen = ({ navigation }) => {
     await Keychain.resetGenericPassword();
     dispatch(logout());
   };
-
-  const InfoRow = ({ icon, label, value }) => (
-    <View style={styles.infoRow}>
-      <View style={styles.iconBox}>
-        <Icon name={icon} size={18} color={colors.primary} />
-      </View>
-      <View style={styles.infoContent}>
-        <Text style={styles.infoLabel}>{label}</Text>
-        <Text style={styles.infoValue}>{value || 'N/A'}</Text>
-      </View>
-    </View>
-  );
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top']}>
@@ -63,7 +62,7 @@ const ProfileScreen = ({ navigation }) => {
       <ScrollView 
         style={styles.scroll} 
         showsVerticalScrollIndicator={false}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[colors.primary]} />}
+        refreshControl={<RefreshControl refreshing={isFetching || false} onRefresh={onRefresh} colors={[theme.colors.primary]} />}
       >
         {/* Profile Hero */}
         <View style={styles.heroCard}>
@@ -78,68 +77,68 @@ const ProfileScreen = ({ navigation }) => {
 
         <View style={styles.content}>
           {/* Student Info */}
-          <View style={styles.card}>
+          <Card variant="elevated">
             <Text style={styles.cardTitle}>Student Information</Text>
             <InfoRow icon="hash"      label="Admission Number" value={profile.admission_number} />
             <InfoRow icon="calendar"  label="Date of Birth"    value={profile.dob} />
             <InfoRow icon="home"      label="House"            value={profile.house} />
-          </View>
+          </Card>
 
           {/* Contact Details */}
-          <View style={styles.card}>
+          <Card variant="elevated">
             <Text style={styles.cardTitle}>Contact Details</Text>
             <InfoRow icon="mail"  label="Email"   value={user?.email} />
             <InfoRow icon="phone" label="Phone"   value={user?.phone} />
             <InfoRow icon="map-pin" label="Address" value={user?.address} />
-          </View>
+          </Card>
 
           {/* Quick Actions */}
-          <View style={styles.card}>
+          <Card variant="elevated">
             <Text style={styles.cardTitle}>Quick Actions</Text>
             <TouchableOpacity
               style={styles.actionRow}
               onPress={() => navigation.navigate('Rewards')}
             >
-              <Icon name="star" size={18} color={colors.warning} />
+              <Icon name="star" size={18} color={theme.colors.warning} />
               <Text style={styles.actionLabel}>My Rewards & Badges</Text>
-              <Icon name="chevron-right" size={16} color={colors.textMuted} />
+              <Icon name="chevron-right" size={16} color={theme.colors.textMuted} />
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.actionRow}
               onPress={() => navigation.navigate('Notifications')}
             >
-              <Icon name="bell" size={18} color={colors.primary} />
+              <Icon name="bell" size={18} color={theme.colors.primary} />
               <Text style={styles.actionLabel}>Notifications</Text>
-              <Icon name="chevron-right" size={16} color={colors.textMuted} />
+              <Icon name="chevron-right" size={16} color={theme.colors.textMuted} />
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.actionRow}
               onPress={() => navigation.navigate('ChangePassword')}
             >
-              <Icon name="lock" size={18} color={colors.textMuted} />
+              <Icon name="lock" size={18} color={theme.colors.textMuted} />
               <Text style={styles.actionLabel}>Change Password</Text>
-              <Icon name="chevron-right" size={16} color={colors.textMuted} />
+              <Icon name="chevron-right" size={16} color={theme.colors.textMuted} />
             </TouchableOpacity>
-          </View>
+          </Card>
 
           {/* Logout */}
-          <TouchableOpacity
-            style={styles.logoutBtn}
+          <Button
+            label="Logout"
+            icon="log-out"
+            variant="danger"
             onPress={() => setShowLogoutModal(true)}
-          >
-            <Icon name="log-out" size={18} color={colors.danger} />
-            <Text style={styles.logoutText}>Logout</Text>
-          </TouchableOpacity>
+            style={styles.logoutBtn}
+          />
         </View>
 
-        <View style={{ height: 24 }} />
+        <View style={{ height: theme.spacing.xxl }} />
       </ScrollView>
 
       {/* Branded Logout Modal */}
       <AppModal
         visible={showLogoutModal}
         icon="log-out"
-        iconColor={colors.danger}
+        iconColor={theme.colors.danger}
         title="Sign Out"
         message="Are you sure you want to sign out of your account?"
         actions={[
@@ -153,19 +152,19 @@ const ProfileScreen = ({ navigation }) => {
 };
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: colors.primary },
-  scroll: { flex: 1, backgroundColor: colors.background },
+  safeArea: { flex: 1, backgroundColor: theme.colors.primary },
+  scroll: { flex: 1, backgroundColor: theme.colors.background },
 
   header: {
-    backgroundColor: colors.primary,
+    backgroundColor: theme.colors.primary,
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: 20, paddingVertical: 14,
+    paddingHorizontal: theme.spacing.lg, paddingVertical: 14,
   },
-  headerTitle: { color: '#fff', fontSize: 18, fontWeight: '700' },
+  headerTitle: { color: '#fff', fontSize: theme.typography.fontSize.lg, fontFamily: theme.typography.fontFamily.heading },
   headerBtn: { padding: 6, backgroundColor: 'rgba(255,255,255,0.15)', borderRadius: 10 },
 
   heroCard: {
-    backgroundColor: colors.primary,
+    backgroundColor: theme.colors.primary,
     alignItems: 'center',
     paddingVertical: 32,
     paddingHorizontal: 20,
@@ -178,45 +177,37 @@ const styles = StyleSheet.create({
     borderWidth: 3, borderColor: 'rgba(255,255,255,0.5)',
     justifyContent: 'center', alignItems: 'center', marginBottom: 14,
   },
-  avatarText: { fontSize: 28, fontWeight: '800', color: '#fff' },
-  nameText: { fontSize: 22, fontWeight: '800', color: '#fff' },
-  classText: { fontSize: 14, color: 'rgba(255,255,255,0.8)', marginTop: 4 },
+  avatarText: { fontSize: 28, fontFamily: theme.typography.fontFamily.heading, color: '#fff' },
+  nameText: { fontSize: 22, fontFamily: theme.typography.fontFamily.heading, color: '#fff' },
+  classText: { fontSize: theme.typography.fontSize.sm, fontFamily: theme.typography.fontFamily.regular, color: 'rgba(255,255,255,0.8)', marginTop: 4 },
 
-  content: { padding: 16 },
+  content: { padding: theme.spacing.md },
 
-  card: {
-    backgroundColor: colors.surface, borderRadius: 16,
-    padding: 18, marginBottom: 14, ...shadows.card,
-  },
   cardTitle: {
-    fontSize: 16, fontWeight: '700', color: colors.text,
+    fontSize: theme.typography.fontSize.md, fontFamily: theme.typography.fontFamily.bold, color: theme.colors.text,
     marginBottom: 14, paddingBottom: 10,
-    borderBottomWidth: 1, borderBottomColor: colors.borderLight,
+    borderBottomWidth: 1, borderBottomColor: theme.colors.borderLight,
   },
   infoRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 14 },
   iconBox: {
     width: 38, height: 38, borderRadius: 19,
-    backgroundColor: colors.primary + '15',
+    backgroundColor: theme.colors.primary + '15',
     justifyContent: 'center', alignItems: 'center', marginRight: 14,
   },
   infoContent: { flex: 1 },
-  infoLabel: { fontSize: 11, color: colors.textMuted, marginBottom: 2 },
-  infoValue: { fontSize: 15, fontWeight: '600', color: colors.text },
+  infoLabel: { fontSize: 11, fontFamily: theme.typography.fontFamily.medium, color: theme.colors.textMuted, marginBottom: 2 },
+  infoValue: { fontSize: theme.typography.fontSize.md, fontFamily: theme.typography.fontFamily.bold, color: theme.colors.text },
 
   actionRow: {
     flexDirection: 'row', alignItems: 'center', gap: 12,
-    paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: colors.borderLight,
+    paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: theme.colors.borderLight,
   },
-  actionLabel: { flex: 1, fontSize: 15, color: colors.text, fontWeight: '500' },
+  actionLabel: { flex: 1, fontSize: theme.typography.fontSize.md, fontFamily: theme.typography.fontFamily.medium, color: theme.colors.text },
 
   logoutBtn: {
-    flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 10,
-    backgroundColor: colors.surface, borderRadius: 16,
-    paddingVertical: 16, marginBottom: 10,
-    borderWidth: 1.5, borderColor: colors.danger + '40',
-    ...shadows.card,
+    marginTop: theme.spacing.sm,
+    marginBottom: theme.spacing.md,
   },
-  logoutText: { fontSize: 16, fontWeight: '700', color: colors.danger },
 });
 
 export default ProfileScreen;

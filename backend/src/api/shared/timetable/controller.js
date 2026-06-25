@@ -34,6 +34,32 @@ export const createTimeTable = async (req, res) => {
 
     if (insertError) throw insertError;
 
+    try {
+      const { FCMService } = await import("../../../services/fcmService.js");
+      
+      // Notify Students
+      const { data: classStudents } = await supabase.from('class_students').select('student_id').eq('class_id', data.classId);
+      if (classStudents && classStudents.length > 0) {
+        const studentIds = classStudents.map(cs => cs.student_id);
+        const title = "New Timetable Published";
+        const message = `A new timetable for ${data.date} has been published.`;
+        
+        await FCMService.sendToUsers(studentIds, title, message, { type: "timetable" });
+        await supabase.from("notifications").insert(studentIds.map(sid => ({ user_id: sid, title, message, type: "timetable", is_read: false })));
+      }
+
+      // Notify Teachers
+      const teacherIds = [...new Set(data.timeTables.map(t => t.teacher).filter(Boolean))];
+      if (teacherIds.length > 0) {
+         const title = "New Classes Assigned";
+         const message = `You have been assigned new classes on ${data.date}.`;
+         await FCMService.sendToUsers(teacherIds, title, message, { type: "timetable" });
+         await supabase.from("notifications").insert(teacherIds.map(tid => ({ user_id: tid, title, message, type: "timetable", is_read: false })));
+      }
+    } catch (notifErr) {
+      console.error("Timetable Notification Error:", notifErr);
+    }
+
     return res.status(201).json({
       success: true,
       message: "TimeTable created successfully",
@@ -257,6 +283,31 @@ export const addPeriod = async (req, res) => {
       .select();
 
     if (error) throw error;
+
+    try {
+      const { FCMService } = await import("../../../services/fcmService.js");
+      
+      // Notify Students
+      const { data: classStudents } = await supabase.from('class_students').select('student_id').eq('class_id', data.classId);
+      if (classStudents && classStudents.length > 0) {
+        const studentIds = classStudents.map(cs => cs.student_id);
+        const title = "Timetable Updated";
+        const message = `A new period (${data.subject || 'Break'}) was added on ${data.date}.`;
+        
+        await FCMService.sendToUsers(studentIds, title, message, { type: "timetable" });
+        await supabase.from("notifications").insert(studentIds.map(sid => ({ user_id: sid, title, message, type: "timetable", is_read: false })));
+      }
+
+      // Notify Teacher
+      if (data.teacher) {
+         const title = "New Class Assigned";
+         const message = `You have been assigned a class (${data.subject}) on ${data.date}.`;
+         await FCMService.sendToUsers([data.teacher], title, message, { type: "timetable" });
+         await supabase.from("notifications").insert([{ user_id: data.teacher, title, message, type: "timetable", is_read: false }]);
+      }
+    } catch (notifErr) {
+      console.error("Period Notification Error:", notifErr);
+    }
 
     return res.status(201).json({
       success: true,

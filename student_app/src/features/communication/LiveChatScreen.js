@@ -3,7 +3,7 @@ import {
   View, Text, StyleSheet, TextInput, TouchableOpacity, FlatList,
   KeyboardAvoidingView, Platform, ActivityIndicator
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/Feather';
 import { useSelector } from 'react-redux';
 import io from 'socket.io-client';
@@ -27,7 +27,9 @@ const LiveChatScreen = ({ route, navigation }) => {
 
   // Initialize socket connection
   useEffect(() => {
-    socketRef.current = io(SOCKET_URL);
+    socketRef.current = io(SOCKET_URL, {
+      transports: ['websocket']
+    });
 
     socketRef.current.on('connect', () => {
       socketRef.current.emit('identify', user.id);
@@ -35,7 +37,11 @@ const LiveChatScreen = ({ route, navigation }) => {
     });
 
     socketRef.current.on('receive_message', (newChat) => {
-      setMessages((prev) => [...prev, newChat]);
+      console.log('Received message via socket:', newChat);
+      setMessages((prev) => {
+        console.log('Previous messages length:', prev.length);
+        return [...prev, newChat];
+      });
       setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
     });
 
@@ -86,13 +92,12 @@ const LiveChatScreen = ({ route, navigation }) => {
   };
 
   return (
-    <View style={styles.container}>
-      {/* Top Safe Area */}
-      <View style={{ height: insets.top, backgroundColor: colors.primary }} />
+    <SafeAreaView style={styles.safeArea} edges={['top']}>
+      <View style={styles.container}>
 
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity style={styles.headerBtn} onPress={() => navigation.goBack()}>
+        <TouchableOpacity style={styles.headerBtn} onPress={() => navigation.navigate('Main', { screen: 'Communication' })}>
           <Icon name="arrow-left" size={22} color="#fff" />
         </TouchableOpacity>
         <View style={styles.headerInfo}>
@@ -105,8 +110,8 @@ const LiveChatScreen = ({ route, navigation }) => {
       {/* Messages */}
       <KeyboardAvoidingView 
         style={styles.keyboardAvoid} 
-        behavior={Platform.OS === 'ios' ? 'padding' : 'padding'}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 90}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 20}
       >
         {isLoading ? (
           <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
@@ -130,7 +135,7 @@ const LiveChatScreen = ({ route, navigation }) => {
         )}
 
         {/* Input Area */}
-        <View style={[styles.inputContainer, { paddingBottom: Platform.OS === 'ios' ? 24 : 12 }]}>
+        <View style={[styles.inputContainer, { paddingBottom: Math.max(insets.bottom, 16) }]}>
           <TextInput
             style={styles.input}
             placeholder="Type a message..."
@@ -148,11 +153,13 @@ const LiveChatScreen = ({ route, navigation }) => {
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
-    </View>
+      </View>
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
+  safeArea: { flex: 1, backgroundColor: colors.primary },
   container: { flex: 1, backgroundColor: colors.background },
   header: {
     backgroundColor: colors.primary,

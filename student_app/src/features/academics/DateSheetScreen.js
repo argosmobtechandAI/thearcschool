@@ -254,7 +254,7 @@ const DateSheetScreen = ({ navigation }) => {
       <ScrollView 
         contentContainerStyle={styles.examsList}
         showsVerticalScrollIndicator={false}
-        refreshControl={<RefreshControl refreshing={isFetching} onRefresh={onRefresh} colors={[colors.primary]} />}
+        refreshControl={<RefreshControl refreshing={isFetching || false} onRefresh={onRefresh} colors={[colors.primary]} />}
       >
         {loading ? (
           <ActivityIndicator size="large" color={colors.primary} style={{ marginTop: 40 }} />

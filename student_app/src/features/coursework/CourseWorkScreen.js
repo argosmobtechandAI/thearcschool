@@ -28,19 +28,16 @@ const SubjectCard = ({ name, count, label, color, onPress }) => (
 const CourseWorkScreen = ({ navigation }) => {
   const { openDrawer } = useDrawer();
   const [activeTab, setActiveTab] = useState(0);
-  const [refreshing, setRefreshing] = useState(false);
-
-  const { data: courseData, isLoading: courseLoading, refetch: refetchCourse } = useGetCourseWorkQuery();
-  const { data: academicsData, isLoading: acadLoading, refetch: refetchAcad } = useGetAcademicsQuery();
+  
+  const { data: courseData, isLoading: isCourseLoading, isFetching: courseFetching, refetch: refetchCourse } = useGetCourseWorkQuery();
+  const { data: academicsData, isLoading: isAcadLoading, isFetching: acadFetching, refetch: refetchAcad } = useGetAcademicsQuery();
 
   const onRefresh = async () => {
-    setRefreshing(true);
-    await Promise.all([refetchCourse(), refetchAcad()]);
-    setRefreshing(false);
-  };
+        await Promise.all([refetchCourse(), refetchAcad()]);
+      };
 
-  const isLoading = courseLoading || acadLoading;
-
+  const isLoading = isCourseLoading || isAcadLoading;
+  const isFetching = courseFetching || acadFetching;
   // Group course items by subject
   const materials = courseData?.courses || [];
   const assignments = courseData?.courses || []; // backend returns course materials; adapt as needed
@@ -102,7 +99,7 @@ const CourseWorkScreen = ({ navigation }) => {
 
       <ScrollView
         style={styles.scroll}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[colors.primary]} />}
+        refreshControl={<RefreshControl refreshing={isFetching || false} onRefresh={onRefresh} colors={[colors.primary]} />}
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.pageHeader}>

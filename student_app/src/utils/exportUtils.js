@@ -68,26 +68,20 @@ export const exportToPDF = async (columns, data, fileName = "export", title = "E
         // Write the file
         await RNFS.writeFile(savePath, pdfBase64, 'base64');
         
-        // Create a notification channel (required for Android)
-        await notifee.requestPermission();
-        const channelId = await notifee.createChannel({
-            id: 'downloads',
-            name: 'Downloads Channel',
-            importance: AndroidImportance.HIGH,
-        });
-
-        // Trigger local notification
-        await notifee.displayNotification({
-            title: 'Download Complete',
-            body: `Tap to open ${title}`,
-            data: { filePath: savePath },
-            android: {
-                channelId,
-                smallIcon: 'ic_launcher', // Use default app icon
-                pressAction: {
-                    id: 'default',
-                },
-            },
+        // Share the file natively
+        import('react-native-share').then(ShareModule => {
+            const Share = ShareModule.default;
+            Share.open({
+                title: `Share ${title}`,
+                url: `file://${savePath}`,
+                type: 'application/pdf',
+                filename: fileName,
+                showAppsToView: true
+            }).catch(err => {
+                if (err && err.message !== 'User did not share') {
+                    console.log('Share error:', err);
+                }
+            });
         });
 
     } catch (error) {

@@ -160,6 +160,13 @@ export const apiSlice = createApi({
       invalidatesTags: ['Consents'],
     }),
 
+    getThoughtOfDay: builder.query({
+      query: () => '/thoughts/today',
+    }),
+
+    getStudentOfWeek: builder.query({
+      query: (classId) => `/shared/student-of-week/current${classId ? `?classId=${classId}` : ''}`,
+    }),
   }),
 });
 
@@ -186,4 +193,6 @@ export const {
   useGetLiveChatsListQuery,
   useGetConsentsQuery,
   useUpdateConsentStatusMutation,
+  useGetThoughtOfDayQuery,
+  useGetStudentOfWeekQuery,
 } = apiSlice;

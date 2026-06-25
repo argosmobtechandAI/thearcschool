@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect, useRef } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { fetchUsers, fetchCommunication, fetchSystemMonitorList } from "../features/dataSlice";
+import { fetchUsers, fetchCommunication, fetchSystemMonitorList, addLiveChatMessage } from "../features/dataSlice";
 import api, { getSystemMonitorHistory, createCommunication } from "../services/api";
 import { toast } from "react-toastify";
 import { Search, Send, Megaphone, PenSquare, MessageSquare, Activity, Filter } from "lucide-react";
@@ -11,6 +11,8 @@ const Communication = () => {
     const dispatch = useDispatch();
     const socketRef = useRef(null);
     const [activeTab, setActiveTab] = useState("my_chats");
+    const [socketStatus, setSocketStatus] = useState('Disconnected');
+    const [socketUrl, setSocketUrl] = useState('');
     const [searchInboxQuery, setSearchInboxQuery] = useState("");
     const [searchMyChats, setSearchMyChats] = useState("");
     const [searchMonitor, setSearchMonitor] = useState("");
@@ -41,23 +43,34 @@ const Communication = () => {
     const myself = (() => {
         try {
             return JSON.parse(localStorage.getItem('adminUser')) || users?.find(u => u.type === 'admin') || null;
-        } catch(e) {
+        } catch (e) {
             return users?.find(u => u.type === 'admin') || null;
         }
     })();
 
     useEffect(() => {
         if (!myself?.id) return;
-        
-        const SOCKET_URL = (import.meta.env.VITE_API_URL || "http://localhost:3002/api").replace('/api', '');
+
+        const SOCKET_URL = (import.meta.env.VITE_API_URL || "http://localhost:3002/api").replace(/\/api\/?$/, '');
         socketRef.current = io(SOCKET_URL);
+        setSocketUrl(SOCKET_URL);
 
         socketRef.current.on('connect', () => {
+            setSocketStatus('Connected');
             socketRef.current.emit('identify', myself.id);
         });
 
+        socketRef.current.on('disconnect', () => {
+            setSocketStatus('Disconnected');
+        });
+
         socketRef.current.on('receive_message', (newChat) => {
-            dispatch(fetchCommunication('live_chat'));
+            console.log("Socket received message:", newChat);
+            // Optionally show a toast if the message is from someone else
+            if (newChat.sender_id !== myself.id) {
+                toast.info(`New message from ${users?.find(u => u.id === newChat.sender_id)?.name || 'User'}`);
+            }
+            dispatch(addLiveChatMessage(newChat));
             dispatch(fetchSystemMonitorList());
         });
 
@@ -72,7 +85,7 @@ const Communication = () => {
         }
     }, [selectedChatUser?.id, myself?.id]);
 
-    const filteredUsers = users?.filter((user) => 
+    const filteredUsers = users?.filter((user) =>
         user.name?.toLowerCase().includes(searchInboxQuery?.toLowerCase())
     );
 
@@ -87,7 +100,7 @@ const Communication = () => {
         let payload = null;
 
         if (activeTab === "broadcast") {
-            const secondPersonIds = users.map((u) => u.id);
+            const secondPersonIds = users.filter(u => u.id !== myself?.id).map((u) => u.id);
             payload = {
                 sender_id: myself?.id,
                 message: content,
@@ -96,7 +109,7 @@ const Communication = () => {
             };
         } else if (activeTab === "post") {
             const filtered = selectedRole === "all" ? users : users.filter((u) => u.type === selectedRole);
-            const secondPersonIds = filtered.map((u) => u.id);
+            const secondPersonIds = filtered.filter(u => u.id !== myself?.id).map((u) => u.id);
             payload = {
                 sender_id: myself?.id,
                 message: content,
@@ -166,17 +179,17 @@ const Communication = () => {
     const myChatUsers = useMemo(() => {
         if (!chats || !myself || !users) return [];
         const uniqueUsers = new Map();
-        
+
         const sortedChats = [...chats].sort((a, b) => new Date(b.created_at || b.createdAt) - new Date(a.created_at || a.createdAt));
 
         sortedChats.filter(c => c.type === "live_chat" && (c.sender_id == myself.id || c.receiver_id == myself.id))
-             .forEach(c => {
-                 const otherId = c.sender_id == myself.id ? c.receiver_id : c.sender_id;
-                 const user = users.find(u => u.id == otherId);
-                 if (user && !uniqueUsers.has(otherId)) {
-                     uniqueUsers.set(otherId, { ...user, lastMessageTime: c.created_at || c.createdAt, lastMessage: c.message || c.title });
-                 }
-             });
+            .forEach(c => {
+                const otherId = c.sender_id == myself.id ? c.receiver_id : c.sender_id;
+                const user = users.find(u => u.id == otherId);
+                if (user && !uniqueUsers.has(otherId)) {
+                    uniqueUsers.set(otherId, { ...user, lastMessageTime: c.created_at || c.createdAt, lastMessage: c.message || c.title });
+                }
+            });
         return Array.from(uniqueUsers.values());
     }, [chats, users, myself]);
 
@@ -185,19 +198,19 @@ const Communication = () => {
     }, [myChatUsers, searchMyChats]);
 
     const filteredMonitorChats = useMemo(() => {
-        return monitorChats?.filter(c => 
-            c.user1_id != myself?.id && 
-            c.user2_id != myself?.id && 
+        return monitorChats?.filter(c =>
+            c.user1_id != myself?.id &&
+            c.user2_id != myself?.id &&
             (c.user1.name.toLowerCase().includes(searchMonitor.toLowerCase()) || c.user2.name.toLowerCase().includes(searchMonitor.toLowerCase()))
         );
     }, [monitorChats, searchMonitor, myself]);
 
     const myChatMessages = useMemo(() => {
         if (!selectedChatUser || !chats || !myself) return [];
-        return chats.filter(c => c.type === "live_chat" && 
+        return chats.filter(c => c.type === "live_chat" &&
             ((c.sender_id == myself.id && c.receiver_id == selectedChatUser.id) ||
-             (c.sender_id == selectedChatUser.id && c.receiver_id == myself.id))
-        ).sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+                (c.sender_id == selectedChatUser.id && c.receiver_id == myself.id))
+        ).sort((a, b) => new Date(a.created_at || a.createdAt) - new Date(b.created_at || b.createdAt));
     }, [chats, selectedChatUser, myself]);
 
     const getUserName = (id) => users?.find(usr => usr.id == id)?.name || "Unknown";
@@ -270,7 +283,8 @@ const Communication = () => {
                     border: 1px solid var(--glass-border);
                     border-radius: var(--radius-lg);
                     overflow: hidden;
-                    height: 600px;
+                    height: calc(100vh - 140px);
+                    min-height: 500px;
                 }
                 @media (min-width: 768px) {
                     .split-panel { flex-direction: row; }
@@ -371,11 +385,14 @@ const Communication = () => {
 
             {/* Header */}
             <div className="comm-header">
-                <div>
-                    <h1 style={{ fontSize: "1.875rem", fontWeight: "700", color: "var(--text-primary)", marginBottom: "0.25rem" }}>Communication Center</h1>
-                    <p style={{ color: "var(--text-secondary)" }}>Manage messages, announcements, and monitor system chats.</p>
-                </div>
-                
+                {/* <div>
+                    <h1 className="text-2xl font-bold text-gray-900">Communication Center</h1>
+                    <p className="text-sm text-gray-500 mt-1">Manage messages, announcements, and monitor system chats.</p>
+                    <p className="text-xs mt-1" style={{color: socketStatus === 'Connected' ? 'green' : 'red'}}>
+                        Socket: {socketStatus} ({socketUrl})
+                    </p>
+                </div> */}
+
                 <div style={{ display: "flex", gap: "1rem", alignItems: "center" }}>
                     {/* Tabs */}
                     <div className="tabs-container">
@@ -385,119 +402,11 @@ const Communication = () => {
                         <button onClick={() => setActiveTab('system_monitor')} className={`tab-btn ${activeTab === 'system_monitor' ? 'active' : ''}`}>
                             <Activity size={16} /> System Monitor
                         </button>
-                        <button onClick={() => setActiveTab('broadcast')} className={`tab-btn ${activeTab === 'broadcast' ? 'active' : ''}`}>
-                            <Megaphone size={16} /> Broadcasts
-                        </button>
-                        <button onClick={() => setActiveTab('post')} className={`tab-btn ${activeTab === 'post' ? 'active' : ''}`}>
-                            <PenSquare size={16} /> Posts
-                        </button>
                     </div>
-
-                    {(activeTab === 'broadcast' || activeTab === 'post') && (
-                        <button onClick={() => setShowFilters(!showFilters)} className="btn btn-ghost" style={{ padding: "0.6rem" }}>
-                            <Filter size={18} color={showFilters ? "var(--accent-primary)" : "var(--text-secondary)"} />
-                        </button>
-                    )}
                 </div>
             </div>
 
-            {/* Filter Panel (Only for Broadcasts/Posts) */}
-            {(activeTab === 'broadcast' || activeTab === 'post') && showFilters && (
-                <div className="filter-panel">
-                    <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                        <Filter size={16} color="var(--accent-primary)" />
-                        <span style={{ fontWeight: "600", color: "var(--text-primary)" }}>Filter by Date</span>
-                    </div>
-                    <div style={{ background: "#f8fafc", padding: "0.25rem", borderRadius: "8px", border: "1px solid var(--glass-border)" }}>
-                        <DateRangePicker onRangeChange={setDateRange} />
-                    </div>
-                </div>
-            )}
 
-            {/* BROADCAST & POSTS */}
-            {(activeTab === "broadcast" || activeTab === "post") && (
-                <div className="split-panel">
-                    <div className="sidebar-area" style={{ padding: "1.5rem", background: "white" }}>
-                        <h2 style={{ fontSize: "1.125rem", fontWeight: "700", marginBottom: "0.5rem" }}>
-                            {activeTab === 'broadcast' ? "New Broadcast" : "Create Post"}
-                        </h2>
-                        <p style={{ color: "var(--text-secondary)", fontSize: "0.85rem", marginBottom: "1.5rem" }}>
-                            {activeTab === 'broadcast' ? "Send a mass announcement to all users in the system." : "Publish a post targeted to specific user groups."}
-                        </p>
-                        
-                        {activeTab === "post" && (
-                            <div style={{ marginBottom: "1rem" }}>
-                                <label style={{ display: "block", fontSize: "0.85rem", fontWeight: "600", marginBottom: "0.5rem", color: "var(--text-primary)" }}>Target Audience</label>
-                                <select value={selectedRole} onChange={(e) => setSelectedRole(e.target.value)} className="input-glass">
-                                    <option value="all">Everyone</option>
-                                    <option value="teacher">Teachers Only</option>
-                                    <option value="student">Students Only</option>
-                                    <option value="parent">Parents Only</option>
-                                </select>
-                            </div>
-                        )}
-
-                        <textarea
-                            value={content}
-                            onChange={(e) => setContent(e.target.value)}
-                            placeholder={activeTab === 'broadcast' ? "Write broadcast message..." : "Write your post content..."}
-                            className="input-glass"
-                            style={{ height: "150px", resize: "none", marginBottom: "1rem" }}
-                        />
-                        <button onClick={handleSend} className="btn btn-primary" style={{ width: "100%", padding: "0.75rem" }}>
-                            <Send size={16} /> {activeTab === 'broadcast' ? "Send Broadcast" : "Publish Post"}
-                        </button>
-                    </div>
-
-                    <div className="content-area" style={{ padding: "1.5rem", background: "#f8fafc", overflowY: "auto" }}>
-                        <h3 style={{ fontWeight: "600", color: "var(--text-primary)", marginBottom: "1rem" }}>
-                            {activeTab === 'broadcast' ? "Recent Broadcasts" : "Your Posts"}
-                        </h3>
-                        
-                        <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
-                            {activeTab === "broadcast" && broadcastList?.map((msg) => {
-                                const senderId = msg.firstPerson || msg.sender_id;
-                                const isMe = senderId == myself?.id;
-                                return (
-                                    <div key={msg.id} className="glass-card">
-                                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "0.5rem" }}>
-                                            <h4 style={{ fontWeight: "600", fontSize: "1rem" }}>{msg.title || msg.message}</h4>
-                                            <span style={{ fontSize: "0.75rem", color: "var(--text-secondary)", background: "#f1f5f9", padding: "2px 8px", borderRadius: "10px" }}>
-                                                {new Date(msg.createdAt || msg.created_at).toLocaleString()}
-                                            </span>
-                                        </div>
-                                        <div style={{ fontSize: "0.85rem", color: "var(--text-secondary)", display: "flex", justifyContent: "space-between", alignItems: "center", borderTop: "1px solid var(--glass-border)", paddingTop: "0.75rem", marginTop: "0.75rem" }}>
-                                            <span>Sent by <strong style={{ color: isMe ? "var(--accent-primary)" : "inherit" }}>{isMe ? "You" : getUserName(senderId)}</strong></span>
-                                            {isMe && <span style={{ background: "var(--accent-light)", color: "var(--accent-primary)", padding: "2px 8px", borderRadius: "4px", fontSize: "0.7rem", fontWeight: "700", textTransform: "uppercase" }}>Your Broadcast</span>}
-                                        </div>
-                                    </div>
-                                );
-                            })}
-                            {activeTab === "broadcast" && broadcastList?.length === 0 && <div style={{ textAlign: "center", padding: "3rem", color: "var(--text-secondary)" }}>No broadcasts found.</div>}
-
-                            {activeTab === "post" && postList?.map((post) => {
-                                const senderId = post.firstPerson || post.sender_id;
-                                const isMe = senderId == myself?.id;
-                                return (
-                                    <div key={post.id} className="glass-card">
-                                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "0.5rem" }}>
-                                            <h4 style={{ fontWeight: "600", fontSize: "1rem" }}>{post.title || post.message}</h4>
-                                            <span style={{ fontSize: "0.75rem", color: "var(--text-secondary)", background: "#f1f5f9", padding: "2px 8px", borderRadius: "10px" }}>
-                                                {new Date(post.createdAt || post.created_at).toLocaleString()}
-                                            </span>
-                                        </div>
-                                        <div style={{ fontSize: "0.85rem", color: "var(--text-secondary)", display: "flex", justifyContent: "space-between", alignItems: "center", borderTop: "1px solid var(--glass-border)", paddingTop: "0.75rem", marginTop: "0.75rem" }}>
-                                            <span>Posted by <strong style={{ color: isMe ? "var(--accent-primary)" : "inherit" }}>{isMe ? "You" : getUserName(senderId)}</strong></span>
-                                            {isMe && <span style={{ background: "rgba(168, 85, 247, 0.1)", color: "#a855f7", padding: "2px 8px", borderRadius: "4px", fontSize: "0.7rem", fontWeight: "700", textTransform: "uppercase" }}>Your Post</span>}
-                                        </div>
-                                    </div>
-                                );
-                            })}
-                            {activeTab === "post" && postList?.length === 0 && <div style={{ textAlign: "center", padding: "3rem", color: "var(--text-secondary)" }}>No posts found.</div>}
-                        </div>
-                    </div>
-                </div>
-            )}
 
             {/* MY CHATS */}
             {activeTab === "my_chats" && (
@@ -512,11 +421,11 @@ const Communication = () => {
                         <div style={{ padding: "0.75rem", borderBottom: "1px solid var(--glass-border)", background: "white" }}>
                             <div style={{ position: "relative" }}>
                                 <Search size={14} color="var(--text-secondary)" style={{ position: "absolute", left: "10px", top: "10px" }} />
-                                <input 
-                                    type="text" 
-                                    placeholder="Search chats..." 
+                                <input
+                                    type="text"
+                                    placeholder="Search chats..."
                                     value={searchMyChats}
-                                    onChange={(e) => setSearchMyChats(e.target.value)} 
+                                    onChange={(e) => setSearchMyChats(e.target.value)}
                                     className="input-glass"
                                     style={{ paddingLeft: "2rem", padding: "0.5rem 0.5rem 0.5rem 2rem", fontSize: "0.85rem", height: "auto" }}
                                 />
@@ -553,7 +462,7 @@ const Communication = () => {
                                         <p style={{ fontSize: "0.75rem", color: "var(--text-secondary)", textTransform: "capitalize" }}>{selectedChatUser.type}</p>
                                     </div>
                                 </div>
-                                
+
                                 <div style={{ flex: 1, overflowY: "auto", padding: "1.5rem", display: "flex", flexDirection: "column", gap: "1rem", background: "#f8fafc" }}>
                                     {myChatMessages?.map((msg) => {
                                         const isMe = msg.sender_id == myself?.id;
@@ -570,7 +479,7 @@ const Communication = () => {
                                     })}
                                     {myChatMessages?.length === 0 && <div style={{ textAlign: "center", color: "var(--text-secondary)", marginTop: "2rem" }}>Say hello to {selectedChatUser.name}!</div>}
                                 </div>
-                                
+
                                 <div style={{ padding: "1rem", borderTop: "1px solid var(--glass-border)", background: "white" }}>
                                     <div style={{ display: "flex", gap: "0.5rem", background: "#f1f5f9", padding: "0.3rem", borderRadius: "var(--radius-md)" }}>
                                         <input
@@ -610,11 +519,11 @@ const Communication = () => {
                         <div style={{ padding: "0.75rem", borderBottom: "1px solid var(--glass-border)", background: "white" }}>
                             <div style={{ position: "relative" }}>
                                 <Search size={14} color="var(--text-secondary)" style={{ position: "absolute", left: "10px", top: "10px" }} />
-                                <input 
-                                    type="text" 
-                                    placeholder="Search users..." 
+                                <input
+                                    type="text"
+                                    placeholder="Search users..."
                                     value={searchMonitor}
-                                    onChange={(e) => setSearchMonitor(e.target.value)} 
+                                    onChange={(e) => setSearchMonitor(e.target.value)}
                                     className="input-glass"
                                     style={{ paddingLeft: "2rem", padding: "0.5rem 0.5rem 0.5rem 2rem", fontSize: "0.85rem", height: "auto" }}
                                 />
@@ -699,10 +608,10 @@ const Communication = () => {
                         <div style={{ padding: "1.25rem", borderBottom: "1px solid var(--glass-border)" }}>
                             <div style={{ position: "relative" }}>
                                 <Search size={16} color="var(--text-secondary)" style={{ position: "absolute", left: "12px", top: "12px" }} />
-                                <input 
-                                    type="text" 
-                                    placeholder="Search users by name..." 
-                                    onChange={(e) => setSearchInboxQuery(e.target.value)} 
+                                <input
+                                    type="text"
+                                    placeholder="Search users by name..."
+                                    onChange={(e) => setSearchInboxQuery(e.target.value)}
                                     className="input-glass"
                                     style={{ paddingLeft: "2.5rem" }}
                                 />
@@ -711,7 +620,7 @@ const Communication = () => {
                         <div style={{ maxHeight: "300px", overflowY: "auto" }}>
                             {filteredUsers?.length > 0 ? (
                                 filteredUsers.map((user) => (
-                                    <div key={user.id} onClick={() => { setSelectedChatUser(user); setSearchInboxQuery(""); setShowNewChat(false); }} 
+                                    <div key={user.id} onClick={() => { setSelectedChatUser(user); setSearchInboxQuery(""); setShowNewChat(false); }}
                                         style={{ display: "flex", alignItems: "center", gap: "1rem", padding: "1rem 1.25rem", cursor: "pointer", borderBottom: "1px solid #f1f5f9", transition: "var(--transition)" }}
                                         onMouseEnter={(e) => e.currentTarget.style.background = "#f8fafc"}
                                         onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}

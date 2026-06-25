@@ -6,7 +6,7 @@ import Icon from 'react-native-vector-icons/Feather';
 import { useGetNotificationsQuery } from '../store/apiSlice';
 import { colors } from '../theme/colors';
 
-const CustomHeader = ({ title, showBack, onMenuPress }) => {
+const CustomHeader = ({ title, showBack, onMenuPress, rightComponent }) => {
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
   
@@ -31,14 +31,18 @@ const CustomHeader = ({ title, showBack, onMenuPress }) => {
 
       <Text style={styles.headerTitle}>{title || 'The Arc School'}</Text>
 
-      <TouchableOpacity style={styles.headerBtn} onPress={() => navigation.navigate('Home', { screen: 'Notifications' })}>
-        {unreadCount > 0 && (
-          <View style={styles.notificationBadge}>
-            <Text style={styles.badgeText}>{unreadCount}</Text>
-          </View>
-        )}
-        <Icon name="bell" size={22} color="#fff" />
-      </TouchableOpacity>
+      {rightComponent ? (
+        rightComponent
+      ) : (
+        <TouchableOpacity style={styles.headerBtn} onPress={() => navigation.navigate('Home', { screen: 'Notifications' })}>
+          {unreadCount > 0 && (
+            <View style={styles.notificationBadge}>
+              <Text style={styles.badgeText}>{unreadCount}</Text>
+            </View>
+          )}
+          <Icon name="bell" size={22} color="#fff" />
+        </TouchableOpacity>
+      )}
     </View>
   );
 };

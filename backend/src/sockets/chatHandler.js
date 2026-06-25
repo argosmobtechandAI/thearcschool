@@ -72,6 +72,7 @@ export const initSocket = (server) => {
 
         if (error) throw error;
 
+        console.log(`About to emit receive_message to room: ${room}, chat:`, chat[0]);
         // Emit to the room, both users' personal rooms (for inbox updates), and admin monitor
         io.to(room).to(sender_id).to(receiver_id).to("admin_monitor").emit("receive_message", chat[0]);
 
@@ -124,27 +125,31 @@ export const initSocket = (server) => {
           const { data: admins } = await supabase.from("user").select("id").in("type", ["admin", "principal"]);
           
           if (admins && admins.length > 0) {
-             const adminIds = admins.map(a => a.id);
+             const adminIds = admins
+                .map(a => a.id)
+                .filter(id => id !== sender_id && id !== receiver_id);
              
-             // Get sender & receiver names for better notification
-             const { data: users } = await supabase.from("user").select("name").in("id", [sender_id, receiver_id]);
-             const userNames = users ? users.map(u => u.name).join(" and ") : "two users";
+             if (adminIds.length > 0) {
+                 // Get sender & receiver names for better notification
+                 const { data: users } = await supabase.from("user").select("name").in("id", [sender_id, receiver_id]);
+                 const userNames = users ? users.map(u => u.name).join(" and ") : "two users";
 
-             const title = "New System Conversation";
-             const body = `A new chat has started between ${userNames}`;
+                 const title = "New System Conversation";
+                 const body = `A new chat has started between ${userNames}`;
 
-             // 1. Send Push
-             await FCMService.sendToUsers(adminIds, title, body, { type: "system_monitor" });
+                 // 1. Send Push
+                 await FCMService.sendToUsers(adminIds, title, body, { type: "system_monitor" });
 
-             // 2. Insert into notifications table so it appears in the History
-             const notificationInserts = adminIds.map(adminId => ({
-                 user_id: adminId,
-                 title: title,
-                 message: body,
-                 type: "system_monitor",
-                 is_read: false
-             }));
-             await supabase.from("notifications").insert(notificationInserts);
+                 // 2. Insert into notifications table so it appears in the History
+                 const notificationInserts = adminIds.map(adminId => ({
+                     user_id: adminId,
+                     title: title,
+                     message: body,
+                     type: "system_monitor",
+                     is_read: false
+                 }));
+                 await supabase.from("notifications").insert(notificationInserts);
+             }
           }
         }
         

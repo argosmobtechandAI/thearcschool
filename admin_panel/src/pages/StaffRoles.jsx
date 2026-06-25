@@ -160,8 +160,8 @@ const StaffRoles = () => {
                   required
                 >
                   <option value="">Select Staff...</option>
-                  {users.filter(u => u.role === "teacher" || u.role === "admin" || u.role === "accountant" || u.role === "principal").map(user => (
-                    <option key={user.id} value={user.id}>{user.name} ({user.role})</option>
+                  {users.filter(u => !['student', 'parent'].includes(u.type)).map(user => (
+                    <option key={user.id} value={user.id}>{user.name} ({user.type})</option>
                   ))}
                 </select>
               </div>

@@ -88,7 +88,7 @@ const ChatRoomScreen = ({ route, navigation }) => {
 
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity style={styles.headerBtn} onPress={() => navigation.goBack()}>
+        <TouchableOpacity style={styles.headerBtn} onPress={() => navigation.navigate('ChatList')}>
           <Icon name="arrow-left" size={22} color="#fff" />
         </TouchableOpacity>
         <View style={styles.headerInfo}>

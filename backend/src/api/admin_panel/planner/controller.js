@@ -115,6 +115,39 @@ export const createPlannerEvent = async (req, res) => {
       await createPendingConsents(data[0].id, data[0].target_classes);
     }
 
+    try {
+      const targetClassesStrArray = data[0].target_classes;
+      let studentIds = [];
+      if (!targetClassesStrArray || targetClassesStrArray.includes("All") || targetClassesStrArray.length === 0) {
+        const { data: students } = await supabase.from('user').select('id').eq('type', 'student');
+        if (students) studentIds = students.map(s => s.id);
+      } else {
+        const { data: classes } = await supabase.from('class').select('id, name, section');
+        if (classes) {
+           const matchingClassIds = classes.filter(c => {
+             return targetClassesStrArray.some(target => {
+               const lowerTarget = target.toLowerCase();
+               return c.name?.toLowerCase().includes(lowerTarget) || 
+                      `${c.name} ${c.section}`.toLowerCase().includes(lowerTarget);
+             });
+           }).map(c => c.id);
+           if (matchingClassIds.length > 0) {
+             const { data: classStudents } = await supabase.from('class_students').select('student_id').in('class_id', matchingClassIds);
+             if (classStudents) studentIds = classStudents.map(cs => cs.student_id);
+           }
+        }
+      }
+      
+      if (studentIds.length > 0) {
+        studentIds = [...new Set(studentIds)];
+        const { FCMService } = await import("../../../services/fcmService.js");
+        const title = "New Event Scheduled";
+        const message = `An event "${data[0].title}" has been scheduled.`;
+        await FCMService.sendToUsers(studentIds, title, message, { type: "event" });
+        await supabase.from("notifications").insert(studentIds.map(sid => ({ user_id: sid, title, message, type: "event", is_read: false })));
+      }
+    } catch (notifErr) { console.error("Event Notification Error:", notifErr); }
+
     res.status(201).json({ message: "Event created successfully", data: data[0] });
   } catch (error) {
     console.error("Error creating planner event:", error);

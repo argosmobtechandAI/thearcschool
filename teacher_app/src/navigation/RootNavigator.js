@@ -29,6 +29,7 @@ import ProfileScreen from '../features/profile/ProfileScreen';
 import ChangePasswordScreen from '../features/profile/ChangePasswordScreen';
 import AnnualPlannerScreen from '../features/planning/AnnualPlannerScreen';
 import TimetableScreen from '../features/timetable/TimeTableScreen';
+import ThoughtScreen from '../features/thoughts/ThoughtScreen';
 
 // Attendance
 import AttendanceHomeScreen from '../features/attendance/AttendanceHomeScreen';
@@ -180,6 +181,13 @@ const MainTabs = () => {
   );
 };
 
+const AuthenticatedStack = () => (
+  <Stack.Navigator screenOptions={{ headerShown: false, animation: 'fade' }}>
+    <Stack.Screen name="Thought" component={ThoughtScreen} />
+    <Stack.Screen name="Main" component={MainTabs} />
+  </Stack.Navigator>
+);
+
 const RootNavigator = () => {
   const isAuthenticated = useSelector((state) => state.auth.isAuthenticated);
 
@@ -188,7 +196,7 @@ const RootNavigator = () => {
       {!isAuthenticated ? (
         <AuthStack />
       ) : (
-        <MainTabs />
+        <AuthenticatedStack />
       )}
     </NavigationContainer>
   );

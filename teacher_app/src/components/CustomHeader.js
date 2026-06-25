@@ -10,7 +10,7 @@ import { colors, shadows } from '../theme/colors';
 
 const LOGO = require('../assets/images/logo.jpeg');
 
-const CustomHeader = ({ title, showBack }) => {
+const CustomHeader = ({ title, showBack, onMenuPress, rightComponent }) => {
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
   const dispatch = useDispatch();
@@ -51,17 +51,18 @@ const CustomHeader = ({ title, showBack }) => {
             <Icon name="chevron-down" size={14} color={colors.surface} style={{ marginLeft: 4 }} />
           </TouchableOpacity>
 
-          <TouchableOpacity 
-            style={styles.iconButton}
-            onPress={() => navigation.navigate('Home', { screen: 'Notifications' })}
-          >
-            {unreadCount > 0 && (
-              <View style={styles.notificationBadge}>
-                <Text style={styles.badgeText}>{unreadCount}</Text>
-              </View>
-            )}
-            <Icon name="bell" size={24} color={colors.surface} />
-          </TouchableOpacity>
+          {rightComponent ? (
+            rightComponent
+          ) : (
+            <TouchableOpacity style={styles.iconButton} onPress={() => navigation.navigate('Home', { screen: 'Notifications' })}>
+              {unreadCount > 0 && (
+                <View style={styles.notificationBadge}>
+                  <Text style={styles.badgeText}>{unreadCount}</Text>
+                </View>
+              )}
+              <Icon name="bell" size={24} color={colors.surface} />
+            </TouchableOpacity>
+          )}
         </View>
       </View>
 

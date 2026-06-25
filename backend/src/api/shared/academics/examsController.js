@@ -93,6 +93,16 @@ export const createExams = async (req, res) => {
       }));
 
       await supabase.from("notifications").insert(notificationInserts);
+      
+      try {
+        const { FCMService } = await import("../../../services/fcmService.js");
+        await FCMService.sendToUsers(
+           studentIds, 
+           "New Exam Scheduled", 
+           `Exam "${data.title}" scheduled on ${data.date} at ${data.time}`, 
+           { type: "exam" }
+        );
+      } catch (fcmErr) { console.error("FCM Error:", fcmErr); }
     }
 
     // 4️⃣ Add Activity for Principals
@@ -456,6 +466,16 @@ export const createDateSheet = async (req, res) => {
         is_read: false
       }));
       await supabase.from("notifications").insert(notificationInserts);
+      
+      try {
+        const { FCMService } = await import("../../../services/fcmService.js");
+        await FCMService.sendToUsers(
+           studentIds, 
+           "New Date Sheet Published", 
+           `Date sheet for "${data.title}" has been published.`, 
+           { type: "exam" }
+        );
+      } catch (fcmErr) { console.error("FCM Error:", fcmErr); }
     }
 
     return res.status(201).json({ success: true, message: "Date Sheet Created Successfully", data: createdExams });
@@ -652,6 +672,21 @@ export const bulkUpdateGrades = async (req, res) => {
       const { error: upsertError } = await supabase.from("grades").upsert(updates);
       if (upsertError) throw upsertError;
     }
+
+    try {
+      const { FCMService } = await import("../../../services/fcmService.js");
+      const notifsToInsert = [];
+      for (const g of grades) {
+         const subject = examSubjectMap[g.exam_id] || "a subject";
+         const title = "Grade Published";
+         const message = `Your grade for ${subject} has been published.`;
+         await FCMService.sendToUsers([g.student_id], title, message, { type: "grade" }).catch(e => console.error(e));
+         notifsToInsert.push({ user_id: g.student_id, title, message, type: "grade", is_read: false });
+      }
+      if (notifsToInsert.length > 0) {
+         await supabase.from("notifications").insert(notifsToInsert);
+      }
+    } catch (fcmErr) { console.error("FCM Error:", fcmErr); }
 
     return res.status(200).json({ success: true, message: "Grades saved successfully" });
   } catch (e) {

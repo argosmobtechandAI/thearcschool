@@ -419,20 +419,12 @@ const AnnualPlanner = () => {
                   <textarea className="input-glass" rows="2" value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} placeholder="Additional details..." style={{ resize: "vertical" }}></textarea>
                 </div>
 
-                <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                  <input type="checkbox" id="requires_consent" checked={formData.requires_consent} onChange={e => setFormData({...formData, requires_consent: e.target.checked})} style={{ width: "16px", height: "16px", accentColor: "var(--primary-color)" }} />
-                  <label htmlFor="requires_consent" style={{ fontSize: "0.875rem", fontWeight: "500", cursor: "pointer" }}>Requires Parent Consent</label>
-                </div>
+
               </div>
               
               <div style={{ display: "flex", justifyContent: "flex-end", gap: "1rem", marginTop: "2rem", paddingTop: "1.5rem", borderTop: "1px solid rgba(0,0,0,0.05)" }}>
-                {selectedEvent && formData.requires_consent && (
-                  <button type="button" onClick={() => setIsConsentModalOpen(true)} className="btn btn-ghost" style={{ color: "var(--primary-color)", background: "rgba(59, 130, 246, 0.1)", display: "flex", alignItems: "center", gap: "0.25rem", marginRight: "auto" }}>
-                    <FileText size={16} /> View Consent Report
-                  </button>
-                )}
                 {selectedEvent && (
-                  <button type="button" onClick={handleDelete} className="btn btn-ghost" style={{ color: "#ef4444", background: "rgba(239, 68, 68, 0.1)", display: "flex", alignItems: "center", gap: "0.25rem", marginRight: !formData.requires_consent ? "auto" : "0" }}>
+                  <button type="button" onClick={handleDelete} className="btn btn-ghost" style={{ color: "#ef4444", background: "rgba(239, 68, 68, 0.1)", display: "flex", alignItems: "center", gap: "0.25rem", marginRight: "auto" }}>
                     <Trash2 size={16} /> Delete
                   </button>
                 )}

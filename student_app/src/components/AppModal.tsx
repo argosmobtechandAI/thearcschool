@@ -1,27 +1,14 @@
 /**
  * AppModal — Reusable branded modal/alert for the student app.
  * Replaces the system Alert.alert() with a premium on-brand design.
- *
- * Usage:
- *   <AppModal
- *     visible={showModal}
- *     title="Logout"
- *     message="Are you sure you want to log out?"
- *     icon="log-out"
- *     iconColor={colors.danger}
- *     actions={[
- *       { label: 'Cancel', onPress: () => setShowModal(false), style: 'cancel' },
- *       { label: 'Logout', onPress: handleLogout, style: 'danger' },
- *     ]}
- *     onClose={() => setShowModal(false)}
- *   />
  */
 import React from 'react';
 import {
-  Modal, View, Text, TouchableOpacity, StyleSheet, Pressable, Platform,
+  Modal, View, Text, StyleSheet, Pressable, Platform,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Feather';
-import { colors, shadows } from '../theme/colors';
+import { theme } from '../theme/theme';
+import Button from './Button';
 
 export interface AppModalAction {
   label: string;
@@ -53,13 +40,13 @@ const AppModal: React.FC<AppModalProps> = ({
 }) => {
   if (!visible) return null;
 
-  const buttonStyle = (style?: string) => {
+  const getButtonVariant = (style?: string) => {
     switch (style) {
-      case 'danger':    return { bg: colors.danger,   text: '#fff' };
-      case 'primary':   return { bg: colors.primary,  text: '#fff' };
-      case 'success':   return { bg: colors.success,  text: '#fff' };
-      case 'cancel':    return { bg: colors.border,   text: colors.textMuted };
-      default:          return { bg: colors.primary,  text: '#fff' };
+      case 'danger': return 'danger';
+      case 'primary': return 'primary';
+      case 'success': return 'primary'; // using primary and overriding color if needed, or fallback
+      case 'cancel': return 'ghost';
+      default: return 'primary';
     }
   };
 
@@ -76,8 +63,8 @@ const AppModal: React.FC<AppModalProps> = ({
 
           {/* Icon (optional) */}
           {icon && (
-            <View style={[styles.iconWrap, { backgroundColor: (iconColor || colors.primary) + '18' }]}>
-              <Icon name={icon} size={28} color={iconColor || colors.primary} />
+            <View style={[styles.iconWrap, { backgroundColor: (iconColor || theme.colors.primary) + '18' }]}>
+              <Icon name={icon} size={28} color={iconColor || theme.colors.primary} />
             </View>
           )}
 
@@ -94,23 +81,16 @@ const AppModal: React.FC<AppModalProps> = ({
           {actions.length > 0 && (
             <View style={[styles.actions, actions.length > 2 && styles.actionsColumn]}>
               {actions.map((action, i) => {
-                const bs = buttonStyle(action.style);
+                const variant = getButtonVariant(action.style);
                 return (
-                  <TouchableOpacity
+                  <Button
                     key={i}
-                    style={[
-                      styles.actionBtn,
-                      { backgroundColor: bs.bg },
-                      actions.length <= 2 ? { flex: 1 } : undefined,
-                    ]}
-                    onPress={action.onPress}
-                    activeOpacity={0.8}
-                  >
-                    {action.icon && (
-                      <Icon name={action.icon} size={16} color={bs.text} style={{ marginRight: 6 }} />
-                    )}
-                    <Text style={[styles.actionText, { color: bs.text }]}>{action.label}</Text>
-                  </TouchableOpacity>
+                    variant={variant}
+                    label={action.label}
+                    onPress={action.onPress || (() => {})}
+                    icon={action.icon}
+                    style={actions.length <= 2 ? { flex: 1 } : { marginBottom: theme.spacing.sm }}
+                  />
                 );
               })}
             </View>
@@ -127,43 +107,42 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(15, 23, 42, 0.6)',
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 24,
+    padding: theme.layout.padding.screen,
   },
   modalBox: {
-    backgroundColor: colors.surface,
-    borderRadius: 24,
-    padding: 24,
+    backgroundColor: theme.colors.surface,
+    borderRadius: theme.layout.borderRadius.xl,
+    padding: theme.spacing.xl,
     width: '100%',
     maxWidth: 380,
     alignItems: 'center',
-    ...shadows.heavy,
+    ...theme.shadows.heavy,
   },
   iconWrap: {
     width: 64, height: 64, borderRadius: 32,
     justifyContent: 'center', alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: theme.spacing.md,
   },
   title: {
-    fontSize: 20, fontWeight: '800', color: colors.text,
-    textAlign: 'center', marginBottom: 8,
+    fontFamily: theme.typography.fontFamily.heading,
+    fontSize: theme.typography.fontSize.xl,
+    color: theme.colors.text,
+    textAlign: 'center',
+    marginBottom: theme.spacing.sm,
   },
   message: {
-    fontSize: 14, color: colors.textMuted, textAlign: 'center',
-    lineHeight: 20, marginBottom: 24,
+    fontFamily: theme.typography.fontFamily.regular,
+    fontSize: theme.typography.fontSize.sm,
+    color: theme.colors.textMuted,
+    textAlign: 'center',
+    lineHeight: 20,
+    marginBottom: theme.spacing.lg,
   },
   actions: {
-    flexDirection: 'row', gap: 10, width: '100%',
+    flexDirection: 'row', gap: theme.spacing.sm, width: '100%',
   },
   actionsColumn: {
     flexDirection: 'column',
-  },
-  actionBtn: {
-    flexDirection: 'row', justifyContent: 'center', alignItems: 'center',
-    paddingVertical: 14, paddingHorizontal: 20,
-    borderRadius: 14,
-  },
-  actionText: {
-    fontSize: 15, fontWeight: '700',
   },
 });
 

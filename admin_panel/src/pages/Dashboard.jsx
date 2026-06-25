@@ -30,6 +30,7 @@ const Dashboard = () => {
   const dispatch = useDispatch();
   
   const [admissionData, setAdmissionData] = useState([]);
+  const [studentOfWeekList, setStudentOfWeekList] = useState([]);
   
   const { user } = useSelector((state) => state.auth);
   // Pulling state directly from the simple Redux slice
@@ -101,6 +102,15 @@ const Dashboard = () => {
         } catch (e) {
           console.error("No topper found");
         }
+        
+        try {
+          const { data: sowData } = await api.get("/admin/student-of-week");
+          if (sowData?.success && sowData.data) {
+            setStudentOfWeekList(sowData.data.slice(0, 3));
+          }
+        } catch (e) {
+          console.error("No student of week found");
+        }
       } catch (error) {
         console.error("Failed to load dashboard data", error);
       } finally {
@@ -151,7 +161,7 @@ const Dashboard = () => {
         />
       </div>
 
-      {user?.type === "admin" && (
+      {(user?.type === "admin" || user?.type === "principal") && (
         <>
           <h3 style={{ fontSize: "1.1rem", fontWeight: "700", marginBottom: "1rem", color: "var(--text-primary)", display: "flex", alignItems: "center", gap: "0.5rem" }}>
             <Users size={18} color="var(--accent-primary)"/> People Overview
@@ -167,7 +177,7 @@ const Dashboard = () => {
         </>
       )}
 
-      {(user?.type === "admin" || user?.type === "finance") && (
+      {(user?.type === "admin" || user?.type === "principal" || user?.type === "finance") && (
         <>
           <h3 style={{ fontSize: "1.1rem", fontWeight: "700", marginBottom: "1rem", color: "var(--text-primary)", display: "flex", alignItems: "center", gap: "0.5rem" }}>
             <CreditCard size={18} color="var(--accent-primary)"/> Operations & Financials
@@ -178,11 +188,11 @@ const Dashboard = () => {
               dispatch(setFeeStatusFilter("Defaulters"));
               navigate("/fees");
             }} />
-            {user?.type === "admin" && (
+            {(user?.type === "admin" || user?.type === "principal") && (
               <>
                 <StatCard title="Active Classes" value={loading ? "..." : stats.activeClasses} icon={GraduationCap} color="14, 165, 233" onClick={() => navigate("/classes")} />
                 <StatCard title="Total Rooms" value={loading ? "..." : stats.totalRooms} icon={Building} color="99, 102, 241" onClick={() => navigate("/rooms")} />
-                <StatCard title="Events Today" value={loading ? "..." : stats.eventsToday} icon={Calendar} color="236, 72, 153" onClick={() => navigate("/events")} />
+                <StatCard title="Events Today" value={loading ? "..." : stats.eventsToday} icon={Calendar} color="236, 72, 153" onClick={() => navigate("/annual-planner")} />
               </>
             )}
           </div>
@@ -190,18 +200,43 @@ const Dashboard = () => {
       )}
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
-        {user?.type === "admin" && (
-          <div className="glass-panel" style={{ padding: "1.5rem" }}>
-            <h3 style={{ fontSize: "1.25rem", fontWeight: "700", marginBottom: "1rem", paddingBottom: "1rem", borderBottom: "1px solid var(--glass-border)" }}>
-              Needs Attention
+        {(user?.type === "admin" || user?.type === "principal") && (
+          <div className="glass-panel" style={{ padding: "1.5rem", display: "flex", flexDirection: "column" }}>
+            <h3 style={{ fontSize: "1.25rem", fontWeight: "700", marginBottom: "1rem", paddingBottom: "1rem", borderBottom: "1px solid var(--glass-border)", display: "flex", alignItems: "center", gap: "0.5rem" }}>
+              <UserCheck size={20} color="var(--accent-primary)" /> Student of the Week
             </h3>
-            <div style={{ padding: "2rem", textAlign: "center", color: "var(--text-secondary)" }}>
-              "You're all caught up! No urgent tasks pending."
+            <div style={{ padding: "1rem", flex: 1, display: "flex", flexDirection: "column", gap: "1rem" }}>
+              {studentOfWeekList.length > 0 ? (
+                <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+                  {studentOfWeekList.map(record => (
+                    <div key={record.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "0.75rem", background: "var(--glass-bg)", borderRadius: "8px", border: "1px solid var(--glass-border)" }}>
+                      <div>
+                        <p style={{ fontWeight: "600", color: "var(--text-primary)", fontSize: "0.95rem" }}>{record.student?.name}</p>
+                        <p style={{ color: "var(--text-secondary)", fontSize: "0.8rem" }}>Class {record.class?.name} - {record.class?.section}</p>
+                      </div>
+                      <span style={{ fontSize: "0.75rem", color: "var(--accent-primary)", fontWeight: "500", background: "var(--accent-light)", padding: "0.25rem 0.5rem", borderRadius: "12px" }}>Awarded</span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div style={{ textAlign: "center", color: "var(--text-secondary)", padding: "1rem 0", flex: 1, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  <p>Manage and review the Student of the Week awards for all classes.</p>
+                </div>
+              )}
+              <div style={{ marginTop: "auto", display: "flex", justifyContent: "center" }}>
+                <button 
+                  onClick={() => navigate("/student-of-week")}
+                  className="btn btn-primary"
+                  style={{ fontSize: "0.9rem", padding: "0.6rem 1.2rem", fontWeight: "600", display: "flex", alignItems: "center", gap: "0.5rem" }}
+                >
+                  Manage Awards
+                </button>
+              </div>
             </div>
           </div>
         )}
 
-        {user?.type === "admin" && (
+        {(user?.type === "admin" || user?.type === "principal") && (
           <div className="glass-panel" style={{ padding: "1.5rem" }}>
             <h3 style={{ fontSize: "1.25rem", fontWeight: "700", marginBottom: "1rem", paddingBottom: "1rem", borderBottom: "1px solid var(--glass-border)" }}>
               Topper of the Month

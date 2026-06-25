@@ -6,6 +6,11 @@ import uploadRouter from "./shared/upload/routes.js";
 import roomRouter from "./shared/rooms/routes.js";
 import communicationRouter from "./shared/communication/routes.js";
 import attendanceRouter from "./shared/attendance/routes.js";
+import thoughtRouter from "./shared/thoughts/routes.js";
+import courseRouter from "./course/routes.js";
+import liveChatRouter from "./shared/live_chat/routes.js";
+import sharedStudentOfWeekRouter from "./shared/student_of_week/routes.js";
+import adminStudentOfWeekRouter from "./admin_panel/student_of_week/routes.js";
 
 // Admin Web Panel Domains
 import adminPanelRouter from "./admin_panel/routes.js";
@@ -30,14 +35,17 @@ router.use("/teacher_app", teacherAppRouter);
 router.use("/principal_app", principalAppRouter);
 
 // Shared Global APIs
-import courseRouter from "./course/routes.js";
+// Shared Global APIs
+
 router.use("/course", courseRouter);
 router.use("/user", userRoutes);
 router.use("/communication", communicationRouter);
 router.use("/attendance", attendanceRouter);
-import liveChatRouter from "./shared/live_chat/routes.js";
 router.use("/upload", uploadRouter);
 router.use("/rooms", roomRouter);
 router.use("/live_chat", liveChatRouter);
+router.use("/thoughts", thoughtRouter);
+router.use("/shared/student-of-week", sharedStudentOfWeekRouter);
+router.use("/admin/student-of-week", adminStudentOfWeekRouter);
 
 export default router;

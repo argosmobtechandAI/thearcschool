@@ -9,19 +9,16 @@ import { useDrawer } from '../../navigation/DrawerContext';
 
 const AttendanceScreen = ({ navigation }) => {
   const { openDrawer } = useDrawer();
-  const [refreshing, setRefreshing] = useState(false);
-  const [currentMonth, setCurrentMonth] = useState(new Date().toISOString().split('T')[0]);
+    const [currentMonth, setCurrentMonth] = useState(new Date().toISOString().split('T')[0]);
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   
   // Fetch all records once; RTK Query will cache this
-  const { data, isLoading, error, refetch } = useGetAttendanceQuery();
+  const { data, isLoading, isFetching, error, refetch } = useGetAttendanceQuery();
   const { data: eventsData, refetch: refetchEvents } = useGetEventsQuery();
 
   const onRefresh = useCallback(async () => {
-    setRefreshing(true);
-    await Promise.all([refetch(), refetchEvents()]);
-    setRefreshing(false);
-  }, [refetch, refetchEvents]);
+        await Promise.all([refetch(), refetchEvents()]);
+      }, [refetch, refetchEvents]);
 
   // Backend returns data.attendance OR data.records — support both
   const allRecords = data?.attendance || data?.records || [];
@@ -194,7 +191,7 @@ const AttendanceScreen = ({ navigation }) => {
       <ScrollView 
         style={styles.scroll} 
         showsVerticalScrollIndicator={false}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[colors.primary]} />}
+        refreshControl={<RefreshControl refreshing={isFetching || false} onRefresh={onRefresh} colors={[colors.primary]} />}
       >
         
         {/* 1. Hero Stats */}

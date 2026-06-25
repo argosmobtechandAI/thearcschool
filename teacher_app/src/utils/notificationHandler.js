@@ -10,7 +10,7 @@ const invalidateNotificationsCache = () => {
     DeviceEventEmitter.emit('onNotificationReceived');
     const { store } = require('../store');
     const { apiSlice } = require('../store/apiSlice');
-    store.dispatch(apiSlice.util.invalidateTags(['Notifications', 'Dashboard']));
+    store.dispatch(apiSlice.util.invalidateTags(['Notifications']));
   } catch (e) {
     console.warn('Could not invalidate notifications cache:', e);
   }
@@ -49,6 +49,9 @@ export const handleNotificationEvent = async ({ type, detail }) => {
         } else if (routeScreen === 'StudentAcademicHistory') {
           targetStack = 'Work';
           actualScreen = 'StudentAcademicHistoryScreen';
+        } else if (routeScreen === 'ChatRoomScreen' || routeScreen === 'LiveChatScreen') {
+          targetStack = 'Connect';
+          actualScreen = 'ChatRoomScreen';
         }
 
         if (targetStack) {

@@ -41,8 +41,9 @@ const DashboardScreen = ({ navigation }) => {
   );
 
   const { data: eventsData, refetch: refetchEvents, isFetching: fetchingEvents } = useGetEventsQuery(activeClassId, { skip: !activeClassId });
-
   const { data: performanceResponse, refetch: refetchPerformance, isFetching: fetchingPerformance } = useGetClassPerformanceQuery(activeClassId, { skip: !activeClassId });
+  const { data: sotwResponse, refetch: refetchSotw, isFetching: fetchingSotw } = require('../../store/apiSlice').useGetStudentOfWeekQuery(activeClassId, { skip: !activeClassId });
+  const studentOfWeek = sotwResponse?.data;
   const performanceData = performanceResponse?.data || [];
   const topPerformers = performanceData.slice(0, 5);
   const bottomPerformers = [...performanceData].reverse().slice(0, 5);
@@ -76,13 +77,14 @@ const DashboardScreen = ({ navigation }) => {
     refetchTimetable();
     refetchEvents();
     if (activeClassId) {
+      refetchSotw();
       refetchStudents();
       refetchAttendance();
       refetchPerformance();
     }
-  }, [refetchExams, refetchCourses, refetchClasses, refetchTimetable, refetchStudents, refetchEvents, refetchAttendance, refetchPerformance, activeClassId]);
+  }, [refetchExams, refetchCourses, refetchClasses, refetchTimetable, refetchStudents, refetchEvents, refetchAttendance, refetchPerformance, refetchSotw, activeClassId]);
 
-  const isRefreshing = fetchingExams || fetchingCourses || fetchingClasses || fetchingTimetable || fetchingStudents || fetchingAttendance || fetchingEvents || fetchingPerformance;
+  const isRefreshing = fetchingExams || fetchingCourses || fetchingClasses || fetchingTimetable || fetchingStudents || fetchingAttendance || fetchingEvents || fetchingPerformance || fetchingSotw;
 
   let attendanceMetric = "Pending";
   if (!activeClassId) {
@@ -163,6 +165,40 @@ const DashboardScreen = ({ navigation }) => {
             </TouchableOpacity>
           </View>
         </View>
+
+        {/* Student of the Week Banner */}
+        {studentOfWeek && (
+          <View style={{ marginHorizontal: 16, marginBottom: 24, backgroundColor: '#fff', borderRadius: 16, padding: 16, shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 8, elevation: 4, borderWidth: 1, borderColor: '#fef08a' }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              {studentOfWeek.student?.avatar_url ? (
+                <Image source={{ uri: studentOfWeek.student.avatar_url }} style={{ width: 56, height: 56, borderRadius: 28, marginRight: 16, borderWidth: 2, borderColor: '#fbbf24' }} />
+              ) : (
+                <View style={{ width: 56, height: 56, borderRadius: 28, marginRight: 16, backgroundColor: '#fbbf24', justifyContent: 'center', alignItems: 'center', shadowColor: '#fbbf24', shadowOpacity: 0.4, shadowRadius: 4, elevation: 2 }}>
+                  <Icon name="award" size={28} color="#fff" />
+                </View>
+              )}
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 13, color: '#d97706', fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.5 }}>Student of the Week</Text>
+                <Text style={{ fontSize: 20, color: '#1f2937', fontWeight: 'bold', marginTop: 2 }}>{studentOfWeek.student?.name}</Text>
+                <Text style={{ fontSize: 13, color: '#6b7280', marginTop: 4 }}>{studentOfWeek.reason}</Text>
+              </View>
+            </View>
+            
+            {/* Metrics Row */}
+            {studentOfWeek.metrics && (
+              <View style={{ flexDirection: 'row', marginTop: 16, paddingTop: 16, borderTopWidth: 1, borderTopColor: '#f3f4f6', gap: 12 }}>
+                <View style={{ flex: 1, backgroundColor: '#ecfdf5', padding: 8, borderRadius: 8, alignItems: 'center' }}>
+                  <Text style={{ fontSize: 11, color: '#059669', fontWeight: '600', textTransform: 'uppercase' }}>Attendance</Text>
+                  <Text style={{ fontSize: 16, color: '#047857', fontWeight: 'bold', marginTop: 2 }}>{studentOfWeek.metrics.attendance || 0} pts</Text>
+                </View>
+                <View style={{ flex: 1, backgroundColor: '#eff6ff', padding: 8, borderRadius: 8, alignItems: 'center' }}>
+                  <Text style={{ fontSize: 11, color: '#2563eb', fontWeight: '600', textTransform: 'uppercase' }}>Grades</Text>
+                  <Text style={{ fontSize: 16, color: '#1d4ed8', fontWeight: 'bold', marginTop: 2 }}>{Math.round(studentOfWeek.metrics.grades || 0)} pts</Text>
+                </View>
+              </View>
+            )}
+          </View>
+        )}
 
         {/* Next in School (Upcoming Events) */}
         {upcomingEventsList.length > 0 && (

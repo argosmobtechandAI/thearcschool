@@ -30,7 +30,7 @@ export const getDashboardData = async (req, res) => {
         .from('timetable')
         .select('*')
         .eq('class_id', classData.class_id)
-        .eq('day_of_week', today);
+        .ilike('day_of_week', today);
       
       if (!ttError && ttData) timetable = ttData;
     }
@@ -76,14 +76,14 @@ export const getDashboardData = async (req, res) => {
       };
     }
 
-    // 5. Upcoming events (from planner)
+    // 5. Upcoming events (from annual_planner)
     let upcomingEvents = [];
     const todayStr = new Date().toISOString().split('T')[0];
-    const { data: eventsData } = await supabase
-      .from('planner')
-      .select('id, title, description, date, end_date, type, color')
-      .gte('date', todayStr)
-      .order('date', { ascending: true })
+    const { data: eventsData, error: evError } = await supabase
+      .from('annual_planner')
+      .select('id, title, description, date:start_date, end_date, type:category')
+      .gte('start_date', todayStr)
+      .order('start_date', { ascending: true })
       .limit(5);
 
     if (eventsData) upcomingEvents = eventsData;

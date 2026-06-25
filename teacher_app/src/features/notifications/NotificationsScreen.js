@@ -22,6 +22,17 @@ const NotificationsScreen = ({ navigation }) => {
   }, [refetch]);
 
   const notifications = data?.data || [];
+  const unreadCount = notifications.filter(n => !n.is_read).length;
+
+  const handleMarkAllRead = async () => {
+    if (unreadCount === 0) return;
+    try {
+      const unreadIds = notifications.filter(n => !n.is_read).map(n => n.id);
+      await Promise.all(unreadIds.map(id => markAsRead(id).unwrap()));
+    } catch (err) {
+      console.error("Failed to mark all as read", err);
+    }
+  };
 
   const handlePress = async (item) => {
     if (!item.is_read) {
@@ -156,7 +167,17 @@ const NotificationsScreen = ({ navigation }) => {
 
   return (
     <SafeAreaView style={styles.container} edges={['bottom']}>
-      <CustomHeader title="Notifications" showBack />
+      <CustomHeader 
+        title="Notifications" 
+        showBack 
+        rightComponent={
+          unreadCount > 0 ? (
+            <TouchableOpacity onPress={handleMarkAllRead} style={{ padding: 8 }}>
+              <Icon name="check-square" size={24} color={colors.surface} />
+            </TouchableOpacity>
+          ) : <View style={{ width: 40 }} />
+        }
+      />
       
       {isLoading ? (
         <View style={styles.center}>

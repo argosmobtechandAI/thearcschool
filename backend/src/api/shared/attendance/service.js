@@ -28,6 +28,17 @@ export class AttendanceService {
 
     const { error } = await supabase.from("attendance").upsert(record);
     if (error) throw new Error("Could not update attendance: " + error.message);
+
+    try {
+      const { FCMService } = await import("../../../services/fcmService.js");
+      const title = "Attendance Update";
+      const message = `Your attendance for ${data.date} is marked as ${formattedStatus}.`;
+      await FCMService.sendToUsers([id], title, message, { type: "attendance" });
+      await supabase.from("notifications").insert([{ user_id: id, title, message, type: "attendance", is_read: false }]);
+    } catch (notifErr) {
+      console.error("Attendance Notification Error:", notifErr);
+    }
+
     return true;
   }
 
@@ -59,6 +70,27 @@ export class AttendanceService {
 
     const { error } = await supabase.from("attendance").upsert(dbRecords);
     if (error) throw new Error("Could not bulk update attendance: " + error.message);
+
+    try {
+      const { FCMService } = await import("../../../services/fcmService.js");
+      const notifsToInsert = [];
+      
+      for (const rec of dbRecords) {
+         if (!rec.status) continue;
+         const title = "Attendance Update";
+         const message = `Your attendance for ${rec.date} is marked as ${rec.status}.`;
+         // Sending push per user in a loop might be slow, but works for standard class sizes.
+         await FCMService.sendToUsers([rec.user_id], title, message, { type: "attendance" }).catch(e => console.error(e));
+         notifsToInsert.push({ user_id: rec.user_id, title, message, type: "attendance", is_read: false });
+      }
+      
+      if (notifsToInsert.length > 0) {
+         await supabase.from("notifications").insert(notifsToInsert);
+      }
+    } catch (notifErr) {
+      console.error("Bulk Attendance Notification Error:", notifErr);
+    }
+
     return true;
   }
 

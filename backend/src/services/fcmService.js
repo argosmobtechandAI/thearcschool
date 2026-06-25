@@ -57,20 +57,26 @@ export const FCMService = {
 
       const tokens = tokensData.map(t => t.fcm_token);
 
-      // 2. Save notification to history table
-      const historyPayload = userIds.map(uid => ({
-        user_id: uid,
-        title,
-        message: body,
-        type: data?.type || 'general',
-      }));
-      await supabase.from('notifications').insert(historyPayload);
+      // Removed duplicate DB insert (handled by controller)
 
       // 3. Construct message payload
       const message = {
         notification: {
           title,
           body,
+        },
+        android: {
+          notification: {
+            channelId: 'high_importance_channel_v4',
+            sound: 'melody'
+          }
+        },
+        apns: {
+          payload: {
+            aps: {
+              sound: 'melody.wav'
+            }
+          }
         },
         data: {
           ...data,
@@ -91,6 +97,7 @@ export const FCMService = {
         response.responses.forEach((resp, idx) => {
           if (!resp.success) {
             const errCode = resp.error?.code;
+            console.error(`FCM send failed for token ${tokens[idx]}:`, resp.error);
             if (errCode === 'messaging/invalid-registration-token' || 
                 errCode === 'messaging/registration-token-not-registered') {
               failedTokens.push(tokens[idx]);

@@ -5,20 +5,22 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/Feather';
-import { colors, shadows } from '../../theme/colors';
+import { theme } from '../../theme/theme';
 import { useGetFeesQuery } from '../../store/apiSlice';
 import { useDrawer } from '../../navigation/DrawerContext';
 import { useSelector, useDispatch } from 'react-redux';
 import { generateReceiptPDF } from '../../utils/exportUtils';
 import { BarChart } from 'react-native-gifted-charts';
 import { setAcademicYear } from '../../store/settingsSlice';
+import Card from '../../components/Card';
+import Button from '../../components/Button';
+import Chip from '../../components/Chip';
 
 const FeesScreen = ({ navigation }) => {
   const dispatch = useDispatch();
   const user = useSelector(state => state.auth.user);
   const { openDrawer } = useDrawer();
-  const [refreshing, setRefreshing] = useState(false);
-  const [activeTab, setActiveTab] = useState('current'); // 'current' | 'history'
+    const [activeTab, setActiveTab] = useState('current'); // 'current' | 'history' | 'structure'
   const [selectedFee, setSelectedFee] = useState(null);
   const [modalVisible, setModalVisible] = useState(false);
 
@@ -41,14 +43,12 @@ const FeesScreen = ({ navigation }) => {
   };
 
   const academicYear = useSelector(state => state.settings.academicYear);
-  const { data, isLoading, refetch } = useGetFeesQuery(academicYear, { refetchOnMountOrArgChange: true });
+  const { data, isLoading, isFetching, refetch } = useGetFeesQuery(academicYear, { refetchOnMountOrArgChange: true });
   const availableYears = getAvailableYears();
 
   const onRefresh = useCallback(async () => {
-    setRefreshing(true);
-    await refetch();
-    setRefreshing(false);
-  }, [refetch]);
+        await refetch();
+      }, [refetch]);
 
   const fees = data?.fees || [];
   const feeStructure = data?.feeStructure || [];
@@ -57,7 +57,6 @@ const FeesScreen = ({ navigation }) => {
   const currentDues = fees.filter(f => f.status === 'pending' || f.status === 'overdue');
   const historicalFees = fees.filter(f => f.status === 'paid');
 
-  // Calculate totals specific to the selected academic year
   const globalTotalDue = fees.reduce((sum, f) => sum + Number(f.fee?.amount || 0), 0);
   const totalPaid = fees.reduce((sum, f) => sum + Number(f.total_paid_amount || 0), 0);
   const totalDue = Math.max(0, globalTotalDue - totalPaid);
@@ -95,13 +94,13 @@ const FeesScreen = ({ navigation }) => {
            label: m,
            spacing: 2,
            labelWidth: 30,
-           labelTextStyle: {color: colors.textMuted, fontSize: 10, fontWeight: '600'},
-           frontColor: colors.secondary,
+           labelTextStyle: { color: theme.colors.textMuted, fontSize: 10, fontFamily: theme.typography.fontFamily.bold },
+           frontColor: theme.colors.secondary,
            topLabelComponent: () => {
              if (balance === 0) return null;
              return (
                <View style={{ width: 50, marginLeft: -19, alignItems: 'center', marginBottom: 2 }}>
-                 <Text style={{ color: colors.success, fontSize: 10, fontWeight: 'bold' }} numberOfLines={1} adjustsFontSizeToFit>
+                 <Text style={{ color: theme.colors.success, fontSize: 10, fontFamily: theme.typography.fontFamily.bold }} numberOfLines={1} adjustsFontSizeToFit>
                    ₹{formatCompactNumber(balance)}
                  </Text>
                </View>
@@ -110,7 +109,7 @@ const FeesScreen = ({ navigation }) => {
          });
          chartData.push({
            value: d.paid,
-           frontColor: colors.primary
+           frontColor: theme.colors.primary
          });
        }
     });
@@ -119,9 +118,9 @@ const FeesScreen = ({ navigation }) => {
   const chartData = generateChartData(fees);
 
   const getStatusColor = (status) => {
-    if (status === 'paid') return colors.success;
-    if (status === 'overdue') return colors.danger;
-    return colors.warning; // pending
+    if (status === 'paid') return theme.colors.success;
+    if (status === 'overdue') return theme.colors.danger;
+    return theme.colors.warning; // pending
   };
 
   const handlePressFee = (record) => {
@@ -131,13 +130,10 @@ const FeesScreen = ({ navigation }) => {
 
   const renderFeeCard = (record) => {
     const feeInfo = record.fee;
-    const statusColor = getStatusColor(record.status);
     const isPaid = record.status === 'paid';
     
     let totalAmount = Number(feeInfo?.amount || 0);
-    if (record.status === 'overdue') {
-      totalAmount += lateFeePenalty;
-    }
+    if (record.status === 'overdue') totalAmount += lateFeePenalty;
 
     return (
       <TouchableOpacity 
@@ -158,17 +154,17 @@ const FeesScreen = ({ navigation }) => {
           <View>
             <Text style={styles.dueDate}>Due: {new Date(feeInfo?.due_date).toLocaleDateString()}</Text>
             {isPaid && record.payment_date && (
-               <Text style={{...styles.dueDate, marginTop: 2, color: colors.success}}>Paid: {new Date(record.payment_date).toLocaleDateString()}</Text>
+               <Text style={{...styles.dueDate, marginTop: 2, color: theme.colors.success}}>Paid: {new Date(record.payment_date).toLocaleDateString()}</Text>
             )}
           </View>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
             {isPaid && (
               <>
                 <TouchableOpacity onPress={() => generateReceiptPDF(record, user)} style={styles.iconActionBtn}>
-                  <Icon name="download" size={16} color={colors.primary} />
+                  <Icon name="download" size={16} color={theme.colors.primary} />
                 </TouchableOpacity>
                 <TouchableOpacity onPress={() => generateReceiptPDF(record, user)} style={styles.iconActionBtn}>
-                  <Icon name="share-2" size={16} color={colors.primary} />
+                  <Icon name="share-2" size={16} color={theme.colors.primary} />
                 </TouchableOpacity>
               </>
             )}
@@ -205,11 +201,9 @@ const FeesScreen = ({ navigation }) => {
 
         <View style={styles.feeBottomRow}>
           <Text style={styles.dueDate}>Applies to: {feeInfo?.class_name || 'All Classes'}</Text>
-          <View style={[styles.statusChip, { backgroundColor: colors.primary + '15' }]}>
-            <View style={[styles.statusDot, { backgroundColor: colors.primary }]} />
-            <Text style={[styles.statusText, { color: colors.primary }]}>
-              STANDARD FEE
-            </Text>
+          <View style={[styles.statusChip, { backgroundColor: theme.colors.primary + '15' }]}>
+            <View style={[styles.statusDot, { backgroundColor: theme.colors.primary }]} />
+            <Text style={[styles.statusText, { color: theme.colors.primary }]}>STANDARD FEE</Text>
           </View>
         </View>
       </View>
@@ -231,16 +225,14 @@ const FeesScreen = ({ navigation }) => {
           <Text style={styles.dueDate}>Paid on: {new Date(payment.created_at).toLocaleDateString()}</Text>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
             <TouchableOpacity onPress={() => generateReceiptPDF(payment, user)} style={styles.iconActionBtn}>
-              <Icon name="download" size={16} color={colors.primary} />
+              <Icon name="download" size={16} color={theme.colors.primary} />
             </TouchableOpacity>
             <TouchableOpacity onPress={() => generateReceiptPDF(payment, user)} style={styles.iconActionBtn}>
-              <Icon name="share-2" size={16} color={colors.primary} />
+              <Icon name="share-2" size={16} color={theme.colors.primary} />
             </TouchableOpacity>
             <View style={[styles.statusChip, { backgroundColor: getStatusColor('paid') + '15' }]}>
               <View style={[styles.statusDot, { backgroundColor: getStatusColor('paid') }]} />
-              <Text style={[styles.statusText, { color: getStatusColor('paid') }]}>
-                SUCCESS
-              </Text>
+              <Text style={[styles.statusText, { color: getStatusColor('paid') }]}>SUCCESS</Text>
             </View>
           </View>
         </View>
@@ -264,7 +256,7 @@ const FeesScreen = ({ navigation }) => {
 
       <ScrollView
         style={styles.scroll}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[colors.primary]} />}
+        refreshControl={<RefreshControl refreshing={isFetching || false} onRefresh={onRefresh} colors={[theme.colors.primary]} />}
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.pageHeader}>
@@ -279,11 +271,8 @@ const FeesScreen = ({ navigation }) => {
               key={year} 
               style={[styles.yearChip, academicYear === year && styles.yearChipActive]}
               onPress={() => {
-                if (academicYear === year) {
-                  refetch();
-                } else {
-                  dispatch(setAcademicYear(year));
-                }
+                if (academicYear === year) refetch();
+                else dispatch(setAcademicYear(year));
               }}
             >
               <Text style={[styles.yearChipText, academicYear === year && styles.yearChipTextActive]}>{year}</Text>
@@ -291,14 +280,14 @@ const FeesScreen = ({ navigation }) => {
           ))}
         </ScrollView>
 
-        {isLoading && !refreshing ? (
+        {isLoading && !isFetching ? (
           <View style={styles.center}>
-            <ActivityIndicator color={colors.primary} size="large" />
+            <ActivityIndicator color={theme.colors.primary} size="large" />
           </View>
         ) : (
           <>
             {/* Summary Chart Card */}
-            <View style={styles.chartCard}>
+            <Card variant="elevated" style={styles.chartCard}>
               <View style={styles.chartHeader}>
                 <View style={styles.chartSummaryBox}>
                   <Text style={styles.chartSummaryLabel}>Total Outstanding</Text>
@@ -310,8 +299,8 @@ const FeesScreen = ({ navigation }) => {
                 </View>
               </View>
               <View style={styles.chartLegend}>
-                 <View style={styles.legendItem}><View style={[styles.legendDot, {backgroundColor: colors.secondary}]}/><Text style={styles.legendText}>Due</Text></View>
-                 <View style={styles.legendItem}><View style={[styles.legendDot, {backgroundColor: colors.primary}]}/><Text style={styles.legendText}>Paid</Text></View>
+                 <View style={styles.legendItem}><View style={[styles.legendDot, {backgroundColor: theme.colors.secondary}]}/><Text style={styles.legendText}>Due</Text></View>
+                 <View style={styles.legendItem}><View style={[styles.legendDot, {backgroundColor: theme.colors.primary}]}/><Text style={styles.legendText}>Paid</Text></View>
               </View>
               {chartData.length > 0 ? (
                 <View style={{ marginTop: 20, alignItems: 'center' }}>
@@ -322,7 +311,7 @@ const FeesScreen = ({ navigation }) => {
                     roundedTop 
                     xAxisThickness={0} 
                     yAxisThickness={0} 
-                    yAxisTextStyle={{color: colors.textMuted, fontSize: 10, fontWeight: '600'}}
+                    yAxisTextStyle={{color: theme.colors.textMuted, fontSize: 10, fontFamily: theme.typography.fontFamily.bold}}
                     noOfSections={4}
                     hideRules
                     initialSpacing={10}
@@ -332,10 +321,10 @@ const FeesScreen = ({ navigation }) => {
                 </View>
               ) : (
                 <View style={{ height: 100, justifyContent: 'center', alignItems: 'center' }}>
-                  <Text style={{color: colors.textMuted}}>No data available for chart</Text>
+                  <Text style={{color: theme.colors.textMuted, fontFamily: theme.typography.fontFamily.medium}}>No data available for chart</Text>
                 </View>
               )}
-            </View>
+            </Card>
 
             {/* Tab Switcher */}
             <View style={styles.tabContainer}>
@@ -364,7 +353,7 @@ const FeesScreen = ({ navigation }) => {
                 activeTab === 'structure' ? displayedFees.map(renderStructureCard) : activeTab === 'history' ? displayedFees.map(renderPaymentCard) : displayedFees.map(renderFeeCard)
               ) : (
                 <View style={styles.emptyState}>
-                  <Icon name={activeTab === 'current' ? "check-circle" : "file-text"} size={48} color={colors.textMuted} />
+                  <Icon name={activeTab === 'current' ? "check-circle" : "file-text"} size={48} color={theme.colors.textMuted} />
                   <Text style={styles.emptyTitle}>
                     {activeTab === 'current' ? 'All Clear!' : activeTab === 'structure' ? 'No Fee Structure' : 'No History'}
                   </Text>
@@ -405,7 +394,7 @@ const FeesScreen = ({ navigation }) => {
                   <View style={styles.modalHeader}>
                     <Text style={styles.modalTitle}>{isPaid ? 'Digital Receipt' : 'Fee Structure'}</Text>
                     <TouchableOpacity onPress={() => setModalVisible(false)}>
-                      <Icon name="x" size={24} color={colors.text} />
+                      <Icon name="x" size={24} color={theme.colors.text} />
                     </TouchableOpacity>
                   </View>
 
@@ -453,18 +442,17 @@ const FeesScreen = ({ navigation }) => {
 
                     {!isPaid && (
                       <View style={styles.infoBox}>
-                        <Icon name="info" size={16} color={colors.primary} />
+                        <Icon name="info" size={16} color={theme.colors.primary} />
                         <Text style={styles.infoText}>Please clear the outstanding dues at the school fee counter.</Text>
                       </View>
                     )}
                     {isPaid && (
-                      <TouchableOpacity 
-                        style={styles.downloadBtn}
+                      <Button 
+                        label="Download Receipt"
+                        icon="download"
                         onPress={() => generateReceiptPDF(selectedFee, user)}
-                      >
-                        <Icon name="download" size={18} color="#fff" />
-                        <Text style={styles.downloadBtnText}>Download Receipt</Text>
-                      </TouchableOpacity>
+                        style={{ marginTop: 16 }}
+                      />
                     )}
                   </View>
                 </>
@@ -479,185 +467,109 @@ const FeesScreen = ({ navigation }) => {
 };
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: colors.primary },
-  scroll: { flex: 1, backgroundColor: colors.background },
+  safeArea: { flex: 1, backgroundColor: theme.colors.primary },
+  scroll: { flex: 1, backgroundColor: theme.colors.background },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', marginTop: 60 },
 
   header: {
-    backgroundColor: colors.primary,
+    backgroundColor: theme.colors.primary,
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: 20, paddingVertical: 14,
+    paddingHorizontal: theme.spacing.lg, paddingVertical: 14,
   },
-  headerTitle: { color: '#fff', fontSize: 18, fontWeight: '700' },
+  headerTitle: { color: '#fff', fontSize: theme.typography.fontSize.lg, fontFamily: theme.typography.fontFamily.heading },
   headerBtn: { padding: 6, backgroundColor: 'rgba(255,255,255,0.15)', borderRadius: 10 },
 
   pageHeader: { paddingHorizontal: 24, paddingVertical: 20 },
-  pageTitle: { fontSize: 32, fontWeight: '800', color: colors.text, marginBottom: 4 },
-  pageSubtitle: { fontSize: 16, color: colors.textMuted },
+  pageTitle: { fontSize: 32, fontFamily: theme.typography.fontFamily.heading, color: theme.colors.text, marginBottom: 4 },
+  pageSubtitle: { fontSize: theme.typography.fontSize.md, fontFamily: theme.typography.fontFamily.medium, color: theme.colors.textMuted },
   
   yearScroll: { paddingBottom: 16 },
   yearScrollContent: { paddingHorizontal: 24, gap: 10 },
-  yearChip: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20, backgroundColor: colors.background, borderWidth: 1, borderColor: colors.border },
-  yearChipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
-  yearChipText: { fontSize: 14, fontWeight: '600', color: colors.textMuted },
+  yearChip: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20, backgroundColor: theme.colors.background, borderWidth: 1, borderColor: theme.colors.borderLight },
+  yearChipActive: { backgroundColor: theme.colors.primary, borderColor: theme.colors.primary },
+  yearChipText: { fontSize: 14, fontFamily: theme.typography.fontFamily.bold, color: theme.colors.textMuted },
   yearChipTextActive: { color: '#fff' },
 
   chartCard: {
-    marginHorizontal: 16, marginBottom: 20,
-    backgroundColor: colors.surface,
-    borderRadius: 24, padding: 20,
-    ...shadows.medium,
+    marginHorizontal: theme.spacing.md, marginBottom: 20,
+    backgroundColor: theme.colors.surface,
+    padding: 20,
   },
   chartHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12 },
   chartSummaryBox: { flex: 1 },
-  chartSummaryLabel: { fontSize: 13, color: colors.textMuted, fontWeight: '500', marginBottom: 4 },
-  chartSummaryValueDue: { fontSize: 24, fontWeight: '800', color: colors.text },
-  chartSummaryValuePaid: { fontSize: 24, fontWeight: '800', color: colors.primary },
+  chartSummaryLabel: { fontSize: 13, color: theme.colors.textMuted, fontFamily: theme.typography.fontFamily.bold, marginBottom: 4 },
+  chartSummaryValueDue: { fontSize: 24, fontFamily: theme.typography.fontFamily.heading, color: theme.colors.text },
+  chartSummaryValuePaid: { fontSize: 24, fontFamily: theme.typography.fontFamily.heading, color: theme.colors.primary },
   chartLegend: { flexDirection: 'row', gap: 12, marginTop: 4 },
   legendItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   legendDot: { width: 8, height: 8, borderRadius: 4 },
-  legendText: { fontSize: 12, color: colors.textMuted, fontWeight: '500' },
+  legendText: { fontSize: 12, color: theme.colors.textMuted, fontFamily: theme.typography.fontFamily.bold },
 
   tabContainer: {
     flexDirection: 'row',
-    marginHorizontal: 16,
+    marginHorizontal: theme.spacing.md,
     marginBottom: 16,
-    backgroundColor: colors.surface,
-    borderRadius: 12,
+    backgroundColor: theme.colors.surface,
+    borderRadius: theme.layout.borderRadius.md,
     padding: 4,
-    ...shadows.card,
+    ...theme.shadows.card,
   },
   tabBtn: {
-    flex: 1,
-    paddingVertical: 10,
-    alignItems: 'center',
-    borderRadius: 8,
+    flex: 1, paddingVertical: 10, alignItems: 'center', borderRadius: 8,
   },
-  tabBtnActive: {
-    backgroundColor: colors.primary + '15',
-  },
-  tabBtnText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: colors.textMuted,
-  },
-  tabBtnTextActive: {
-    color: colors.primary,
-  },
+  tabBtnActive: { backgroundColor: theme.colors.primary + '15' },
+  tabBtnText: { fontSize: 14, fontFamily: theme.typography.fontFamily.bold, color: theme.colors.textMuted },
+  tabBtnTextActive: { color: theme.colors.primary },
 
-  listContainer: { paddingHorizontal: 16 },
+  listContainer: { paddingHorizontal: theme.spacing.md },
   feeCard: {
-    backgroundColor: colors.surface,
-    borderRadius: 16, padding: 16,
-    marginBottom: 12,
-    ...shadows.card,
+    backgroundColor: theme.colors.surface,
+    borderRadius: 16, padding: 16, marginBottom: 12,
+    ...theme.shadows.card,
   },
   feeTopRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
-  feeTitle: { fontSize: 16, fontWeight: '700', color: colors.text },
-  feeType: { fontSize: 12, color: colors.textMuted, marginTop: 2 },
-  feeAmount: { fontSize: 18, fontWeight: '800', color: colors.text },
+  feeTitle: { fontSize: 16, fontFamily: theme.typography.fontFamily.heading, color: theme.colors.text },
+  feeType: { fontSize: 12, color: theme.colors.textMuted, marginTop: 2, fontFamily: theme.typography.fontFamily.medium },
+  feeAmount: { fontSize: 18, fontFamily: theme.typography.fontFamily.heading, color: theme.colors.text },
   feeBottomRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 16 },
-  dueDate: { fontSize: 13, color: colors.textMuted, fontWeight: '500' },
+  dueDate: { fontSize: 13, color: theme.colors.textMuted, fontFamily: theme.typography.fontFamily.bold },
   statusChip: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 },
   statusDot: { width: 6, height: 6, borderRadius: 3, marginRight: 6 },
-  statusText: { fontSize: 11, fontWeight: '700', letterSpacing: 0.5 },
-  iconActionBtn: {
-    padding: 6,
-    backgroundColor: colors.primary + '15',
-    borderRadius: 8,
-  },
+  statusText: { fontSize: 11, fontFamily: theme.typography.fontFamily.bold, letterSpacing: 0.5 },
+  iconActionBtn: { padding: 6, backgroundColor: theme.colors.primary + '15', borderRadius: 8 },
 
   emptyState: { alignItems: 'center', paddingTop: 40, paddingBottom: 60, gap: 12 },
-  emptyTitle: { fontSize: 18, fontWeight: '700', color: colors.text },
-  emptyText: { fontSize: 14, color: colors.textMuted, textAlign: 'center', paddingHorizontal: 40 },
+  emptyTitle: { fontSize: 18, fontFamily: theme.typography.fontFamily.heading, color: theme.colors.text },
+  emptyText: { fontSize: 14, color: theme.colors.textMuted, textAlign: 'center', paddingHorizontal: 40, fontFamily: theme.typography.fontFamily.regular },
 
-  /* Modal Styles */
-  modalOverlay: {
-    flex: 1,
-    justifyContent: 'flex-end',
-  },
-  modalBackdrop: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.4)',
-  },
+  modalOverlay: { flex: 1, justifyContent: 'flex-end' },
+  modalBackdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.4)' },
   modalContent: {
-    backgroundColor: colors.surface,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    padding: 24,
-    minHeight: 400,
-    ...shadows.heavy,
+    backgroundColor: theme.colors.surface,
+    borderTopLeftRadius: 24, borderTopRightRadius: 24,
+    padding: 24, minHeight: 400, ...theme.shadows.heavy,
   },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  modalTitle: { fontSize: 20, fontWeight: '800', color: colors.text },
+  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
+  modalTitle: { fontSize: 20, fontFamily: theme.typography.fontFamily.heading, color: theme.colors.text },
   modalBody: { paddingBottom: 20 },
-  modalFeeName: { fontSize: 22, fontWeight: '700', color: colors.text },
-  modalFeeType: { fontSize: 14, color: colors.textMuted, marginTop: 4, marginBottom: 24 },
+  modalFeeName: { fontSize: 22, fontFamily: theme.typography.fontFamily.heading, color: theme.colors.text },
+  modalFeeType: { fontSize: 14, color: theme.colors.textMuted, marginTop: 4, marginBottom: 24, fontFamily: theme.typography.fontFamily.medium },
   
-  receiptBox: {
-    backgroundColor: colors.background,
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 20,
-  },
-  receiptRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 12,
-  },
-  receiptLabel: { fontSize: 14, color: colors.textMuted, fontWeight: '500' },
-  receiptValue: { fontSize: 14, color: colors.text, fontWeight: '700' },
-  receiptTotalRow: {
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
-    paddingTop: 12,
-    marginTop: 4,
-    marginBottom: 0,
-  },
-  receiptTotalLabel: { fontSize: 16, color: colors.text, fontWeight: '800' },
-  receiptTotalValue: { fontSize: 20, color: colors.primary, fontWeight: '900' },
+  receiptBox: { backgroundColor: theme.colors.background, borderRadius: 16, padding: 16, marginBottom: 20 },
+  receiptRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12 },
+  receiptLabel: { fontSize: 14, color: theme.colors.textMuted, fontFamily: theme.typography.fontFamily.bold },
+  receiptValue: { fontSize: 14, color: theme.colors.text, fontFamily: theme.typography.fontFamily.bold },
+  receiptTotalRow: { borderTopWidth: 1, borderTopColor: theme.colors.borderLight, paddingTop: 12, marginTop: 4, marginBottom: 0 },
+  receiptTotalLabel: { fontSize: 16, color: theme.colors.text, fontFamily: theme.typography.fontFamily.heading },
+  receiptTotalValue: { fontSize: 20, color: theme.colors.primary, fontFamily: theme.typography.fontFamily.heading },
 
-  detailsBox: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    backgroundColor: colors.background,
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 20,
-  },
+  detailsBox: { flexDirection: 'row', justifyContent: 'space-between', backgroundColor: theme.colors.background, borderRadius: 16, padding: 16, marginBottom: 20 },
   detailItem: { flex: 1 },
-  detailLabel: { fontSize: 12, color: colors.textMuted, marginBottom: 4 },
-  detailValue: { fontSize: 14, color: colors.text, fontWeight: '600' },
+  detailLabel: { fontSize: 12, color: theme.colors.textMuted, marginBottom: 4, fontFamily: theme.typography.fontFamily.bold },
+  detailValue: { fontSize: 14, color: theme.colors.text, fontFamily: theme.typography.fontFamily.bold },
 
-  infoBox: {
-    flexDirection: 'row',
-    backgroundColor: colors.primary + '10',
-    padding: 16,
-    borderRadius: 12,
-    alignItems: 'center',
-    gap: 12,
-  },
-  infoText: { flex: 1, fontSize: 13, color: colors.primary, fontWeight: '500', lineHeight: 18 },
-  downloadBtn: {
-    backgroundColor: colors.primary,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 14,
-    borderRadius: 12,
-    marginTop: 16,
-    gap: 8,
-  },
-  downloadBtnText: {
-    color: '#fff',
-    fontSize: 15,
-    fontWeight: '700',
-  },
+  infoBox: { flexDirection: 'row', backgroundColor: theme.colors.primary + '10', padding: 16, borderRadius: 12, alignItems: 'center', gap: 12 },
+  infoText: { flex: 1, fontSize: 13, color: theme.colors.primary, fontFamily: theme.typography.fontFamily.medium, lineHeight: 18 },
 });
 
 export default FeesScreen;

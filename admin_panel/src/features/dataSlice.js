@@ -1,5 +1,5 @@
 import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
-import api, { getCommunication, getInfo, getResults } from "../services/api";
+import api, { getCommunication, getInfo, getResults, getSystemMonitorList } from "../services/api";
 
 export const fetchUsers = createAsyncThunk(
   "data/fetchUsers",
@@ -131,7 +131,7 @@ export const fetchCommunication = createAsyncThunk('data/fetchCommunication', as
 
 export const fetchSystemMonitorList = createAsyncThunk('data/fetchSystemMonitorList', async (_, { rejectWithValue }) => {
     try {
-        const { getSystemMonitorList } = await import('../services/api');
+        // Removed dynamic import, using static import
         const response = await getSystemMonitorList();
         return response.data.chats || [];
     } catch (error) {
@@ -189,7 +189,14 @@ const initialState = {
 export const dataSlice = createSlice({
   name: "data",
   initialState,
-  reducers: {},
+  reducers: {
+    addLiveChatMessage: (state, action) => {
+      // Append if it doesn't already exist
+      if (state.chats && !state.chats.find(c => c.id === action.payload.id)) {
+        state.chats.push(action.payload);
+      }
+    }
+  },
   extraReducers: (builder) => {
     builder
       // Users
@@ -366,4 +373,5 @@ export const dataSlice = createSlice({
   },
 });
 
+export const { addLiveChatMessage } = dataSlice.actions;
 export default dataSlice.reducer;
