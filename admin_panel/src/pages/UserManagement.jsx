@@ -145,7 +145,7 @@ const UserManagement = () => {
         }
 
         return true;
-      });
+      }).sort((a, b) => (a.name || "").localeCompare(b.name || ""));
   }, [users, type, searchQuery, classFilter, formSubmittedFilter, leftSchoolFilter, tcStatusFilter, genderFilter, siblingCountFilter]);
 
   const customGetters = useMemo(() => {
@@ -295,6 +295,7 @@ const UserManagement = () => {
         password: "", // Don't populate password on edit
         phone: user.phone || "",
         type: user.type,
+        avatar_url: user.avatar_url || "",
         connections: user.connections || [],
         classId: user.classes?.[0] || "",
         classes: user.classes || [],
@@ -336,6 +337,7 @@ const UserManagement = () => {
       setEditingUser(null);
       setFormData({ 
         name: "", email: "", password: "password@1", phone: "", alternate_number: "", type: type, connections: [], classId: "", classes: [],
+        avatar_url: "",
         admission_number: "", house: "", father_name: "", mother_name: "", bus_fee: "", fee_exempted: false,
         admission_date: "", form_submitted: false, address: "", dob: "", doj: "", father_spouse_name: "", leave_school: false, tc_received: false, tc_date: "",
         slc_received: false, slc_date: "", character_certificate_received: false, character_certificate_date: "",
@@ -347,7 +349,7 @@ const UserManagement = () => {
     setIsModalOpen(true);
   };
 
-  const handleFileUpload = async (e, fieldName) => {
+  const handleFileUpload = async (e, fieldName, category = "admissions") => {
     const file = e.target.files[0];
     if (!file) return;
 
@@ -355,15 +357,15 @@ const UserManagement = () => {
     uploadData.append("file", file);
 
     try {
-      const res = await api.post("/upload/file", uploadData, {
+      const res = await api.post(`/upload/file?category=${category}`, uploadData, {
         headers: { "Content-Type": "multipart/form-data" }
       });
       if (res.data.success) {
         setFormData(prev => ({ ...prev, [fieldName]: res.data.url }));
-        toast.success("Document uploaded successfully");
+        toast.success("File uploaded successfully");
       }
     } catch (err) {
-      toast.error(err.response?.data?.message || "Failed to upload document");
+      toast.error(err.response?.data?.message || "Failed to upload file");
     }
   };
 
@@ -1040,6 +1042,40 @@ const UserManagement = () => {
             <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
               {/* Basic Info */}
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
+                {/* Profile Picture Uploader */}
+                {(type === 'student' || type === 'teacher') && (
+                  <div style={{ gridColumn: "span 2", display: "flex", gap: "1.5rem", alignItems: "center", background: "rgba(255,255,255,0.02)", padding: "1rem", borderRadius: "10px", border: "1px solid var(--glass-border)", marginBottom: "0.5rem" }}>
+                    <div style={{ width: "80px", height: "80px", borderRadius: "50%", background: "rgba(255,255,255,0.05)", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden", border: "2px solid var(--glass-border)" }}>
+                      {formData.avatar_url ? (
+                        <img src={formData.avatar_url} alt="Profile" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                      ) : (
+                        <span style={{ fontSize: "0.75rem", color: "var(--text-secondary)" }}>No Photo</span>
+                      )}
+                    </div>
+                    <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+                      <label style={{ fontSize: "0.875rem", fontWeight: "600", color: "var(--text-primary)" }}>Profile Picture (Avatar)</label>
+                      <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
+                        <input 
+                          type="file" 
+                          accept="image/*" 
+                          onChange={(e) => handleFileUpload(e, 'avatar_url', 'avatar')} 
+                          style={{ fontSize: "0.875rem" }} 
+                        />
+                        {formData.avatar_url && (
+                          <button 
+                            type="button" 
+                            className="btn btn-ghost" 
+                            style={{ color: "#ef4444", fontSize: "0.75rem", padding: "0.25rem 0.5rem" }}
+                            onClick={() => setFormData({ ...formData, avatar_url: "" })}
+                          >
+                            Remove
+                          </button>
+                        )}
+                      </div>
+                      <span style={{ fontSize: "0.75rem", color: "var(--text-secondary)" }}>Upload photo to CDN (cdn.thearcschool.in)</span>
+                    </div>
+                  </div>
+                )}
                 <div style={{ gridColumn: "span 2" }}>
                   <label style={{ display: "block", marginBottom: "0.5rem", fontSize: "0.875rem" }}>{type === 'parent' ? "Father & Mother Names (e.g. John & Jane)" : "Full Name"}</label>
                   <input required className="input-glass" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} />
@@ -1082,7 +1118,7 @@ const UserManagement = () => {
                       onChange={e => setFormData({...formData, classId: e.target.value === "" ? null : e.target.value})}
                     >
                       <option value="">Select a class...</option>
-                      {classes.map(c => (
+                      {[...classes].sort((a, b) => `${a.name}-${a.section}`.localeCompare(`${b.name}-${b.section}`)).map(c => (
                         <option key={c.id} value={c.id}>{c.name} {c.section}</option>
                       ))}
                     </select>

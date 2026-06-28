@@ -52,6 +52,9 @@ export const handleNotificationEvent = async ({ type, detail }) => {
         } else if (routeScreen === 'ChatRoomScreen' || routeScreen === 'LiveChatScreen') {
           targetStack = 'Connect';
           actualScreen = 'ChatRoomScreen';
+        } else if (routeScreen === 'Circulars' || routeScreen === 'CircularsScreen') {
+          targetStack = 'Home';
+          actualScreen = 'Circulars';
         }
 
         if (targetStack) {

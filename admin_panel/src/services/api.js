@@ -75,11 +75,11 @@ export const getAllNotifications = (params) => api.get('/admin_panel/notificatio
 export const markNotificationsAsRead = () => api.patch('/admin_panel/notifications/all/read');
 
 // File Upload API (proxied through backend — NO direct Supabase access)
-export const uploadFile = async (file, bucket = "school") => {
+export const uploadFile = async (file, bucket = "school", category = "") => {
   const formData = new FormData();
   formData.append("file", file);
   formData.append("bucket", bucket);
-  const response = await api.post("/upload/file", formData, {
+  const response = await api.post(`/upload/file?category=${category || bucket}`, formData, {
     headers: { "Content-Type": "multipart/form-data" },
   });
   return response.data.url;
@@ -91,5 +91,13 @@ export const getConsents = (params) => api.get('/admin_panel/consents/admin', { 
 export const getConsentReport = (id) => api.get(`/admin_panel/consents/admin/${id}/report`);
 export const updateConsent = (id, data) => api.put(`/admin_panel/consents/admin/${id}`, data);
 export const deleteConsent = (id) => api.delete(`/admin_panel/consents/admin/${id}`);
+
+// Circulars API
+export const createCircular = (data) => api.post('/circulars', data);
+export const getCirculars = (params) => api.get('/circulars', { params });
+export const deleteCircular = (id) => api.delete(`/circulars/${id}`);
+export const uploadCircularFile = (formData) => api.post('/circulars/upload', formData, {
+  headers: { "Content-Type": "multipart/form-data" }
+});
 
 export default api;

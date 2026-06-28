@@ -195,7 +195,8 @@ export const approveNewUser = async (req, res) => {
         });
       }
 
-      const initialPassword = userReq[0].name.toLowerCase();
+      const candidate = userReq[0];
+      const avatarUrl = payload.avatar_url || candidate.avatar_url || (Array.isArray(candidate.documents) ? candidate.documents.find(d => d.type === "avatar")?.url : "");
 
       // Create user using Supabase Auth Admin API
       const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
@@ -208,11 +209,23 @@ export const approveNewUser = async (req, res) => {
           phone: payload.phone,
           gender: payload.gender,
           dob: payload.dob,
-          status: payload.status || 'active'
+          status: payload.status || 'active',
+          avatar_url: avatarUrl
         }
       });
 
       if (authError) throw authError;
+
+      // Update avatar_url directly in public.user to guarantee it is saved!
+      if (avatarUrl) {
+        const { error: profilePicError } = await supabase
+          .from("user")
+          .update({ avatar_url: avatarUrl })
+          .eq("id", authData.user.id);
+        if (profilePicError) {
+          console.error("Failed to update avatar_url in public.user:", profilePicError);
+        }
+      }
 
       // The PostgreSQL trigger handles creating the public.user row.
       

@@ -47,11 +47,86 @@ export const getLiveChatHistory = async (req, res) => {
 
 export const getTeachers = async (req, res) => {
   try {
-    const { data: teachers, error } = await supabase
+    const currentUserId = req.user?.id;
+    const currentUserType = req.user?.type;
+
+    let teachersQuery = supabase
       .from("user")
-      .select("id, name, email, type")
+      .select("id, name, email, type, avatar_url")
       .eq("type", "teacher");
 
+    if (currentUserType === "student" || currentUserType === "parent") {
+      let studentIds = [];
+
+      if (currentUserType === "parent") {
+        // Find connected students
+        const [connections1, connections2] = await Promise.all([
+          supabase.from("user_connections").select("student_id").eq("parent_id", currentUserId),
+          supabase.from("student_parents").select("student_id").eq("parent_id", currentUserId)
+        ]);
+
+        const sIds = new Set();
+        if (connections1.data) connections1.data.forEach(c => sIds.add(c.student_id));
+        if (connections2.data) connections2.data.forEach(c => sIds.add(c.student_id));
+        studentIds = Array.from(sIds);
+      } else {
+        studentIds = [currentUserId];
+      }
+
+      if (studentIds.length > 0) {
+        // Fetch classes for these students
+        const { data: classMappings, error: classErr } = await supabase
+          .from("class_students")
+          .select("class_id")
+          .in("student_id", studentIds);
+
+        if (classErr) throw classErr;
+
+        const classIds = (classMappings || []).map(m => m.class_id).filter(Boolean);
+
+        if (classIds.length > 0) {
+          // Fetch teachers teaching these classes
+          const [subjectTeachersRes, classTeachersRes] = await Promise.all([
+            supabase.from("subject_teachers").select("teacher_id").in("class_id", classIds),
+            supabase.from("class_teachers").select("teacher_id").in("class_id", classIds)
+          ]);
+
+          const teacherIds = new Set();
+          if (subjectTeachersRes.data) {
+            subjectTeachersRes.data.forEach(st => {
+              if (st.teacher_id) teacherIds.add(st.teacher_id);
+            });
+          }
+          if (classTeachersRes.data) {
+            classTeachersRes.data.forEach(ct => {
+              if (ct.teacher_id) teacherIds.add(ct.teacher_id);
+            });
+          }
+
+          const teacherIdList = Array.from(teacherIds);
+          if (teacherIdList.length > 0) {
+            teachersQuery = teachersQuery.in("id", teacherIdList);
+          } else {
+            return res.status(200).json({
+              success: true,
+              teachers: []
+            });
+          }
+        } else {
+          return res.status(200).json({
+            success: true,
+            teachers: []
+          });
+        }
+      } else {
+        return res.status(200).json({
+          success: true,
+          teachers: []
+        });
+      }
+    }
+
+    const { data: teachers, error } = await teachersQuery;
     if (error) throw error;
 
     return res.status(200).json({

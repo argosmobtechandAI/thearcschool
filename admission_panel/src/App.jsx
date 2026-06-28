@@ -7,6 +7,7 @@ import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import AdmissionLayout from "./layouts/AdmissionLayout";
 import AdmissionManagement from "./pages/AdmissionManagement";
+import Gallery from "./pages/Gallery";
 
 const ProtectedRoute = ({ children }) => {
   const { isAuthenticated, user } = useSelector((state) => state.auth);
@@ -39,6 +40,7 @@ function App() {
           <Route index element={<Navigate to="/dashboard" replace />} />
           <Route path="dashboard" element={<Dashboard />} />
           <Route path="admissions" element={<AdmissionManagement />} />
+          <Route path="gallery" element={<Gallery />} />
         </Route>
         
         <Route path="*" element={<Navigate to="/" replace />} />

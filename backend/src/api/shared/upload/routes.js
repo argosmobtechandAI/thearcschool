@@ -13,7 +13,35 @@ if (!fs.existsSync(uploadDir)) {
 
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
-    cb(null, uploadDir);
+    const rawCategory = req.query.category || "general";
+    let category = "general";
+    if (rawCategory === "school" || rawCategory === "school_info") {
+      category = "school_info";
+    } else if (rawCategory === "exam" || rawCategory === "exams") {
+      category = "exams";
+    } else if (rawCategory === "document" || rawCategory === "admissions" || rawCategory === "student" || rawCategory === "aadhar" || rawCategory === "pan" || rawCategory === "birthCertificate") {
+      category = "admissions";
+    } else if (rawCategory === "circular") {
+      category = "circular";
+    } else if (rawCategory === "avatar" || rawCategory === "avatars" || rawCategory === "profile") {
+      category = "avatar";
+    } else if (rawCategory === "gallery") {
+      category = "gallery";
+    }
+
+    // Check if running on Linux VPS
+    const isVPS = fs.existsSync("/var/www") && process.platform === "linux";
+    const baseDir = isVPS
+      ? "/var/www/thearcschool/public"
+      : path.join(process.cwd(), "uploads");
+
+    const targetDir = path.join(baseDir, category);
+
+    if (!fs.existsSync(targetDir)) {
+      fs.mkdirSync(targetDir, { recursive: true });
+    }
+
+    cb(null, targetDir);
   },
   filename: function (req, file, cb) {
     const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);

@@ -18,7 +18,7 @@ export const apiSlice = createApi({
       return headers;
     },
   }),
-  tagTypes: ['Dashboard', 'Academics', 'Attendance', 'Notifications', 'Chats', 'LiveChat', 'Quote', 'Rewards', 'Timetable', 'CourseWork', 'Events', 'Fees', 'Consents'],
+  tagTypes: ['Dashboard', 'Academics', 'Attendance', 'Notifications', 'Chats', 'LiveChat', 'Quote', 'Rewards', 'Timetable', 'CourseWork', 'Events', 'Fees', 'Consents', 'Circulars', 'Gallery'],
   endpoints: (builder) => ({
     // Auth endpoints
     login: builder.mutation({
@@ -160,8 +160,23 @@ export const apiSlice = createApi({
       invalidatesTags: ['Consents'],
     }),
 
+    // Circulars
+    getCirculars: builder.query({
+      query: () => '/circulars',
+      providesTags: ['Circulars'],
+    }),
+
     getThoughtOfDay: builder.query({
       query: () => '/thoughts/today',
+    }),
+
+    getSpotlightOfToday: builder.query({
+      query: () => '/spotlight/today',
+    }),
+
+    getGalleryItems: builder.query({
+      query: () => '/gallery',
+      providesTags: ['Gallery'],
     }),
 
     getStudentOfWeek: builder.query({
@@ -194,5 +209,8 @@ export const {
   useGetConsentsQuery,
   useUpdateConsentStatusMutation,
   useGetThoughtOfDayQuery,
+  useGetSpotlightOfTodayQuery,
   useGetStudentOfWeekQuery,
+  useGetCircularsQuery,
+  useGetGalleryItemsQuery,
 } = apiSlice;

@@ -7,7 +7,7 @@ export const getDashboardData = async (req, res) => {
     // 1. Fetch student details (name, class info)
     const { data: studentData, error: studentError } = await supabase
       .from('user')
-      .select('id, name, admission_number, dob')
+      .select('id, name, admission_number, dob, avatar_url')
       .eq('id', studentId)
       .single();
 

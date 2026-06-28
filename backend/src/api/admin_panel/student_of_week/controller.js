@@ -10,7 +10,7 @@ export const getAllStudentOfWeek = async (req, res) => {
         week_start_date,
         week_end_date,
         created_at,
-        student:student_id (id, name),
+        student:student_id (id, name, avatar_url),
         class:class_id (id, name, section),
         metrics
       `)

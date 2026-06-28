@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useSelector, useDispatch } from 'react-redux';
 import Icon from 'react-native-vector-icons/Feather';
@@ -75,9 +75,13 @@ const ProfileScreen = ({ navigation }) => {
         {/* Profile Header */}
         <View style={styles.header}>
           <View style={styles.avatar}>
-            <Text style={styles.avatarText}>
-              {user?.name ? user.name.charAt(0).toUpperCase() : 'T'}
-            </Text>
+            {user?.avatar_url ? (
+              <Image source={{ uri: user.avatar_url }} style={styles.avatarImage} />
+            ) : (
+              <Text style={styles.avatarText}>
+                {user?.name ? user.name.charAt(0).toUpperCase() : 'T'}
+              </Text>
+            )}
           </View>
           <Text style={styles.name}>{user?.name || 'Teacher Name'}</Text>
           <Text style={styles.email}>{user?.email || 'teacher@school.com'}</Text>
@@ -151,7 +155,9 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 6,
+    overflow: 'hidden',
   },
+  avatarImage: { width: '100%', height: '100%', borderRadius: 48, resizeMode: 'cover' },
   avatarText: { fontSize: 36, fontWeight: 'bold', color: colors.background },
   name: { fontSize: 24, fontWeight: 'bold', color: colors.text, marginBottom: 4 },
   email: { fontSize: 14, color: colors.textMuted, marginBottom: 12 },

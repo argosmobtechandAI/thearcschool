@@ -39,6 +39,8 @@ import StudentNotesScreen from '../features/dashboard/StudentNotesScreen';
 import StudentAttendanceHistoryScreen from '../features/attendance/StudentAttendanceHistoryScreen';
 import StudentAcademicHistoryScreen from '../features/grading/StudentAcademicHistoryScreen';
 import NotificationsScreen from '../features/notifications/NotificationsScreen';
+import CircularsScreen from '../features/circulars/CircularsScreen';
+import GalleryScreen from '../features/gallery/GalleryScreen';
 
 // Grading / Course Work
 import ExamsListScreen from '../features/grading/ExamsListScreen';
@@ -68,6 +70,8 @@ const DashboardStack = () => (
     <Stack.Screen name="DateSheetScreen" component={DateSheetScreen} />
     <Stack.Screen name="Notifications" component={NotificationsScreen} />
     <Stack.Screen name="ChangePassword" component={ChangePasswordScreen} />
+    <Stack.Screen name="Circulars" component={CircularsScreen} />
+    <Stack.Screen name="Gallery" component={GalleryScreen} />
   </Stack.Navigator>
 );
 

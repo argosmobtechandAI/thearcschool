@@ -35,12 +35,14 @@ const AdmissionManagement = () => {
     monthly_fee: "",
     bus_fee: "",
     assigned_to: "",
+    avatar_url: "",
   });
 
   const [selectedFiles, setSelectedFiles] = useState({
     aadhar: null,
     pan: null,
     birthCertificate: null,
+    avatar: null,
   });
 
   useEffect(() => {
@@ -51,7 +53,7 @@ const AdmissionManagement = () => {
   const handleFileUpload = async (fileUpload) => {
     if (!fileUpload) return null;
     try {
-      const url = await uploadFile(fileUpload);
+      const url = await uploadFile(fileUpload, "admissions", "admissions");
       return url;
     } catch (err) {
       console.error("Upload failed", err);
@@ -78,9 +80,15 @@ const AdmissionManagement = () => {
         }
       }
 
+      // Filter out old avatar from existing documents if a new avatar is being uploaded
+      let baseDocuments = formData.documents || [];
+      if (selectedFiles.avatar) {
+        baseDocuments = baseDocuments.filter(d => d.type !== "avatar");
+      }
+
       const payload = {
         ...formData,
-        documents: [...(formData.documents || []), ...documentsArray],
+        documents: [...baseDocuments, ...documentsArray],
       };
 
       if (editingId) {
@@ -139,8 +147,8 @@ const AdmissionManagement = () => {
 
   const closeModal = () => {
     setEditingId(null);
-    setFormData({ name: "", email: "", parent: "", parentEmail: "", phone: "", status: "Pending", dob: "", gender: "", documents: [], monthly_fee: "", bus_fee: "", assigned_to: "" });
-    setSelectedFiles({ aadhar: null, pan: null, birthCertificate: null });
+    setFormData({ name: "", email: "", parent: "", parentEmail: "", phone: "", status: "Pending", dob: "", gender: "", documents: [], monthly_fee: "", bus_fee: "", assigned_to: "", avatar_url: "" });
+    setSelectedFiles({ aadhar: null, pan: null, birthCertificate: null, avatar: null });
     setOpenModal(false);
   };
 
@@ -153,6 +161,7 @@ const AdmissionManagement = () => {
 
   const handleEdit = (user) => {
     setEditingId(user.id);
+    const avatarDoc = user.documents?.find(d => d.type === "avatar");
     setFormData({
       name: user.name,
       email: user.email,
@@ -164,8 +173,8 @@ const AdmissionManagement = () => {
       gender: user.gender,
       documents: user.documents || [],
       monthly_fee: user.monthly_fee || "",
-
       assigned_to: user.assigned_to || "",
+      avatar_url: avatarDoc ? avatarDoc.url : "",
     });
     setOpenModal(true);
   };
@@ -175,7 +184,7 @@ const AdmissionManagement = () => {
       (filter === "All" || user.status?.toLowerCase() === filter.toLowerCase()) &&
       (genderFilter === "" || user.gender === genderFilter) &&
       user.name?.toLowerCase().includes(search.toLowerCase())
-  );
+  )?.sort((a, b) => (a.name || "").localeCompare(b.name || ""));
 
   const { items: sortedUsers, requestSort, sortConfig } = useSortableData(filteredUsers || []);
 
@@ -410,6 +419,43 @@ const AdmissionManagement = () => {
             </h2>
             <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
+                {/* Profile Picture Uploader */}
+                <div style={{ gridColumn: "span 2", display: "flex", gap: "1.5rem", alignItems: "center", background: "rgba(255,255,255,0.02)", padding: "1rem", borderRadius: "10px", border: "1px solid var(--glass-border)", marginBottom: "0.5rem" }}>
+                  <div style={{ width: "80px", height: "80px", borderRadius: "50%", background: "rgba(255,255,255,0.05)", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden", border: "2px solid var(--glass-border)" }}>
+                    {selectedFiles.avatar ? (
+                      <img src={URL.createObjectURL(selectedFiles.avatar)} alt="Preview" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                    ) : formData.avatar_url ? (
+                      <img src={formData.avatar_url} alt="Profile" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                    ) : (
+                      <span style={{ fontSize: "0.75rem", color: "var(--text-secondary)" }}>No Photo</span>
+                    )}
+                  </div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+                    <label style={{ fontSize: "0.875rem", fontWeight: "600", color: "var(--text-primary)" }}>Profile Picture (Avatar)</label>
+                    <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
+                      <input 
+                        type="file" 
+                        accept="image/*" 
+                        onChange={(e) => setSelectedFiles({ ...selectedFiles, avatar: e.target.files[0] })} 
+                        style={{ fontSize: "0.875rem" }} 
+                      />
+                      {(selectedFiles.avatar || formData.avatar_url) && (
+                        <button 
+                          type="button" 
+                          className="btn btn-ghost" 
+                          style={{ color: "#ef4444", fontSize: "0.75rem", padding: "0.25rem 0.5rem" }}
+                          onClick={() => {
+                            setSelectedFiles({ ...selectedFiles, avatar: null });
+                            setFormData({ ...formData, avatar_url: "" });
+                          }}
+                        >
+                          Remove
+                        </button>
+                      )}
+                    </div>
+                    <span style={{ fontSize: "0.75rem", color: "var(--text-secondary)" }}>Upload photo to CDN (cdn.thearcschool.in)</span>
+                  </div>
+                </div>
                 <div>
                   <label style={{ display: "block", marginBottom: "0.5rem", fontSize: "0.875rem" }}>Student Name</label>
                   <input required className="input-glass" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} />
@@ -446,7 +492,7 @@ const AdmissionManagement = () => {
                   <label style={{ display: "block", marginBottom: "0.5rem", fontSize: "0.875rem" }}>Assign Counselor</label>
                   <select className="input-glass" value={formData.assigned_to} onChange={(e) => setFormData({ ...formData, assigned_to: e.target.value })}>
                     <option value="">Unassigned</option>
-                    {users?.filter(u => u.type === 'admission').map(c => (
+                    {[...users].filter(u => u.type === 'admission').sort((a, b) => (a.name || "").localeCompare(b.name || "")).map(c => (
                       <option key={c.id} value={c.id}>{c.name}</option>
                     ))}
                   </select>
@@ -458,15 +504,15 @@ const AdmissionManagement = () => {
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "1rem" }}>
                   <div>
                     <label style={{ display: "block", marginBottom: "0.5rem", fontSize: "0.75rem" }}>Aadhar Card</label>
-                    <input type="file" style={{ fontSize: "0.75rem" }} onChange={(e) => setSelectedFiles({ ...selectedFiles, aadhar: e.target.files[0] })} />
+                    <input type="file" className="input-glass" style={{ padding: "0.4rem 0.6rem" }} onChange={(e) => setSelectedFiles({ ...selectedFiles, aadhar: e.target.files[0] })} />
                   </div>
                   <div>
                     <label style={{ display: "block", marginBottom: "0.5rem", fontSize: "0.75rem" }}>PAN Card</label>
-                    <input type="file" style={{ fontSize: "0.75rem" }} onChange={(e) => setSelectedFiles({ ...selectedFiles, pan: e.target.files[0] })} />
+                    <input type="file" className="input-glass" style={{ padding: "0.4rem 0.6rem" }} onChange={(e) => setSelectedFiles({ ...selectedFiles, pan: e.target.files[0] })} />
                   </div>
                   <div>
                     <label style={{ display: "block", marginBottom: "0.5rem", fontSize: "0.75rem" }}>Birth Certificate</label>
-                    <input type="file" style={{ fontSize: "0.75rem" }} onChange={(e) => setSelectedFiles({ ...selectedFiles, birthCertificate: e.target.files[0] })} />
+                    <input type="file" className="input-glass" style={{ padding: "0.4rem 0.6rem" }} onChange={(e) => setSelectedFiles({ ...selectedFiles, birthCertificate: e.target.files[0] })} />
                   </div>
                 </div>
               </div>

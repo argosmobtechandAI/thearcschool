@@ -2,7 +2,7 @@ import React, { useState, useCallback, useEffect, useRef } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, RefreshControl,
   ActivityIndicator, TouchableOpacity, Share, Platform,
-  Animated, Dimensions
+  Animated, Dimensions, Image
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { 
@@ -10,7 +10,8 @@ import {
   useGetNotificationsQuery,
   useGetConsentsQuery,
   useGetFeesQuery,
-  useGetTimetableQuery
+  useGetTimetableQuery,
+  useGetSpotlightOfTodayQuery
 } from '../../store/apiSlice';
 import Icon from 'react-native-vector-icons/Feather';
 import { theme } from '../../theme/theme';
@@ -129,14 +130,20 @@ const DashboardScreen = ({ navigation }) => {
   const { data: consentsData, refetch: refetchConsents } = useGetConsentsQuery();
   const { data: feesData, refetch: refetchFees } = useGetFeesQuery();
   const { data: timetableData, refetch: refetchTimetable } = useGetTimetableQuery();
+  const { data: spotlightResponse, refetch: refetchSpotlight } = useGetSpotlightOfTodayQuery();
+  const spotlightOfToday = spotlightResponse?.data;
   
   const classId = data?.data?.classInfo?.id;
   const { data: sotwResponse, refetch: refetchSotw } = require('../../store/apiSlice').useGetStudentOfWeekQuery(classId, { skip: !classId });
   const studentOfWeek = sotwResponse?.data;
+  const studentOfWeekList = Array.isArray(studentOfWeek)
+    ? studentOfWeek
+    : (studentOfWeek ? [studentOfWeek] : []);
   
   const [registerFcmToken] = require('../../store/apiSlice').useRegisterFcmTokenMutation();
 
   const fadeAnim = useRef(new Animated.Value(0)).current;
+  const spotlightRotation = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     Animated.timing(fadeAnim, {
@@ -144,6 +151,14 @@ const DashboardScreen = ({ navigation }) => {
       duration: 600,
       useNativeDriver: true,
     }).start();
+
+    Animated.loop(
+      Animated.timing(spotlightRotation, {
+        toValue: 1,
+        duration: 4000,
+        useNativeDriver: true,
+      })
+    ).start();
 
     const initNotifications = async () => {
       try {
@@ -162,11 +177,16 @@ const DashboardScreen = ({ navigation }) => {
     initNotifications();
   }, [registerFcmToken, fadeAnim]);
 
+  const rotationInterpolate = spotlightRotation.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['0deg', '360deg']
+  });
+
   const onRefresh = useCallback(async () => {
-        const promises = [refetchDash(), refetchNotifs(), refetchConsents(), refetchFees(), refetchTimetable()];
+        const promises = [refetchDash(), refetchNotifs(), refetchConsents(), refetchFees(), refetchTimetable(), refetchSpotlight()];
         if (classId) promises.push(refetchSotw());
         await Promise.all(promises);
-      }, [refetchDash, refetchNotifs, refetchConsents, refetchFees, refetchTimetable, refetchSotw, classId]);
+      }, [refetchDash, refetchNotifs, refetchConsents, refetchFees, refetchTimetable, refetchSotw, refetchSpotlight, classId]);
 
   if (isLoading) {
     return (
@@ -249,7 +269,11 @@ const DashboardScreen = ({ navigation }) => {
           </TouchableOpacity>
           <TouchableOpacity style={styles.headerBtn} onPress={() => navigation.navigate('Profile')}>
             <View style={styles.headerAvatarCircle}>
-              <Text style={styles.headerAvatarText}>{initials}</Text>
+              {profile?.avatar_url ? (
+                <Image source={{ uri: profile.avatar_url }} style={styles.headerAvatarImage} />
+              ) : (
+                <Text style={styles.headerAvatarText}>{initials}</Text>
+              )}
             </View>
           </TouchableOpacity>
         </View>
@@ -276,37 +300,194 @@ const DashboardScreen = ({ navigation }) => {
             </View>
           </View>
 
-          {/* Student of the Week Banner */}
-          {studentOfWeek && (
-            <View style={{ marginHorizontal: 16, marginBottom: 20, backgroundColor: '#fff', borderRadius: 24, padding: 20, shadowColor: '#f59e0b', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.15, shadowRadius: 16, elevation: 6, borderWidth: 1, borderColor: '#fef08a' }}>
-              <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
-                {studentOfWeek.student?.avatar_url ? (
-                  <Image source={{ uri: studentOfWeek.student.avatar_url }} style={{ width: 64, height: 64, borderRadius: 32, marginRight: 16, borderWidth: 3, borderColor: '#fbbf24' }} />
-                ) : (
-                  <View style={{ width: 64, height: 64, borderRadius: 32, marginRight: 16, backgroundColor: '#fef3c7', justifyContent: 'center', alignItems: 'center', borderWidth: 2, borderColor: '#fbbf24' }}>
-                    <Icon name="award" size={32} color="#f59e0b" />
+          {/* Spotlight of the Day Banner */}
+          {spotlightOfToday && (
+            <View style={{
+              marginHorizontal: 16,
+              marginBottom: 20,
+              borderRadius: 24,
+              overflow: 'hidden',
+              padding: 2, // Forms the glowing border thickness
+              backgroundColor: '#e2e8f0', // Neutral fallback border
+              ...theme.shadows.card,
+              position: 'relative'
+            }}>
+              {/* Rotating Border Beam */}
+              <Animated.View style={{
+                position: 'absolute',
+                width: '200%',
+                height: '200%',
+                top: '-50%',
+                left: '-50%',
+                transform: [{ rotate: rotationInterpolate }],
+                justifyContent: 'center',
+                alignItems: 'center',
+              }}>
+                {/* Glowing light beam strip */}
+                <View style={{
+                  width: 140,
+                  height: '100%',
+                  backgroundColor: '#F59E0B', // Glowing gold laser beam
+                  opacity: 0.8,
+                }} />
+              </Animated.View>
+
+              {/* Inner Content Card (covers center of rotating beam) */}
+              <View style={{
+                backgroundColor: '#ffffff',
+                borderRadius: 22,
+                padding: 16,
+                flexDirection: 'row',
+                alignItems: 'center',
+              }}>
+                <View style={{ flex: 1, marginRight: spotlightOfToday.image_url ? 12 : 0 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
+                    <View style={{
+                      width: 24,
+                      height: 24,
+                      borderRadius: 12,
+                      backgroundColor: 'rgba(245, 158, 11, 0.15)',
+                      justifyContent: 'center',
+                      alignItems: 'center',
+                      marginRight: 8
+                    }}>
+                      <Icon name="star" size={12} color="#D97706" />
+                    </View>
+                    <Text style={{
+                      fontSize: 11,
+                      color: '#000080',
+                      fontFamily: theme.typography.fontFamily.bold,
+                      textTransform: 'uppercase',
+                      letterSpacing: 1
+                    }}>
+                      Spotlight of the Day
+                    </Text>
                   </View>
+                  <Text style={{
+                    fontSize: 18,
+                    color: '#0F172A',
+                    fontFamily: theme.typography.fontFamily.heading,
+                    marginBottom: 6
+                  }}>
+                    {spotlightOfToday.title}
+                  </Text>
+                  <Text style={{
+                    fontSize: 13,
+                    color: '#475569',
+                    fontFamily: theme.typography.fontFamily.medium,
+                    lineHeight: 18
+                  }}>
+                    {spotlightOfToday.description}
+                  </Text>
+                </View>
+                {spotlightOfToday.image_url && (
+                  <Image 
+                    source={{ uri: spotlightOfToday.image_url }} 
+                    style={{ 
+                      width: 90, 
+                      height: 90, 
+                      borderRadius: 16, 
+                      resizeMode: 'cover', 
+                      borderWidth: 1, 
+                      borderColor: 'rgba(0, 0, 0, 0.05)' 
+                    }} 
+                  />
                 )}
-                <View style={{ flex: 1, paddingTop: 2 }}>
-                  <Text style={{ fontSize: 12, color: '#d97706', fontWeight: '800', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 4 }}>Student of the Week</Text>
-                  <Text style={{ fontSize: 20, color: '#1e293b', fontWeight: '900', letterSpacing: -0.5 }}>{studentOfWeek.student?.name}</Text>
-                  <Text style={{ fontSize: 13, color: '#64748b', marginTop: 6, lineHeight: 18 }}>{studentOfWeek.reason}</Text>
-                </View>
               </View>
-              
-              {/* Metrics Row */}
-              {studentOfWeek.metrics && (
-                <View style={{ flexDirection: 'row', marginTop: 20, gap: 12 }}>
-                  <View style={{ flex: 1, backgroundColor: '#ecfdf5', paddingVertical: 12, paddingHorizontal: 8, borderRadius: 16, alignItems: 'center', borderWidth: 1, borderColor: '#d1fae5' }}>
-                    <Text style={{ fontSize: 11, color: '#059669', fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 }}>Attendance</Text>
-                    <Text style={{ fontSize: 20, color: '#047857', fontWeight: '900', marginTop: 4 }}>{studentOfWeek.metrics.attendance || 0} pts</Text>
+            </View>
+          )}
+
+          {/* Student of the Week Banner */}
+          {studentOfWeekList && studentOfWeekList.length > 0 && (
+            <View style={{ marginBottom: 20 }}>
+              <Text style={{ fontSize: 13, color: '#d97706', fontWeight: '800', textTransform: 'uppercase', letterSpacing: 1, marginHorizontal: 20, marginBottom: 10 }}>
+                Students of the Week
+              </Text>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={{ paddingHorizontal: 12 }}
+              >
+                {studentOfWeekList.map((winner, idx) => (
+                  <View
+                    key={winner.id || idx}
+                    style={{
+                      width: studentOfWeekList.length > 1 ? 300 : 340,
+                      marginHorizontal: 4,
+                      backgroundColor: '#fff',
+                      borderRadius: 24,
+                      padding: 20,
+                      shadowColor: '#f59e0b',
+                      shadowOffset: { width: 0, height: 8 },
+                      shadowOpacity: 0.15,
+                      shadowRadius: 16,
+                      elevation: 6,
+                      borderWidth: 1,
+                      borderColor: '#fef08a',
+                      position: 'relative'
+                    }}
+                  >
+                    {/* Rank Badge */}
+                    <View style={{
+                      position: 'absolute',
+                      top: 16,
+                      right: 16,
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      paddingHorizontal: 8,
+                      paddingVertical: 3,
+                      borderRadius: 12,
+                      backgroundColor: idx === 0 ? '#fef3c7' : idx === 1 ? '#f3f4f6' : '#ffedd5',
+                      borderWidth: 1,
+                      borderColor: idx === 0 ? '#fbbf24' : idx === 1 ? '#d1d5db' : '#fed7aa',
+                      zIndex: 10
+                    }}>
+                      <Icon 
+                        name="star" 
+                        size={10} 
+                        color={idx === 0 ? '#d97706' : idx === 1 ? '#4b5563' : '#c2410c'} 
+                        style={{ marginRight: 3 }}
+                      />
+                      <Text style={{
+                        fontSize: 9,
+                        fontWeight: '900',
+                        color: idx === 0 ? '#d97706' : idx === 1 ? '#4b5563' : '#c2410c',
+                        textTransform: 'uppercase'
+                      }}>
+                        {idx === 0 ? 'Gold' : idx === 1 ? 'Silver' : 'Bronze'}
+                      </Text>
+                    </View>
+
+                    <View style={{ flexDirection: 'row', alignItems: 'flex-start', paddingRight: 60 }}>
+                      {winner.student?.avatar_url ? (
+                        <Image source={{ uri: winner.student.avatar_url }} style={{ width: 56, height: 56, borderRadius: 28, marginRight: 12, borderWidth: 3, borderColor: '#fbbf24' }} />
+                      ) : (
+                        <View style={{ width: 56, height: 56, borderRadius: 28, marginRight: 12, backgroundColor: '#fef3c7', justifyContent: 'center', alignItems: 'center', borderWidth: 2, borderColor: '#fbbf24' }}>
+                          <Icon name="award" size={28} color="#f59e0b" />
+                        </View>
+                      )}
+                      <View style={{ flex: 1, paddingTop: 2 }}>
+                        <Text style={{ fontSize: 18, color: '#1e293b', fontWeight: '900', letterSpacing: -0.5 }} numberOfLines={1}>{winner.student?.name}</Text>
+                        <Text style={{ fontSize: 12, color: '#64748b', marginTop: 4, lineHeight: 16 }}>{winner.reason}</Text>
+                      </View>
+                    </View>
+                    
+                    {/* Metrics Row */}
+                    {winner.metrics ? (
+                      <View style={{ flexDirection: 'row', marginTop: 16, gap: 10 }}>
+                        <View style={{ flex: 1, backgroundColor: '#ecfdf5', paddingVertical: 10, paddingHorizontal: 8, borderRadius: 12, alignItems: 'center', borderWidth: 1, borderColor: '#d1fae5' }}>
+                          <Text style={{ fontSize: 10, color: '#059669', fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 }}>Attendance</Text>
+                          <Text style={{ fontSize: 16, color: '#047857', fontWeight: '900', marginTop: 2 }}>{winner.metrics.attendance || 0} pts</Text>
+                        </View>
+                        <View style={{ flex: 1, backgroundColor: '#eff6ff', paddingVertical: 10, paddingHorizontal: 8, borderRadius: 12, alignItems: 'center', borderWidth: 1, borderColor: '#dbeafe' }}>
+                          <Text style={{ fontSize: 10, color: '#2563eb', fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 }}>Grades</Text>
+                          <Text style={{ fontSize: 16, color: '#1d4ed8', fontWeight: '900', marginTop: 2 }}>{Math.round(winner.metrics.grades || 0)} pts</Text>
+                        </View>
+                      </View>
+                    ) : null}
                   </View>
-                  <View style={{ flex: 1, backgroundColor: '#eff6ff', paddingVertical: 12, paddingHorizontal: 8, borderRadius: 16, alignItems: 'center', borderWidth: 1, borderColor: '#dbeafe' }}>
-                    <Text style={{ fontSize: 11, color: '#2563eb', fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 }}>Grades</Text>
-                    <Text style={{ fontSize: 20, color: '#1d4ed8', fontWeight: '900', marginTop: 4 }}>{Math.round(studentOfWeek.metrics.grades || 0)} pts</Text>
-                  </View>
-                </View>
-              )}
+                ))}
+              </ScrollView>
             </View>
           )}
 
@@ -510,7 +691,8 @@ const styles = StyleSheet.create({
   },
   navTitle: { color: '#fff', fontSize: 18, fontFamily: theme.typography.fontFamily.bold, letterSpacing: 0.5 },
   headerBtn: { padding: 4 },
-  headerAvatarCircle: { width: 34, height: 34, borderRadius: 17, backgroundColor: 'rgba(255,255,255,0.25)', justifyContent: 'center', alignItems: 'center', borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.5)' },
+  headerAvatarCircle: { width: 34, height: 34, borderRadius: 17, backgroundColor: 'rgba(255,255,255,0.25)', justifyContent: 'center', alignItems: 'center', borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.5)', overflow: 'hidden' },
+  headerAvatarImage: { width: '100%', height: '100%', borderRadius: 17, resizeMode: 'cover' },
   headerAvatarText: { fontSize: 14, fontFamily: theme.typography.fontFamily.bold, color: '#fff' },
   badgeContainer: { position: 'absolute', top: -4, right: -6, backgroundColor: '#ef4444', borderRadius: 10, minWidth: 20, height: 20, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 4 },
   badgeText: { color: '#fff', fontSize: 10, fontFamily: theme.typography.fontFamily.bold },

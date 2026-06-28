@@ -1,7 +1,7 @@
 import { Outlet, useNavigate, NavLink } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import { useEffect, useState } from "react";
-import { LogOut, LayoutDashboard, Users, BookOpen, UserCircle, Settings, UserCheck, IndianRupee, FileEdit, Clock, Calendar, ClipboardCheck, Bell, DollarSign, MessageSquare, Info, ShieldAlert, MapPin, ExternalLink, TrendingUp, FileSignature, Quote, Award } from "lucide-react";
+import { LogOut, LayoutDashboard, Users, BookOpen, UserCircle, Settings, UserCheck, IndianRupee, FileEdit, Clock, Calendar, ClipboardCheck, Bell, DollarSign, MessageSquare, Info, ShieldAlert, MapPin, ExternalLink, TrendingUp, FileSignature, Quote, Award, FileText, Sparkles, Image as ImageIcon } from "lucide-react";
 import { toast } from "react-toastify";
 import { logout } from "../features/authSlice";
 import { messaging } from "../config/firebase";
@@ -138,12 +138,12 @@ const AdminLayout = () => {
           {(user?.type === "admin" || user?.type === "principal") && (
             <>
               <NavGroup title="People" />
+              <NavLink to="/users/parent" style={navLinkStyle}><Users size={16} /> Parents</NavLink>
               <NavLink to="/users/student" style={navLinkStyle}><Users size={16} /> Students</NavLink>
               <NavLink to="/users/teacher" style={navLinkStyle}><UserCircle size={16} /> Teachers</NavLink>
-              <NavLink to="/users/parent" style={navLinkStyle}><Users size={16} /> Parents</NavLink>
               <NavGroup title="Staff" />
-              <NavLink to="/users/admission" style={navLinkStyle}><UserCheck size={16} /> Counselors</NavLink>
               <NavLink to="/users/finance" style={navLinkStyle}><IndianRupee size={16} /> Accountants</NavLink>
+              <NavLink to="/users/admission" style={navLinkStyle}><UserCheck size={16} /> Counselors</NavLink>
             </>
           )}
           
@@ -151,20 +151,21 @@ const AdminLayout = () => {
             <>
               <NavGroup title="Academics" />
               <NavLink to="/admissions" style={navLinkStyle}><UserCheck size={16} /> Admissions Pipeline</NavLink>
-              <NavLink to="/classes" style={navLinkStyle}><BookOpen size={16} /> Classes</NavLink>
-              <NavLink to="/subjects" style={navLinkStyle}><BookOpen size={16} /> Subjects</NavLink>
-              <NavLink to="/subject-teachers" style={navLinkStyle}><Users size={16} /> Subject Teachers</NavLink>
-              <NavLink to="/timetable" style={navLinkStyle}><Clock size={16} /> Timetable</NavLink>
               <NavLink to="/attendance" style={navLinkStyle}><UserCheck size={16} /> Attendance</NavLink>
-              <NavLink to="/exams" style={navLinkStyle}><ClipboardCheck size={16} /> Exams & Grading</NavLink>
+              <NavLink to="/circulars" style={navLinkStyle}><FileText size={16} /> Circulars</NavLink>
+              <NavLink to="/classes" style={navLinkStyle}><BookOpen size={16} /> Classes</NavLink>
               <NavLink to="/communication/inbox" style={navLinkStyle}>
                 <MessageSquare size={16} /> Communication
               </NavLink>
+              <NavLink to="/consents" style={navLinkStyle}><FileSignature size={16} /> Consents</NavLink>
+              <NavLink to="/exams" style={navLinkStyle}><ClipboardCheck size={16} /> Exams & Grading</NavLink>
               <NavLink to="/notification" style={navLinkStyle}>
                 <Bell size={16} /> Notifications
               </NavLink>
               <NavLink to="/school-info" style={navLinkStyle}><Info size={16} /> School Info</NavLink>
-              <NavLink to="/consents" style={navLinkStyle}><FileSignature size={16} /> Consents</NavLink>
+              <NavLink to="/subject-teachers" style={navLinkStyle}><Users size={16} /> Subject Teachers</NavLink>
+              <NavLink to="/subjects" style={navLinkStyle}><BookOpen size={16} /> Subjects</NavLink>
+              <NavLink to="/timetable" style={navLinkStyle}><Clock size={16} /> Timetable</NavLink>
             </>
           )}
 
@@ -172,16 +173,22 @@ const AdminLayout = () => {
             <>
               <NavGroup title="Management" />
               {(user?.type === "admin" || user?.type === "principal") && (
-                <>
-                  <NavLink to="/annual-planner" style={navLinkStyle}><Calendar size={16} /> Annual Planner</NavLink>
-                  <NavLink to="/rooms" style={navLinkStyle}><MapPin size={16} /> Rooms Management</NavLink>
-                  <NavLink to="/staff-roles" style={navLinkStyle}><UserCheck size={16} /> Staff Roles</NavLink>
-                  <NavLink to="/thoughts" style={navLinkStyle}><Quote size={16} /> Thought of the Day</NavLink>
-                  <NavLink to="/student-of-week" style={navLinkStyle}><Award size={16} /> Student of the Week</NavLink>
-                </>
+                <NavLink to="/annual-planner" style={navLinkStyle}><Calendar size={16} /> Annual Planner</NavLink>
               )}
               <NavLink to="/fees" style={navLinkStyle}><IndianRupee size={16} /> Fees</NavLink>
+              {(user?.type === "admin" || user?.type === "principal") && (
+                <NavLink to="/gallery" style={navLinkStyle}><ImageIcon size={16} /> Gallery</NavLink>
+              )}
               <NavLink to="/pnl" style={navLinkStyle}><TrendingUp size={16} /> Profit & Loss</NavLink>
+              {(user?.type === "admin" || user?.type === "principal") && (
+                <>
+                  <NavLink to="/rooms" style={navLinkStyle}><MapPin size={16} /> Rooms Management</NavLink>
+                  <NavLink to="/spotlight" style={navLinkStyle}><Sparkles size={16} /> Spotlight of the Day</NavLink>
+                  <NavLink to="/staff-roles" style={navLinkStyle}><UserCheck size={16} /> Staff Roles</NavLink>
+                  <NavLink to="/student-of-week" style={navLinkStyle}><Award size={16} /> Student of the Week</NavLink>
+                  <NavLink to="/thoughts" style={navLinkStyle}><Quote size={16} /> Thought of the Day</NavLink>
+                </>
+              )}
             </>
           )}
 

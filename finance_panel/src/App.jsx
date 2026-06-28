@@ -18,6 +18,7 @@ import StudentFinanceDetails from './pages/StudentFinanceDetails';
 import IncomeCategories from './pages/IncomeCategories';
 import ExpenseCategories from './pages/ExpenseCategories';
 import ProfitLoss from './pages/ProfitLoss';
+import Gallery from './pages/Gallery';
 import FinanceLayout from './layouts/FinanceLayout';
 
 const PrivateRoute = ({ children }) => {
@@ -47,6 +48,7 @@ function App() {
           <Route path="metrics" element={<DashboardMetrics />} />
           <Route path="student-master" element={<StudentMaster />} />
           <Route path="student-master/:id" element={<StudentFinanceDetails />} />
+          <Route path="gallery" element={<Gallery />} />
         </Route>
         
         {/* Fallback routing temporarily */}

@@ -86,8 +86,12 @@ const TeacherProfile = () => {
       {teacher && (
         <>
           <div className="glass-panel" style={{ padding: "1.5rem", marginBottom: "2rem", display: "flex", gap: "2rem", alignItems: "center", flexWrap: "wrap", borderLeft: "4px solid #10b981" }}>
-            <div style={{ width: "100px", height: "100px", borderRadius: "16px", background: "linear-gradient(135deg, #10b981 0%, #059669 100%)", display: "flex", alignItems: "center", justifyContent: "center", color: "white", fontSize: "3rem", fontWeight: "bold", boxShadow: "0 10px 25px -5px rgba(16, 185, 129, 0.5)" }}>
-              {teacher.name?.charAt(0)?.toUpperCase()}
+            <div style={{ width: "100px", height: "100px", borderRadius: "16px", background: teacher.avatar_url ? "none" : "linear-gradient(135deg, #10b981 0%, #059669 100%)", display: "flex", alignItems: "center", justifyContent: "center", color: "white", fontSize: "3rem", fontWeight: "bold", boxShadow: "0 10px 25px -5px rgba(16, 185, 129, 0.5)", overflow: "hidden", border: teacher.avatar_url ? "2px solid var(--glass-border)" : "none" }}>
+              {teacher.avatar_url ? (
+                <img src={teacher.avatar_url} alt="Profile" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+              ) : (
+                teacher.name?.charAt(0)?.toUpperCase()
+              )}
             </div>
             
             <div style={{ flex: 1, minWidth: "250px" }}>

@@ -1,11 +1,11 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, RefreshControl, Platform } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import { View, Text, StyleSheet, ScrollView, Animated, TouchableOpacity, Image, RefreshControl, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/Feather';
 import { useSelector, useDispatch } from 'react-redux';
 import { colors, shadows } from '../../theme/colors';
 import CustomHeader from '../../components/CustomHeader';
-import { useGetExamsQuery, useGetCoursesQuery, useGetTimetableQuery, useGetTeacherClassesQuery, useGetClassStudentsQuery, useGetAttendanceQuery, useGetEventsQuery, useGetClassPerformanceQuery } from '../../store/apiSlice';
+import { useGetExamsQuery, useGetCoursesQuery, useGetTimetableQuery, useGetTeacherClassesQuery, useGetClassStudentsQuery, useGetAttendanceQuery, useGetEventsQuery, useGetClassPerformanceQuery, useGetSpotlightOfTodayQuery } from '../../store/apiSlice';
 import { setAvailableClasses, setActiveClass } from '../../store/appSlice';
 
 const DashboardScreen = ({ navigation }) => {
@@ -43,10 +43,32 @@ const DashboardScreen = ({ navigation }) => {
   const { data: eventsData, refetch: refetchEvents, isFetching: fetchingEvents } = useGetEventsQuery(activeClassId, { skip: !activeClassId });
   const { data: performanceResponse, refetch: refetchPerformance, isFetching: fetchingPerformance } = useGetClassPerformanceQuery(activeClassId, { skip: !activeClassId });
   const { data: sotwResponse, refetch: refetchSotw, isFetching: fetchingSotw } = require('../../store/apiSlice').useGetStudentOfWeekQuery(activeClassId, { skip: !activeClassId });
+  const { data: spotlightResponse, refetch: refetchSpotlight } = useGetSpotlightOfTodayQuery();
+  const spotlightOfToday = spotlightResponse?.data;
   const studentOfWeek = sotwResponse?.data;
+  const studentOfWeekList = Array.isArray(studentOfWeek)
+    ? studentOfWeek
+    : (studentOfWeek ? [studentOfWeek] : []);
   const performanceData = performanceResponse?.data || [];
   const topPerformers = performanceData.slice(0, 5);
   const bottomPerformers = [...performanceData].reverse().slice(0, 5);
+
+  const spotlightRotation = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.loop(
+      Animated.timing(spotlightRotation, {
+        toValue: 1,
+        duration: 4000,
+        useNativeDriver: true,
+      })
+    ).start();
+  }, [spotlightRotation]);
+
+  const rotationInterpolate = spotlightRotation.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['0deg', '360deg']
+  });
 
   const [registerFcmToken] = require('../../store/apiSlice').useRegisterFcmTokenMutation();
 
@@ -76,13 +98,14 @@ const DashboardScreen = ({ navigation }) => {
     refetchClasses();
     refetchTimetable();
     refetchEvents();
+    refetchSpotlight();
     if (activeClassId) {
       refetchSotw();
       refetchStudents();
       refetchAttendance();
       refetchPerformance();
     }
-  }, [refetchExams, refetchCourses, refetchClasses, refetchTimetable, refetchStudents, refetchEvents, refetchAttendance, refetchPerformance, refetchSotw, activeClassId]);
+  }, [refetchExams, refetchCourses, refetchClasses, refetchTimetable, refetchStudents, refetchEvents, refetchAttendance, refetchPerformance, refetchSotw, refetchSpotlight, activeClassId]);
 
   const isRefreshing = fetchingExams || fetchingCourses || fetchingClasses || fetchingTimetable || fetchingStudents || fetchingAttendance || fetchingEvents || fetchingPerformance || fetchingSotw;
 
@@ -166,37 +189,192 @@ const DashboardScreen = ({ navigation }) => {
           </View>
         </View>
 
-        {/* Student of the Week Banner */}
-        {studentOfWeek && (
-          <View style={{ marginHorizontal: 16, marginBottom: 24, backgroundColor: '#fff', borderRadius: 16, padding: 16, shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 8, elevation: 4, borderWidth: 1, borderColor: '#fef08a' }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-              {studentOfWeek.student?.avatar_url ? (
-                <Image source={{ uri: studentOfWeek.student.avatar_url }} style={{ width: 56, height: 56, borderRadius: 28, marginRight: 16, borderWidth: 2, borderColor: '#fbbf24' }} />
-              ) : (
-                <View style={{ width: 56, height: 56, borderRadius: 28, marginRight: 16, backgroundColor: '#fbbf24', justifyContent: 'center', alignItems: 'center', shadowColor: '#fbbf24', shadowOpacity: 0.4, shadowRadius: 4, elevation: 2 }}>
-                  <Icon name="award" size={28} color="#fff" />
+        {/* Spotlight of the Day Banner */}
+        {spotlightOfToday && (
+          <View style={{
+            marginHorizontal: 16,
+            marginBottom: 24,
+            borderRadius: 24,
+            overflow: 'hidden',
+            padding: 2, // Forms the glowing border thickness
+            backgroundColor: '#e2e8f0', // Neutral fallback border
+            ...shadows.card,
+            position: 'relative'
+          }}>
+            {/* Rotating Border Beam */}
+            <Animated.View style={{
+              position: 'absolute',
+              width: '200%',
+              height: '200%',
+              top: '-50%',
+              left: '-50%',
+              transform: [{ rotate: rotationInterpolate }],
+              justifyContent: 'center',
+              alignItems: 'center',
+            }}>
+              {/* Glowing light beam strip */}
+              <View style={{
+                width: 140,
+                height: '100%',
+                backgroundColor: '#F59E0B', // Glowing gold laser beam
+                opacity: 0.8,
+              }} />
+            </Animated.View>
+
+            {/* Inner Content Card (covers center of rotating beam) */}
+            <View style={{
+              backgroundColor: '#ffffff',
+              borderRadius: 22,
+              padding: 16,
+              flexDirection: 'row',
+              alignItems: 'center',
+            }}>
+              <View style={{ flex: 1, marginRight: spotlightOfToday.image_url ? 12 : 0 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
+                  <View style={{
+                    width: 24,
+                    height: 24,
+                    borderRadius: 12,
+                    backgroundColor: 'rgba(245, 158, 11, 0.15)',
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    marginRight: 8
+                  }}>
+                    <Icon name="star" size={12} color="#D97706" />
+                  </View>
+                  <Text style={{
+                    fontSize: 11,
+                    color: '#000080',
+                    fontWeight: '800',
+                    textTransform: 'uppercase',
+                    letterSpacing: 1
+                  }}>
+                    Spotlight of the Day
+                  </Text>
                 </View>
+                <Text style={{
+                  fontSize: 18,
+                  color: '#0F172A',
+                  fontWeight: 'bold',
+                  marginBottom: 6
+                }}>
+                  {spotlightOfToday.title}
+                </Text>
+                <Text style={{
+                  fontSize: 13,
+                  color: '#475569',
+                  lineHeight: 18
+                }}>
+                  {spotlightOfToday.description}
+                </Text>
+              </View>
+              {spotlightOfToday.image_url && (
+                <Image 
+                  source={{ uri: spotlightOfToday.image_url }} 
+                  style={{ 
+                    width: 90, 
+                    height: 90, 
+                    borderRadius: 16, 
+                    resizeMode: 'cover', 
+                    borderWidth: 1, 
+                    borderColor: 'rgba(0, 0, 0, 0.05)' 
+                  }} 
+                />
               )}
-              <View style={{ flex: 1 }}>
-                <Text style={{ fontSize: 13, color: '#d97706', fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.5 }}>Student of the Week</Text>
-                <Text style={{ fontSize: 20, color: '#1f2937', fontWeight: 'bold', marginTop: 2 }}>{studentOfWeek.student?.name}</Text>
-                <Text style={{ fontSize: 13, color: '#6b7280', marginTop: 4 }}>{studentOfWeek.reason}</Text>
-              </View>
             </View>
-            
-            {/* Metrics Row */}
-            {studentOfWeek.metrics && (
-              <View style={{ flexDirection: 'row', marginTop: 16, paddingTop: 16, borderTopWidth: 1, borderTopColor: '#f3f4f6', gap: 12 }}>
-                <View style={{ flex: 1, backgroundColor: '#ecfdf5', padding: 8, borderRadius: 8, alignItems: 'center' }}>
-                  <Text style={{ fontSize: 11, color: '#059669', fontWeight: '600', textTransform: 'uppercase' }}>Attendance</Text>
-                  <Text style={{ fontSize: 16, color: '#047857', fontWeight: 'bold', marginTop: 2 }}>{studentOfWeek.metrics.attendance || 0} pts</Text>
+          </View>
+        )}
+
+        {/* Student of the Week Banner */}
+        {studentOfWeekList && studentOfWeekList.length > 0 && (
+          <View style={{ marginBottom: 24 }}>
+            <Text style={{ fontSize: 13, color: '#d97706', fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.5, marginHorizontal: 20, marginBottom: 10 }}>
+              Students of the Week
+            </Text>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={{ paddingHorizontal: 12 }}
+            >
+              {studentOfWeekList.map((winner, idx) => (
+                <View
+                  key={winner.id || idx}
+                  style={{
+                    width: studentOfWeekList.length > 1 ? 290 : 340,
+                    marginHorizontal: 4,
+                    backgroundColor: '#fff',
+                    borderRadius: 16,
+                    padding: 16,
+                    shadowColor: '#000',
+                    shadowOpacity: 0.1,
+                    shadowRadius: 8,
+                    elevation: 4,
+                    borderWidth: 1,
+                    borderColor: '#fef08a',
+                    position: 'relative'
+                  }}
+                >
+                  {/* Rank Badge */}
+                  <View style={{
+                    position: 'absolute',
+                    top: 12,
+                    right: 12,
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    paddingHorizontal: 8,
+                    paddingVertical: 3,
+                    borderRadius: 12,
+                    backgroundColor: idx === 0 ? '#fef3c7' : idx === 1 ? '#f3f4f6' : '#ffedd5',
+                    borderWidth: 1,
+                    borderColor: idx === 0 ? '#fbbf24' : idx === 1 ? '#d1d5db' : '#fed7aa',
+                    zIndex: 10
+                  }}>
+                    <Icon 
+                      name="star" 
+                      size={10} 
+                      color={idx === 0 ? '#d97706' : idx === 1 ? '#4b5563' : '#c2410c'} 
+                      style={{ marginRight: 3 }}
+                    />
+                    <Text style={{
+                      fontSize: 9,
+                      fontWeight: '950',
+                      color: idx === 0 ? '#d97706' : idx === 1 ? '#4b5563' : '#c2410c',
+                      textTransform: 'uppercase'
+                    }}>
+                      {idx === 0 ? 'Gold' : idx === 1 ? 'Silver' : 'Bronze'}
+                    </Text>
+                  </View>
+
+                  <View style={{ flexDirection: 'row', alignItems: 'center', paddingRight: 60 }}>
+                    {winner.student?.avatar_url ? (
+                      <Image source={{ uri: winner.student.avatar_url }} style={{ width: 48, height: 48, borderRadius: 24, marginRight: 12, borderWidth: 2, borderColor: '#fbbf24' }} />
+                    ) : (
+                      <View style={{ width: 48, height: 48, borderRadius: 24, marginRight: 12, backgroundColor: '#fbbf24', justifyContent: 'center', alignItems: 'center', shadowColor: '#fbbf24', shadowOpacity: 0.4, shadowRadius: 4, elevation: 2 }}>
+                        <Icon name="award" size={24} color="#fff" />
+                      </View>
+                    )}
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ fontSize: 16, color: '#1f2937', fontWeight: 'bold' }} numberOfLines={1}>{winner.student?.name}</Text>
+                      <Text style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>{winner.reason}</Text>
+                    </View>
+                  </View>
+                  
+                  {/* Metrics Row */}
+                  {winner.metrics ? (
+                    <View style={{ flexDirection: 'row', marginTop: 12, paddingTop: 12, borderTopWidth: 1, borderTopColor: '#f3f4f6', gap: 10 }}>
+                      <View style={{ flex: 1, backgroundColor: '#ecfdf5', padding: 6, borderRadius: 6, alignItems: 'center' }}>
+                        <Text style={{ fontSize: 10, color: '#059669', fontWeight: '600', textTransform: 'uppercase' }}>Attendance</Text>
+                        <Text style={{ fontSize: 14, color: '#047857', fontWeight: 'bold', marginTop: 2 }}>{winner.metrics.attendance || 0} pts</Text>
+                      </View>
+                      <View style={{ flex: 1, backgroundColor: '#eff6ff', padding: 6, borderRadius: 6, alignItems: 'center' }}>
+                        <Text style={{ fontSize: 10, color: '#2563eb', fontWeight: '600', textTransform: 'uppercase' }}>Grades</Text>
+                        <Text style={{ fontSize: 14, color: '#1d4ed8', fontWeight: 'bold', marginTop: 2 }}>{Math.round(winner.metrics.grades || 0)} pts</Text>
+                      </View>
+                    </View>
+                  ) : null}
                 </View>
-                <View style={{ flex: 1, backgroundColor: '#eff6ff', padding: 8, borderRadius: 8, alignItems: 'center' }}>
-                  <Text style={{ fontSize: 11, color: '#2563eb', fontWeight: '600', textTransform: 'uppercase' }}>Grades</Text>
-                  <Text style={{ fontSize: 16, color: '#1d4ed8', fontWeight: 'bold', marginTop: 2 }}>{Math.round(studentOfWeek.metrics.grades || 0)} pts</Text>
-                </View>
-              </View>
-            )}
+              ))}
+            </ScrollView>
           </View>
         )}
 
@@ -340,15 +518,16 @@ const DashboardScreen = ({ navigation }) => {
 
         {/* Main Grid */}
         <View style={styles.gridContainer}>
-          <GridItem icon="user" label="Profile" color={colors.pink} onPress={() => navigation.navigate('Profile')} />
-          <GridItem icon="check-square" label="Attendance" color={colors.primary} onPress={() => navigation.navigate('Attend')} />
-          <GridItem icon="edit-3" label="Grades" color={colors.warning} onPress={() => navigation.navigate('Work', { screen: 'ExamsList' })} />
-          <GridItem icon="calendar" label="Timetable" color={colors.purple} onPress={() => navigation.navigate('Timetable')} />
-          <GridItem icon="clock" label="Date Sheet" color={colors.info || '#17a2b8'} onPress={() => navigation.navigate('DateSheetScreen')} />
-          <GridItem icon="users" label="Students" color={colors.success} onPress={() => navigation.navigate('StudentsList')} />
-          <GridItem icon="award" label="Results" color={colors.danger} onPress={() => navigation.navigate('Work', { screen: 'ResultsHome' })} />
           <GridItem icon="calendar" label="Academic Planner" color={colors.primaryLight} onPress={() => navigation.navigate('AnnualPlanner')} />
-          <View style={{ width: '31%' }} />
+          <GridItem icon="check-square" label="Attendance" color={colors.primary} onPress={() => navigation.navigate('Attend')} />
+          <GridItem icon="info" label="Circulars" color={colors.secondary} onPress={() => navigation.navigate('Circulars')} />
+          <GridItem icon="clock" label="Date Sheet" color={colors.info || '#17a2b8'} onPress={() => navigation.navigate('DateSheetScreen')} />
+          <GridItem icon="image" label="Gallery" color={colors.pink || '#EC4899'} onPress={() => navigation.navigate('Gallery')} />
+          <GridItem icon="edit-3" label="Grades" color={colors.warning} onPress={() => navigation.navigate('Work', { screen: 'ExamsList' })} />
+          <GridItem icon="user" label="Profile" color={colors.pink} onPress={() => navigation.navigate('Profile')} />
+          <GridItem icon="award" label="Results" color={colors.danger} onPress={() => navigation.navigate('Work', { screen: 'ResultsHome' })} />
+          <GridItem icon="users" label="Students" color={colors.success} onPress={() => navigation.navigate('StudentsList')} />
+          <GridItem icon="calendar" label="Timetable" color={colors.purple} onPress={() => navigation.navigate('Timetable')} />
         </View>
 
         {activeClassId && topPerformers.length > 0 && (

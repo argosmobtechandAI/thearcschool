@@ -7,10 +7,13 @@ import roomRouter from "./shared/rooms/routes.js";
 import communicationRouter from "./shared/communication/routes.js";
 import attendanceRouter from "./shared/attendance/routes.js";
 import thoughtRouter from "./shared/thoughts/routes.js";
+import spotlightRouter from "./shared/spotlight/routes.js";
 import courseRouter from "./course/routes.js";
 import liveChatRouter from "./shared/live_chat/routes.js";
 import sharedStudentOfWeekRouter from "./shared/student_of_week/routes.js";
 import adminStudentOfWeekRouter from "./admin_panel/student_of_week/routes.js";
+import circularsRouter from "./shared/circulars/routes.js";
+import galleryRouter from "./shared/gallery/routes.js";
 
 // Admin Web Panel Domains
 import adminPanelRouter from "./admin_panel/routes.js";
@@ -43,8 +46,11 @@ router.use("/communication", communicationRouter);
 router.use("/attendance", attendanceRouter);
 router.use("/upload", uploadRouter);
 router.use("/rooms", roomRouter);
+router.use("/circulars", circularsRouter);
+router.use("/gallery", galleryRouter);
 router.use("/live_chat", liveChatRouter);
 router.use("/thoughts", thoughtRouter);
+router.use("/spotlight", spotlightRouter);
 router.use("/shared/student-of-week", sharedStudentOfWeekRouter);
 router.use("/admin/student-of-week", adminStudentOfWeekRouter);
 

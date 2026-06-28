@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useSelector, useDispatch } from "react-redux";
-import { Users, GraduationCap, Calendar, CreditCard, BookOpen, Clock, UserCheck, Building } from "lucide-react";
+import { Users, GraduationCap, Calendar, CreditCard, BookOpen, Clock, UserCheck, Building, Sparkles } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Cell, RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis } from "recharts";
 import api from "../services/api";
 import { setDashboardLoading, setDashboardStats, setDashboardTopper, setFeeStatusFilter } from "../features/dashboardSlice";
@@ -31,6 +31,7 @@ const Dashboard = () => {
   
   const [admissionData, setAdmissionData] = useState([]);
   const [studentOfWeekList, setStudentOfWeekList] = useState([]);
+  const [spotlightOfToday, setSpotlightOfToday] = useState(null);
   
   const { user } = useSelector((state) => state.auth);
   // Pulling state directly from the simple Redux slice
@@ -111,6 +112,15 @@ const Dashboard = () => {
         } catch (e) {
           console.error("No student of week found");
         }
+
+        try {
+          const { data: spotlightRes } = await api.get("/spotlight/today");
+          if (spotlightRes?.success && spotlightRes.data) {
+            setSpotlightOfToday(spotlightRes.data);
+          }
+        } catch (e) {
+          console.error("No spotlight found today");
+        }
       } catch (error) {
         console.error("Failed to load dashboard data", error);
       } finally {
@@ -160,6 +170,23 @@ const Dashboard = () => {
           defaultRange="mtd"
         />
       </div>
+      
+      {/* Spotlight of the Day Banner */}
+      {spotlightOfToday && (
+        <div className="glass-panel" style={{ padding: "1.5rem", marginBottom: "2rem", display: "flex", gap: "1.5rem", alignItems: "center", border: "1px solid var(--primary-color)", background: "rgba(99, 102, 241, 0.05)" }}>
+          <div style={{ width: "48px", height: "48px", borderRadius: "12px", background: "rgba(99, 102, 241, 0.15)", color: "var(--primary-color)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+            <Sparkles size={24} />
+          </div>
+          <div style={{ flex: 1 }}>
+            <span style={{ fontSize: "0.75rem", fontWeight: "700", textTransform: "uppercase", color: "var(--primary-color)", letterSpacing: "1px" }}>Spotlight of the Day</span>
+            <h2 style={{ fontSize: "1.25rem", fontWeight: "800", color: "var(--text-primary)", marginTop: "0.25rem", marginBottom: "0.5rem" }}>{spotlightOfToday.title}</h2>
+            <p style={{ color: "var(--text-secondary)", fontSize: "0.95rem", lineHeight: "1.5", margin: 0 }}>{spotlightOfToday.description}</p>
+          </div>
+          {spotlightOfToday.image_url && (
+            <img src={spotlightOfToday.image_url} alt="Spotlight" style={{ width: "120px", height: "80px", borderRadius: "8px", objectFit: "cover", border: "1px solid var(--glass-border)", flexShrink: 0 }} />
+          )}
+        </div>
+      )}
 
       {(user?.type === "admin" || user?.type === "principal") && (
         <>

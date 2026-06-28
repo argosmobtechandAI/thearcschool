@@ -1,6 +1,6 @@
 import { Outlet, useNavigate, NavLink, useLocation } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
-import { LogOut, LayoutDashboard, UserPlus, ExternalLink } from "lucide-react";
+import { LogOut, LayoutDashboard, UserPlus, ExternalLink, Image as ImageIcon } from "lucide-react";
 import { logout } from "../features/authSlice";
 
 const AdmissionLayout = () => {
@@ -98,6 +98,11 @@ const AdmissionLayout = () => {
           <NavLink to="/admissions?status=Rejected" style={() => getLinkStyle("/admissions", "Rejected")}>
             <div style={{ width: "6px", height: "6px", borderRadius: "50%", background: "#ef4444", marginLeft: "4px" }}></div>
             Rejected
+          </NavLink>
+
+          <NavGroup title="Media" />
+          <NavLink to="/gallery" style={() => getLinkStyle("/gallery")}>
+            <ImageIcon size={16} /> Gallery
           </NavLink>
 
           {(user?.type === "admin" || user?.type === "principal") && (

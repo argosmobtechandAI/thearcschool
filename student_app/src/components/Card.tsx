@@ -30,7 +30,6 @@ const styles = StyleSheet.create({
     borderRadius: theme.layout.borderRadius.lg,
     padding: theme.spacing.md,
     marginBottom: theme.spacing.md,
-    width: '100%',
   },
 });
 

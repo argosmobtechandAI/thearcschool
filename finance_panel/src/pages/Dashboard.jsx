@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { fetchFinanceStats } from "../features/dataSlice";
-import { IndianRupee, Users, TrendingUp, TrendingDown, ArrowRight } from "lucide-react";
+import { IndianRupee, Users, TrendingUp, TrendingDown, ArrowRight, Sparkles } from "lucide-react";
 import { Link } from "react-router-dom";
 import api from "../services/api";
 
@@ -14,6 +14,7 @@ const Dashboard = () => {
   const { user } = useSelector((state) => state.auth);
   const [dashboardData, setDashboardData] = useState(null);
   const [loadingDashboard, setLoadingDashboard] = useState(false);
+  const [spotlightOfToday, setSpotlightOfToday] = useState(null);
 
   useEffect(() => {
     dispatch(fetchFinanceStats({ startDate, endDate }));
@@ -32,9 +33,21 @@ const Dashboard = () => {
       }
     };
     
+    const fetchSpotlight = async () => {
+      try {
+        const res = await api.get("/spotlight/today");
+        if (res.data?.success && res.data.data) {
+          setSpotlightOfToday(res.data.data);
+        }
+      } catch (err) {
+        console.error("No spotlight found today", err);
+      }
+    };
+
     if (user?.can_view_revenue || user?.type === 'admin') {
       fetchDashboard();
     }
+    fetchSpotlight();
   }, [dispatch, startDate, endDate, user]);
 
   const dateParams = `${startDate ? `&startDate=${startDate}` : ""}${endDate ? `&endDate=${endDate}` : ""}`;
@@ -51,6 +64,23 @@ const Dashboard = () => {
           <p style={{ color: "var(--text-secondary)" }}>Overview of school finances and fee collections.</p>
         </div>
       </div>
+
+      {/* Spotlight of the Day Banner */}
+      {spotlightOfToday && (
+        <div className="glass-panel" style={{ padding: "1.5rem", marginBottom: "2rem", display: "flex", gap: "1.5rem", alignItems: "center", border: "1px solid var(--primary-color)", background: "rgba(99, 102, 241, 0.05)" }}>
+          <div style={{ width: "48px", height: "48px", borderRadius: "12px", background: "rgba(99, 102, 241, 0.15)", color: "var(--primary-color)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+            <Sparkles size={24} />
+          </div>
+          <div style={{ flex: 1 }}>
+            <span style={{ fontSize: "0.75rem", fontWeight: "700", textTransform: "uppercase", color: "var(--primary-color)", letterSpacing: "1px" }}>Spotlight of the Day</span>
+            <h2 style={{ fontSize: "1.25rem", fontWeight: "800", color: "var(--text-primary)", marginTop: "0.25rem", marginBottom: "0.5rem" }}>{spotlightOfToday.title}</h2>
+            <p style={{ color: "var(--text-secondary)", fontSize: "0.95rem", lineHeight: "1.5", margin: 0 }}>{spotlightOfToday.description}</p>
+          </div>
+          {spotlightOfToday.image_url && (
+            <img src={spotlightOfToday.image_url} alt="Spotlight" style={{ width: "120px", height: "80px", borderRadius: "8px", objectFit: "cover", border: "1px solid var(--glass-border)", flexShrink: 0 }} />
+          )}
+        </div>
+      )}
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: "1.5rem", marginBottom: "2rem" }}>
         <Link to={`/metrics?view=collected${dateParams}`} style={{ textDecoration: "none" }} className="hover-scale">

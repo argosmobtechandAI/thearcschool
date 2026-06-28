@@ -56,6 +56,8 @@ export const handleNotificationEvent = async ({ type, detail }) => {
           actualScreen = 'Home';
         } else if (routeScreen === 'ChatRoomScreen') {
           actualScreen = 'LiveChatScreen';
+        } else if (routeScreen === 'Circulars' || routeScreen === 'CircularsScreen') {
+          actualScreen = 'Circulars';
         }
 
         navigate(actualScreen, routeParams);

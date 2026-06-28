@@ -22,6 +22,7 @@ import Communication from './pages/Communication';
 import Notification from './pages/Notification';
 import SchoolInfo from './pages/SchoolInfo';
 import Consents from './pages/Consents';
+import Circulars from './pages/Circulars';
 import SubjectManagement from './pages/SubjectManagement';
 import SubjectTeachers from './pages/SubjectTeachers';
 import RoomManagement from './pages/RoomManagement';
@@ -32,7 +33,9 @@ import TeacherProfile from './pages/TeacherProfile';
 import ClassProfile from './pages/ClassProfile';
 import StaffRoles from './pages/StaffRoles';
 import ThoughtsManagement from "./pages/ThoughtsManagement";
+import SpotlightManagement from "./pages/SpotlightManagement";
 import StudentOfWeekManagement from "./pages/StudentOfWeekManagement";
+import GalleryManagement from "./pages/GalleryManagement";
 import ProfitLoss from './pages/ProfitLoss';
 
 const ProtectedRoute = ({ children, allowedRoles }) => {
@@ -85,9 +88,12 @@ function App() {
           <Route path="notification" element={<ProtectedRoute allowedRoles={["admin", "principal"]}><Notification /></ProtectedRoute>} />
           <Route path="school-info" element={<ProtectedRoute allowedRoles={["admin", "principal"]}><SchoolInfo /></ProtectedRoute>} />
           <Route path="consents" element={<ProtectedRoute allowedRoles={["admin", "principal"]}><Consents /></ProtectedRoute>} />
+          <Route path="circulars" element={<ProtectedRoute allowedRoles={["admin", "principal"]}><Circulars /></ProtectedRoute>} />
           <Route path="staff-roles" element={<ProtectedRoute allowedRoles={["admin", "principal"]}><StaffRoles /></ProtectedRoute>} />
           <Route path="thoughts" element={<ProtectedRoute allowedRoles={["admin", "principal"]}><ThoughtsManagement /></ProtectedRoute>} />
+          <Route path="spotlight" element={<ProtectedRoute allowedRoles={["admin", "principal"]}><SpotlightManagement /></ProtectedRoute>} />
           <Route path="student-of-week" element={<ProtectedRoute allowedRoles={["admin", "principal"]}><StudentOfWeekManagement /></ProtectedRoute>} />
+          <Route path="gallery" element={<ProtectedRoute allowedRoles={["admin", "principal"]}><GalleryManagement /></ProtectedRoute>} />
           
           {/* Shared Admin / Teachers / etc (if applicable, but mainly admin for these) */}
           <Route path="attendance" element={<ProtectedRoute allowedRoles={["admin", "principal"]}><Attendance /></ProtectedRoute>} />

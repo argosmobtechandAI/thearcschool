@@ -15,7 +15,7 @@ export const apiSlice = createApi({
       return headers;
     },
   }),
-  tagTypes: ['Exams', 'Courses', 'Attendance', 'Timetable', 'Events', 'Students', 'Classes', 'Complaints', 'Grades', 'Notifications', 'Performance', 'Chats'],
+  tagTypes: ['Exams', 'Courses', 'Attendance', 'Timetable', 'Events', 'Students', 'Classes', 'Complaints', 'Grades', 'Notifications', 'Performance', 'Chats', 'Circulars', 'Gallery'],
   endpoints: (builder) => ({
     getTeacherClasses: builder.query({
       query: () => '/teacher_app/classes',
@@ -130,8 +130,19 @@ export const apiSlice = createApi({
     getThoughtOfDay: builder.query({
       query: () => '/thoughts/today',
     }),
+    getSpotlightOfToday: builder.query({
+      query: () => '/spotlight/today',
+    }),
+    getGalleryItems: builder.query({
+      query: () => '/gallery',
+      providesTags: ['Gallery'],
+    }),
     getStudentOfWeek: builder.query({
       query: (classId) => `/shared/student-of-week/current${classId ? `?classId=${classId}` : ''}`,
+    }),
+    getCirculars: builder.query({
+      query: () => '/circulars',
+      providesTags: ['Circulars'],
     }),
   }),
 });
@@ -161,5 +172,8 @@ export const {
   useGetStudentsQuery,
   useGetPrincipalQuery,
   useGetThoughtOfDayQuery,
+  useGetSpotlightOfTodayQuery,
   useGetStudentOfWeekQuery,
+  useGetCircularsQuery,
+  useGetGalleryItemsQuery,
 } = apiSlice;

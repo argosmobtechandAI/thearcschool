@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useRef, useCallback } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, TouchableWithoutFeedback,
-  ScrollView, Animated, Dimensions, Modal, StatusBar,
+  ScrollView, Animated, Dimensions, Modal, StatusBar, Image,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSelector, useDispatch } from 'react-redux';
@@ -42,7 +42,7 @@ const DrawerItem = ({ icon, label, onPress, color = colors.textMuted, badgeCount
 
 // ─── Drawer Content (rendered inside Modal) ──────────────────────────────────
 
-import { useGetNotificationsQuery } from '../store/apiSlice';
+import { useGetNotificationsQuery, useGetDashboardQuery } from '../store/apiSlice';
 
 const DrawerContent = ({ close }) => {
   const { user } = useSelector(state => state.auth);
@@ -52,9 +52,11 @@ const DrawerContent = ({ close }) => {
   const { data: notificationsData } = useGetNotificationsQuery();
   const unreadCount = notificationsData?.data?.filter(n => !n.is_read)?.length || 0;
 
-  const initials = user?.name
-    ? user.name.split(' ').map(p => p[0]).slice(0, 2).join('').toUpperCase()
-    : 'S';
+  const { data: dashboardData } = useGetDashboardQuery();
+  const profile = dashboardData?.data?.profile;
+
+  const initials = (profile?.name || user?.name || 'S')
+    .split(' ').map(p => p[0]).slice(0, 2).join('').toUpperCase();
 
   const go = (screen) => {
     close();
@@ -86,24 +88,30 @@ const DrawerContent = ({ close }) => {
           <Icon name="arrow-left" size={22} color="#fff" />
         </TouchableOpacity>
         <View style={styles.avatar}>
-          <Text style={styles.avatarText}>{initials}</Text>
+          {(profile?.avatar_url || user?.avatar_url) ? (
+            <Image source={{ uri: profile?.avatar_url || user?.avatar_url }} style={styles.avatarImage} />
+          ) : (
+            <Text style={styles.avatarText}>{initials}</Text>
+          )}
         </View>
-        <Text style={styles.userName}>{user?.name || 'Student'}</Text>
-        <Text style={styles.userRole}>Roll No: {user?.admission_number || 'N/A'}</Text>
+        <Text style={styles.userName}>{profile?.name || user?.name || 'Student'}</Text>
+        <Text style={styles.userRole}>Roll No: {profile?.admission_number || user?.admission_number || 'N/A'}</Text>
       </View>
 
       {/* Nav Items */}
       <View style={styles.navSection}>
         <DrawerItem icon="home"           label="Home"          color="#3B82F6" onPress={() => go('Home')} />
-        <DrawerItem icon="check-circle"   label="Attendance"    color="#10B981" onPress={() => go('Attendance')} />
-        <DrawerItem icon="calendar"       label="Timetable"     color="#8B5CF6" onPress={() => go('Class')} />
-        <DrawerItem icon="credit-card"    label="Fee Details"   color="#EF4444" onPress={() => go('Fees')} />
         <DrawerItem icon="file-text"      label="Academic Calendar"    color="#06B6D4" onPress={() => go('AcademicCalendar')} />
-        <DrawerItem icon="edit-3"         label="Date Sheet"    color="#F97316" onPress={() => go('DateSheet')} />
-        <DrawerItem icon="award"          label="My Grades"     color="#EAB308" onPress={() => go('Result')} />
         <DrawerItem icon="bell"           label="Announcements" color="#F43F5E" badgeCount={unreadCount} onPress={() => go('Notifications')} />
+        <DrawerItem icon="check-circle"   label="Attendance"    color="#10B981" onPress={() => go('Attendance')} />
+        <DrawerItem icon="info"           label="Circulars"     color="#0EA5E9" onPress={() => go('Circulars')} />
         <DrawerItem icon="message-square" label="Communication" color="#14B8A6" onPress={() => go('Communication')} />
+        <DrawerItem icon="edit-3"         label="Date Sheet"    color="#F97316" onPress={() => go('DateSheet')} />
+        <DrawerItem icon="credit-card"    label="Fee Details"   color="#EF4444" onPress={() => go('Fees')} />
+        <DrawerItem icon="image"          label="Gallery"       color="#EC4899" onPress={() => go('Gallery')} />
+        <DrawerItem icon="award"          label="My Grades"     color="#EAB308" onPress={() => go('Result')} />
         <DrawerItem icon="user"           label="My Profile"    color="#64748B" onPress={() => go('Profile')} />
+        <DrawerItem icon="calendar"       label="Timetable"     color="#8B5CF6" onPress={() => go('Class')} />
       </View>
 
       {/* Footer */}
@@ -245,8 +253,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center', alignItems: 'center',
     marginBottom: 12,
     borderWidth: 2, borderColor: '#fff',
+    overflow: 'hidden',
   },
   avatarText: { color: '#fff', fontSize: 28, fontWeight: '700' },
+  avatarImage: { width: '100%', height: '100%', borderRadius: 38, resizeMode: 'cover' },
   userName: { color: '#fff', fontSize: 18, fontWeight: '700', marginBottom: 4 },
   userRole: { color: 'rgba(255,255,255,0.8)', fontSize: 14 },
 

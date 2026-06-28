@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl, Image } from 'react-native';
 import { useDispatch, useSelector } from 'react-redux';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useGetDashboardQuery } from '../../store/apiSlice';
@@ -67,7 +67,11 @@ const ProfileScreen = ({ navigation }) => {
         {/* Profile Hero */}
         <View style={styles.heroCard}>
           <View style={styles.avatarCircle}>
-            <Text style={styles.avatarText}>{initials}</Text>
+            {profile?.avatar_url ? (
+              <Image source={{ uri: profile.avatar_url }} style={styles.avatarImage} />
+            ) : (
+              <Text style={styles.avatarText}>{initials}</Text>
+            )}
           </View>
           <Text style={styles.nameText}>{profile.name || user?.name || 'Student'}</Text>
           <Text style={styles.classText}>
@@ -176,7 +180,9 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.2)',
     borderWidth: 3, borderColor: 'rgba(255,255,255,0.5)',
     justifyContent: 'center', alignItems: 'center', marginBottom: 14,
+    overflow: 'hidden',
   },
+  avatarImage: { width: '100%', height: '100%', borderRadius: 37, resizeMode: 'cover' },
   avatarText: { fontSize: 28, fontFamily: theme.typography.fontFamily.heading, color: '#fff' },
   nameText: { fontSize: 22, fontFamily: theme.typography.fontFamily.heading, color: '#fff' },
   classText: { fontSize: theme.typography.fontSize.sm, fontFamily: theme.typography.fontFamily.regular, color: 'rgba(255,255,255,0.8)', marginTop: 4 },

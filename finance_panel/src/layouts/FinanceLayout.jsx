@@ -1,6 +1,6 @@
 import { Outlet, useNavigate, NavLink, useLocation, Link } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
-import { LogOut, LayoutDashboard, FileSpreadsheet, BarChart, Settings, ExternalLink, IndianRupee, TrendingDown, TrendingUp, Users } from "lucide-react";
+import { LogOut, LayoutDashboard, FileSpreadsheet, BarChart, Settings, ExternalLink, IndianRupee, TrendingDown, TrendingUp, Users, Image as ImageIcon } from "lucide-react";
 import { logout } from "../features/authSlice";
 import { setGlobalDateRange } from "../features/dataSlice";
 import DateRangePicker from "../components/DateRangePicker";
@@ -101,6 +101,9 @@ const FinanceLayout = () => {
           <NavLink to="/income-categories" style={navLinkStyle}><Settings size={16} /> Income Categories</NavLink>
           <NavLink to="/expense-categories" style={navLinkStyle}><Settings size={16} /> Expense Categories</NavLink>
           <NavLink to="/fee-structures" style={navLinkStyle}><Settings size={16} /> Fee Configuration</NavLink>
+
+          <NavGroup title="Media" />
+          <NavLink to="/gallery" style={navLinkStyle}><ImageIcon size={16} /> Gallery</NavLink>
 
           {(user?.type === "admin" || user?.type === "principal") && (
             <>

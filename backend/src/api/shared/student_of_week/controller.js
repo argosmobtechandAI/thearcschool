@@ -25,8 +25,8 @@ export const getCurrentStudentOfWeek = async (req, res) => {
 
     const { start: currentStart, end: currentEnd } = getWeekRange(new Date());
     
-    // Check if record exists for current week for this class
-    const { data: existingRecord, error: checkError } = await supabaseAdmin
+    // Check if records exist for current week for this class
+    const { data: existingRecords, error: checkError } = await supabaseAdmin
       .from("student_of_the_week")
       .select(`
         id,
@@ -34,25 +34,23 @@ export const getCurrentStudentOfWeek = async (req, res) => {
         metrics,
         week_start_date,
         week_end_date,
-        student:student_id (id, name)
+        student:student_id (id, name, avatar_url)
       `)
       .eq("class_id", classId)
       .gte("week_end_date", currentStart.toISOString())
       .lte("week_start_date", currentEnd.toISOString())
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
+      .order("created_at", { ascending: false });
 
     if (checkError) {
       if (checkError.code === 'PGRST205') {
-        return res.status(200).json({ success: true, table_missing: true, data: null });
+        return res.status(200).json({ success: true, table_missing: true, data: [] });
       }
       console.error("Error fetching student of the week:", checkError);
       return res.status(500).json({ success: false, message: "Failed to fetch student of the week" });
     }
 
-    if (existingRecord) {
-      return res.status(200).json({ success: true, data: existingRecord });
+    if (existingRecords && existingRecords.length > 0) {
+      return res.status(200).json({ success: true, data: existingRecords });
     }
 
     // --- AUTOMATED SELECTION LOGIC (PER CLASS) ---
@@ -123,54 +121,67 @@ export const getCurrentStudentOfWeek = async (req, res) => {
       });
     }
 
-    // Tally up total scores and pick the highest
-    let eligibleStudents = [...studentIds];
-    eligibleStudents.sort(() => Math.random() - 0.5); // Randomize for ties
-
-    eligibleStudents.forEach(sid => {
+    // Tally up total scores and pick top 3
+    const studentScores = studentIds.map(sid => {
       const total = studentMetrics[sid].attendance + studentMetrics[sid].grades;
       studentMetrics[sid].total = total;
-
-      if (total > highestScore) {
-        highestScore = total;
-        topStudentId = sid;
-      }
+      return {
+        student_id: sid,
+        total: total,
+        metrics: studentMetrics[sid]
+      };
     });
 
-    if (!topStudentId) {
-      topStudentId = studentIds[Math.floor(Math.random() * studentIds.length)];
-    }
+    // Sort students by total score descending, randomizing for ties
+    studentScores.sort((a, b) => {
+      if (b.total !== a.total) {
+        return b.total - a.total;
+      }
+      return Math.random() - 0.5;
+    });
 
-    const reason = `Outstanding overall performance and attendance for the week of ${prevStart.toLocaleDateString()}.`;
-    const finalMetrics = studentMetrics[topStudentId] || { attendance: 0, grades: 0, total: 0 };
+    // Select top 3 students (or all if class has fewer than 3)
+    const topWinners = studentScores.slice(0, 3);
 
-    // Insert new record
-    const { data: newRecord, error: insertError } = await supabaseAdmin
+    // Insert new records for the winners
+    const insertPromises = topWinners.map(async (winner) => {
+      const reason = `Outstanding overall performance and attendance for the week of ${prevStart.toLocaleDateString()}.`;
+      return supabaseAdmin
+        .from("student_of_the_week")
+        .insert({
+          student_id: winner.student_id,
+          class_id: classId,
+          week_start_date: currentStart.toISOString().split('T')[0],
+          week_end_date: currentEnd.toISOString().split('T')[0],
+          reason: reason,
+          metrics: winner.metrics
+        });
+    });
+
+    await Promise.all(insertPromises);
+
+    // Fetch the newly created records with full student details
+    const { data: newRecords, error: fetchNewError } = await supabaseAdmin
       .from("student_of_the_week")
-      .insert({
-        student_id: topStudentId,
-        class_id: classId,
-        week_start_date: currentStart.toISOString().split('T')[0],
-        week_end_date: currentEnd.toISOString().split('T')[0],
-        reason: reason,
-        metrics: finalMetrics
-      })
       .select(`
         id,
         reason,
         metrics,
         week_start_date,
         week_end_date,
-        student:student_id (id, name)
+        student:student_id (id, name, avatar_url)
       `)
-      .single();
+      .eq("class_id", classId)
+      .gte("week_end_date", currentStart.toISOString())
+      .lte("week_start_date", currentEnd.toISOString())
+      .order("created_at", { ascending: false });
 
-    if (insertError) {
-      console.error("Error creating student of the week:", insertError);
-      return res.status(500).json({ success: false, message: "Failed to create student of the week" });
+    if (fetchNewError) {
+      console.error("Error fetching newly created SOTW records:", fetchNewError);
+      return res.status(500).json({ success: false, message: "Failed to load winners" });
     }
 
-    return res.status(200).json({ success: true, data: newRecord });
+    return res.status(200).json({ success: true, data: newRecords });
 
   } catch (error) {
     console.error("Error in getCurrentStudentOfWeek:", error);

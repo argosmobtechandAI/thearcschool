@@ -67,8 +67,12 @@ const StudentProfile = () => {
       {student && (
         <>
           <div className="glass-panel" style={{ padding: "1.5rem", marginBottom: "2rem", display: "flex", gap: "2rem", alignItems: "center", flexWrap: "wrap", borderLeft: "4px solid #3b82f6" }}>
-            <div style={{ width: "100px", height: "100px", borderRadius: "16px", background: "linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)", display: "flex", alignItems: "center", justifyContent: "center", color: "white", fontSize: "3rem", fontWeight: "bold", boxShadow: "0 10px 25px -5px rgba(59, 130, 246, 0.5)" }}>
-              {student.name?.charAt(0)?.toUpperCase()}
+            <div style={{ width: "100px", height: "100px", borderRadius: "16px", background: student.avatar_url ? "none" : "linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)", display: "flex", alignItems: "center", justifyContent: "center", color: "white", fontSize: "3rem", fontWeight: "bold", boxShadow: "0 10px 25px -5px rgba(59, 130, 246, 0.5)", overflow: "hidden", border: student.avatar_url ? "2px solid var(--glass-border)" : "none" }}>
+              {student.avatar_url ? (
+                <img src={student.avatar_url} alt="Profile" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+              ) : (
+                student.name?.charAt(0)?.toUpperCase()
+              )}
             </div>
             
             <div style={{ flex: 1, minWidth: "250px" }}>
