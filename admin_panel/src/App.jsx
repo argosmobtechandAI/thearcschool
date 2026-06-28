@@ -37,6 +37,7 @@ import SpotlightManagement from "./pages/SpotlightManagement";
 import StudentOfWeekManagement from "./pages/StudentOfWeekManagement";
 import GalleryManagement from "./pages/GalleryManagement";
 import ProfitLoss from './pages/ProfitLoss';
+import CourseWorkManagement from './pages/CourseWorkManagement';
 
 const ProtectedRoute = ({ children, allowedRoles }) => {
   const { isAuthenticated, user } = useSelector((state) => state.auth);
@@ -94,6 +95,7 @@ function App() {
           <Route path="spotlight" element={<ProtectedRoute allowedRoles={["admin", "principal"]}><SpotlightManagement /></ProtectedRoute>} />
           <Route path="student-of-week" element={<ProtectedRoute allowedRoles={["admin", "principal"]}><StudentOfWeekManagement /></ProtectedRoute>} />
           <Route path="gallery" element={<ProtectedRoute allowedRoles={["admin", "principal"]}><GalleryManagement /></ProtectedRoute>} />
+          <Route path="coursework" element={<ProtectedRoute allowedRoles={["admin", "principal"]}><CourseWorkManagement /></ProtectedRoute>} />
           
           {/* Shared Admin / Teachers / etc (if applicable, but mainly admin for these) */}
           <Route path="attendance" element={<ProtectedRoute allowedRoles={["admin", "principal"]}><Attendance /></ProtectedRoute>} />

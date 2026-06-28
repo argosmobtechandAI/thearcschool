@@ -41,6 +41,21 @@ export const apiSlice = createApi({
       query: (classId) => `/teacher_app/course${classId ? `?classId=${classId}` : ''}`,
       providesTags: ['Courses'],
     }),
+    createCourse: builder.mutation({
+      query: (data) => ({
+        url: '/teacher_app/course',
+        method: 'POST',
+        body: { data },
+      }),
+      invalidatesTags: ['Courses'],
+    }),
+    deleteCourse: builder.mutation({
+      query: (id) => ({
+        url: `/teacher_app/course/${id}`,
+        method: 'DELETE',
+      }),
+      invalidatesTags: ['Courses'],
+    }),
     getEvents: builder.query({
       query: (classId) => `/teacher_app/events${classId ? `?classId=${classId}` : ''}`,
       providesTags: ['Events'],
@@ -154,6 +169,8 @@ export const {
   useGetClassStudentsQuery,
   useGetExamsQuery,
   useGetCoursesQuery,
+  useCreateCourseMutation,
+  useDeleteCourseMutation,
   useGetEventsQuery,
   useGetAttendanceQuery,
   useChangePasswordMutation,

@@ -1,15 +1,18 @@
 import React, { useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  RefreshControl, ActivityIndicator,
+  RefreshControl, ActivityIndicator, Modal, FlatList, Alert
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/Feather';
+import RNFS from 'react-native-fs';
+import FileViewer from 'react-native-file-viewer';
 import { colors, shadows } from '../../theme/colors';
-import { useGetCourseWorkQuery, useGetAcademicsQuery } from '../../store/apiSlice';
-import { useDrawer } from '../../navigation/DrawerContext';
+import { useGetCourseWorkQuery } from '../../store/apiSlice';
+import CustomHeader from '../../components/CustomHeader';
+import { theme } from '../../theme/theme';
 
-const TABS = ['Materials', 'Assignments', 'Exams'];
+const TABS = ['Study Material', 'Assignments', 'Homework'];
+const TAB_TYPES = ['study_material', 'assignment', 'homework'];
 
 const subjectColors = [
   colors.primary, colors.purple, colors.success, '#E67E22', colors.danger, '#16A085',
@@ -25,77 +28,157 @@ const SubjectCard = ({ name, count, label, color, onPress }) => (
   </TouchableOpacity>
 );
 
-const CourseWorkScreen = ({ navigation }) => {
-  const { openDrawer } = useDrawer();
+const CourseWorkScreen = () => {
   const [activeTab, setActiveTab] = useState(0);
-  
-  const { data: courseData, isLoading: isCourseLoading, isFetching: courseFetching, refetch: refetchCourse } = useGetCourseWorkQuery();
-  const { data: academicsData, isLoading: isAcadLoading, isFetching: acadFetching, refetch: refetchAcad } = useGetAcademicsQuery();
+  const [selectedSubject, setSelectedSubject] = useState(null); // String name of subject
+  const [downloadingFile, setDownloadingFile] = useState(null); // Track which file is downloading
+
+  const { data: courseData, isLoading, isFetching, refetch } = useGetCourseWorkQuery();
+  const courseworkItems = courseData?.courses || [];
 
   const onRefresh = async () => {
-        await Promise.all([refetchCourse(), refetchAcad()]);
-      };
+    await refetch();
+  };
 
-  const isLoading = isCourseLoading || isAcadLoading;
-  const isFetching = courseFetching || acadFetching;
-  // Group course items by subject
-  const materials = courseData?.courses || [];
-  const assignments = courseData?.courses || []; // backend returns course materials; adapt as needed
-  const grades = academicsData?.grades || [];
-  const upcomingExams = academicsData?.upcomingExams || [];
+  // Filter items by type first
+  const currentType = TAB_TYPES[activeTab];
+  const itemsFilteredByType = courseworkItems.filter(item => item.type === currentType);
 
-  const getSubjectGroups = (items, nameKey = 'subject') => {
+  // Group coursework items of the current type by subject name
+  const subjectGroups = (() => {
     const map = {};
-    items.forEach((item, i) => {
-      const subj = item[nameKey] || item.title || item.name || 'General';
+    itemsFilteredByType.forEach(item => {
+      const subj = item.subject || 'General';
       if (!map[subj]) map[subj] = [];
       map[subj].push(item);
     });
     return Object.entries(map).map(([name, list], i) => ({
       name,
       count: list.length,
+      items: list,
       color: subjectColors[i % subjectColors.length],
     }));
+  })();
+
+  const activeGroup = selectedSubject ? subjectGroups.find(g => g.name === selectedSubject) : null;
+
+  const handleDownload = async (fileUrl) => {
+    if (!fileUrl) return;
+    const fileName = fileUrl.split('/').pop();
+    const localPath = `${RNFS.DocumentDirectoryPath}/${fileName}`;
+
+    try {
+      setDownloadingFile(fileUrl);
+      const downloadResult = await RNFS.downloadFile({
+        fromUrl: fileUrl,
+        toFile: localPath,
+      }).promise;
+
+      if (downloadResult.statusCode === 200) {
+        await FileViewer.open(localPath);
+      } else {
+        Alert.alert('Download Failed', `Server returned status: ${downloadResult.statusCode}`);
+      }
+    } catch (err) {
+      Alert.alert('Error', 'Could not open attachment. Make sure you have a compatible PDF/Word reader installed.');
+    } finally {
+      setDownloadingFile(null);
+    }
   };
 
-  const getExamSubjectGroups = () => {
-    const map = {};
-    upcomingExams.forEach((ex, i) => {
-      const subj = ex.subject?.name || ex.name || 'Exam';
-      if (!map[subj]) map[subj] = [];
-      map[subj].push(ex);
-    });
-    return Object.entries(map).map(([name, list], i) => ({
-      name,
-      count: list.length,
-      color: subjectColors[i % subjectColors.length],
-    }));
+  const renderDetailItem = ({ item }) => {
+    const isMaterial = item.type === 'study_material';
+    return (
+      <View style={styles.detailCard}>
+        <Text style={styles.detailTitle}>{item.title}</Text>
+        
+        {/* Structured layout exactly matching client requirements */}
+        <View style={styles.clientFormatContainer}>
+          {item.date && (
+            <Text style={styles.formatRow}>
+              🗓 <Text style={styles.boldText}>Date: </Text>{item.date} {item.day ? `(${item.day})` : ''}
+            </Text>
+          )}
+
+          <Text style={styles.formatRow}>
+            📚 <Text style={styles.boldText}>Subject: </Text>{item.subject}
+          </Text>
+
+          {item.chapter && (
+            <Text style={styles.formatRow}>
+              ▫️ <Text style={styles.boldText}>Chapter Name: </Text>{item.chapter}
+            </Text>
+          )}
+
+          {item.unit && (
+            <Text style={styles.formatRow}>
+              ▫️ <Text style={styles.boldText}>Unit: </Text>{item.unit} {item.lesson_no ? `| Lesson No.: ${item.lesson_no}` : ''}
+            </Text>
+          )}
+
+          {item.topics_taught && (
+            <Text style={styles.formatRow}>
+              ▫️ <Text style={styles.boldText}>Topics Taught: </Text>{item.topics_taught}
+            </Text>
+          )}
+
+          {item.page_number && (
+            <Text style={styles.formatRow}>
+              ▫️ <Text style={styles.boldText}>Page Number: </Text>{item.page_number}
+            </Text>
+          )}
+
+          {item.others && (
+            <Text style={styles.formatRow}>
+              ▫️ <Text style={styles.boldText}>Others (Notes): </Text>{item.others}
+            </Text>
+          )}
+
+          {!isMaterial && item.homework && (
+            <View style={styles.homeworkBlock}>
+              <Text style={styles.formatRow}>
+                ◻️ <Text style={styles.boldText}>Homework: </Text>{item.homework}
+              </Text>
+            </View>
+          )}
+
+          {!isMaterial && item.duedate && (
+            <Text style={styles.formatRow}>
+              ◻️ <Text style={styles.boldText}>Submission Date: </Text>{item.duedate}
+            </Text>
+          )}
+
+          {item.description && !item.others && (
+            <Text style={styles.formatRow}>
+              📄 <Text style={styles.boldText}>Instructions: </Text>{item.description}
+            </Text>
+          )}
+        </View>
+
+        {/* Attachment download */}
+        {item.file_url && (
+          <TouchableOpacity 
+            style={styles.downloadBtn} 
+            onPress={() => handleDownload(item.file_url)}
+            disabled={downloadingFile === item.file_url}
+          >
+            {downloadingFile === item.file_url ? (
+              <ActivityIndicator size="small" color="#fff" />
+            ) : (
+              <>
+                <Icon name="download" size={14} color="#fff" style={{ marginRight: 6 }} />
+                <Text style={styles.downloadBtnText}>Download Attachment</Text>
+              </>
+            )}
+          </TouchableOpacity>
+        )}
+      </View>
+    );
   };
-
-  const tabData = [
-    getSubjectGroups(materials, 'subject'),
-    getSubjectGroups(assignments, 'subject'),
-    getExamSubjectGroups(),
-  ];
-
-  const currentGroups = tabData[activeTab];
-  const tabLabels = ['material', 'assignment', 'exam'];
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={['top']}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={openDrawer} style={styles.headerBtn}>
-          <Icon name="menu" size={22} color="#fff" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>The Arc School</Text>
-        <TouchableOpacity
-          style={styles.headerBtn}
-          onPress={() => navigation.navigate('Notifications')}
-        >
-          <Icon name="bell" size={22} color="#fff" />
-        </TouchableOpacity>
-      </View>
+    <View style={styles.container}>
+      <CustomHeader title="My Coursework" showBack={true} />
 
       <ScrollView
         style={styles.scroll}
@@ -103,18 +186,18 @@ const CourseWorkScreen = ({ navigation }) => {
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.pageHeader}>
-          <Text style={styles.pageTitle}>My Course Work</Text>
-          <Text style={styles.pageSubtitle}>Access materials, assignments, and exams</Text>
+          <Text style={styles.pageTitle}>My Coursework</Text>
+          <Text style={styles.pageSubtitle}>Access study materials, assignments, and daily homework</Text>
         </View>
 
-        {/* Segmented Control */}
+        {/* Tab Selection */}
         <View style={styles.segmentWrapper}>
           <View style={styles.segment}>
             {TABS.map((tab, i) => (
               <TouchableOpacity
                 key={tab}
                 style={[styles.segmentTab, activeTab === i && styles.segmentTabActive]}
-                onPress={() => setActiveTab(i)}
+                onPress={() => { setActiveTab(i); setSelectedSubject(null); }}
                 activeOpacity={0.8}
               >
                 <Text style={[styles.segmentText, activeTab === i && styles.segmentTextActive]}>
@@ -133,16 +216,16 @@ const CourseWorkScreen = ({ navigation }) => {
           <>
             <Text style={styles.selectSubjectLabel}>SELECT SUBJECT</Text>
 
-            {currentGroups.length > 0 ? (
+            {subjectGroups.length > 0 ? (
               <View style={styles.grid}>
-                {currentGroups.map((group, i) => (
+                {subjectGroups.map((group, i) => (
                   <SubjectCard
                     key={i}
                     name={group.name}
                     count={group.count}
-                    label={`${tabLabels[activeTab]}${group.count !== 1 ? 's' : ''}`}
+                    label={`${currentType === 'study_material' ? 'Material' : currentType}${group.count !== 1 ? 's' : ''}`}
                     color={group.color}
-                    onPress={() => {}}
+                    onPress={() => setSelectedSubject(group.name)}
                   />
                 ))}
               </View>
@@ -150,37 +233,50 @@ const CourseWorkScreen = ({ navigation }) => {
               <View style={styles.emptyState}>
                 <Icon name="inbox" size={48} color={colors.textMuted} />
                 <Text style={styles.emptyTitle}>No {TABS[activeTab]} Yet</Text>
-                <Text style={styles.emptyText}>Check back later for new content.</Text>
+                <Text style={styles.emptyText}>Check back later for new uploads.</Text>
               </View>
             )}
           </>
         )}
 
-        <View style={{ height: 24 }} />
+        <View style={{ height: 40 }} />
       </ScrollView>
-    </SafeAreaView>
+
+      {/* Lightbox list modal for selected subject */}
+      {selectedSubject && activeGroup && (
+        <Modal visible={true} animationType="slide" transparent>
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalContent}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>{selectedSubject} - {TABS[activeTab]}</Text>
+                <TouchableOpacity onPress={() => setSelectedSubject(null)}>
+                  <Icon name="x" size={24} color={colors.text} />
+                </TouchableOpacity>
+              </View>
+
+              <FlatList
+                data={activeGroup.items}
+                keyExtractor={(item) => item.id.toString()}
+                renderItem={renderDetailItem}
+                contentContainerStyle={{ paddingBottom: 40 }}
+                showsVerticalScrollIndicator={false}
+              />
+            </View>
+          </View>
+        </Modal>
+      )}
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: colors.primary },
-  scroll: { flex: 1, backgroundColor: colors.background },
+  container: { flex: 1, backgroundColor: '#f8fafc' },
+  scroll: { flex: 1, backgroundColor: '#f8fafc' },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', marginTop: 60 },
 
-  header: {
-    backgroundColor: colors.primary,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingVertical: 14,
-  },
-  headerTitle: { color: '#fff', fontSize: 18, fontWeight: '700' },
-  headerBtn: { padding: 6, backgroundColor: 'rgba(255,255,255,0.15)', borderRadius: 10 },
-
   pageHeader: { paddingHorizontal: 20, paddingTop: 20, paddingBottom: 8 },
-  pageTitle: { fontSize: 24, fontWeight: '800', color: colors.text },
-  pageSubtitle: { fontSize: 13, color: colors.textMuted, marginTop: 4 },
+  pageTitle: { fontSize: 24, fontWeight: '800', color: colors.text, fontFamily: theme.typography.fontFamily.heading },
+  pageSubtitle: { fontSize: 13, color: colors.textMuted, marginTop: 4, fontFamily: theme.typography.fontFamily.medium },
 
   segmentWrapper: { paddingHorizontal: 20, marginBottom: 20, marginTop: 12 },
   segment: {
@@ -193,7 +289,7 @@ const styles = StyleSheet.create({
     flex: 1, paddingVertical: 10, alignItems: 'center', borderRadius: 11,
   },
   segmentTabActive: { backgroundColor: colors.surface, ...shadows.card },
-  segmentText: { fontSize: 14, fontWeight: '600', color: colors.textMuted },
+  segmentText: { fontSize: 13, fontWeight: '600', color: colors.textMuted, fontFamily: theme.typography.fontFamily.bold },
   segmentTextActive: { color: colors.text },
 
   selectSubjectLabel: {
@@ -218,12 +314,29 @@ const styles = StyleSheet.create({
     justifyContent: 'center', alignItems: 'center',
     marginBottom: 12,
   },
-  subjectName: { fontSize: 15, fontWeight: '700', color: colors.text, marginBottom: 4 },
-  subjectCount: { fontSize: 12, color: colors.textMuted },
+  subjectName: { fontSize: 15, fontWeight: '700', color: colors.text, marginBottom: 4, fontFamily: theme.typography.fontFamily.bold },
+  subjectCount: { fontSize: 12, color: colors.textMuted, fontFamily: theme.typography.fontFamily.medium },
 
   emptyState: { alignItems: 'center', paddingTop: 60, gap: 12 },
-  emptyTitle: { fontSize: 18, fontWeight: '700', color: colors.text },
-  emptyText: { fontSize: 14, color: colors.textMuted },
+  emptyTitle: { fontSize: 18, fontWeight: '700', color: colors.text, fontFamily: theme.typography.fontFamily.heading },
+  emptyText: { fontSize: 14, color: colors.textMuted, fontFamily: theme.typography.fontFamily.medium },
+
+  // Modal styles
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
+  modalContent: { backgroundColor: '#fff', borderTopLeftRadius: 24, borderTopRightRadius: 24, height: '80%', padding: 20 },
+  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
+  modalTitle: { fontSize: 18, fontWeight: '700', color: colors.text, fontFamily: theme.typography.fontFamily.heading },
+
+  detailCard: { backgroundColor: '#f8fafc', borderWidth: 1, borderColor: colors.border, borderRadius: 16, padding: 16, marginBottom: 16 },
+  detailTitle: { fontSize: 16, fontWeight: '700', color: colors.text, marginBottom: 12, fontFamily: theme.typography.fontFamily.bold },
+  
+  clientFormatContainer: { gap: 6, marginBottom: 12 },
+  formatRow: { fontSize: 13, color: colors.textMuted, fontFamily: theme.typography.fontFamily.medium, lineHeight: 18 },
+  boldText: { fontWeight: '700', color: colors.text, fontFamily: theme.typography.fontFamily.bold },
+  homeworkBlock: { borderTopWidth: 1, borderTopColor: 'rgba(0,0,0,0.05)', paddingTop: 6, marginTop: 4 },
+
+  downloadBtn: { flexDirection: 'row', backgroundColor: colors.primary, borderRadius: 8, paddingVertical: 10, paddingHorizontal: 16, alignSelf: 'flex-start', alignItems: 'center' },
+  downloadBtnText: { color: '#fff', fontSize: 13, fontWeight: '600', fontFamily: theme.typography.fontFamily.bold }
 });
 
 export default CourseWorkScreen;

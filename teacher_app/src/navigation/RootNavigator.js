@@ -30,6 +30,7 @@ import ChangePasswordScreen from '../features/profile/ChangePasswordScreen';
 import AnnualPlannerScreen from '../features/planning/AnnualPlannerScreen';
 import TimetableScreen from '../features/timetable/TimeTableScreen';
 import ThoughtScreen from '../features/thoughts/ThoughtScreen';
+import CourseWorkListScreen from '../features/coursework/CourseWorkListScreen';
 
 // Attendance
 import AttendanceHomeScreen from '../features/attendance/AttendanceHomeScreen';
@@ -72,6 +73,7 @@ const DashboardStack = () => (
     <Stack.Screen name="ChangePassword" component={ChangePasswordScreen} />
     <Stack.Screen name="Circulars" component={CircularsScreen} />
     <Stack.Screen name="Gallery" component={GalleryScreen} />
+    <Stack.Screen name="CourseWork" component={CourseWorkListScreen} />
   </Stack.Navigator>
 );
 

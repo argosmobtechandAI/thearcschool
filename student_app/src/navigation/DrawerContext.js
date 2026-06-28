@@ -104,6 +104,7 @@ const DrawerContent = ({ close }) => {
         <DrawerItem icon="file-text"      label="Academic Calendar"    color="#06B6D4" onPress={() => go('AcademicCalendar')} />
         <DrawerItem icon="bell"           label="Announcements" color="#F43F5E" badgeCount={unreadCount} onPress={() => go('Notifications')} />
         <DrawerItem icon="check-circle"   label="Attendance"    color="#10B981" onPress={() => go('Attendance')} />
+        <DrawerItem icon="book-open"      label="My Coursework" color="#8B5CF6" onPress={() => go('CourseWork')} />
         <DrawerItem icon="info"           label="Circulars"     color="#0EA5E9" onPress={() => go('Circulars')} />
         <DrawerItem icon="message-square" label="Communication" color="#14B8A6" onPress={() => go('Communication')} />
         <DrawerItem icon="edit-3"         label="Date Sheet"    color="#F97316" onPress={() => go('DateSheet')} />

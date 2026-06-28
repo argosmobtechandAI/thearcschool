@@ -54,7 +54,18 @@ export const createCourse = async (req, res) => {
         subject: data.subject,
         class_id: classId,
         chapter: data.chapter,
-        dueDate: data.dueDate
+        duedate: data.duedate || data.dueDate || null,
+        description: data.description || null,
+        file_url: data.file_url || null,
+        type: data.type || 'assignment',
+        date: data.date || null,
+        day: data.day || null,
+        topics_taught: data.topics_taught || null,
+        unit: data.unit || null,
+        lesson_no: data.lesson_no || null,
+        page_number: data.page_number || null,
+        others: data.others || null,
+        homework: data.homework || null
       }])
       .select();
 
@@ -117,7 +128,25 @@ export const createCourse = async (req, res) => {
 
 export const getcourse = async (req, res) => {
   try {
-    const { data: courses, error } = await supabase.from("course").select("*, class(name, section), solution:course_submissions(*)");
+    let query = supabase.from("course").select("*, class(name, section), solution:course_submissions(*)");
+
+    if (req.user && req.user.type === 'teacher') {
+      const [{ data: classTeachers }, { data: subjectTeachers }] = await Promise.all([
+        supabase.from("class_teachers").select("class_id").eq("teacher_id", req.user.id),
+        supabase.from("subject_teachers").select("class_id").eq("teacher_id", req.user.id)
+      ]);
+      const classIds = new Set();
+      (classTeachers || []).forEach(ct => classIds.add(ct.class_id));
+      (subjectTeachers || []).forEach(st => classIds.add(st.class_id));
+      
+      if (classIds.size > 0) {
+        query = query.in("class_id", Array.from(classIds));
+      } else {
+        return res.status(200).json({ success: true, count: 0, courses: [] });
+      }
+    }
+
+    const { data: courses, error } = await query;
 
     if (error) throw error;
 

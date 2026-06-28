@@ -548,11 +548,11 @@ const DashboardScreen = ({ navigation }) => {
           </View>
         )}
 
-        <Text style={styles.sectionTitle}>Coming Soon</Text>
+        <Text style={styles.sectionTitle}>Coursework & HR</Text>
         <View style={styles.gridContainer}>
-          <GridItem icon="file-text" label="Assignment" color={colors.purple} onPress={() => navigation.navigate('ComingSoon', { moduleName: 'Assignments' })} />
-          <GridItem icon="book-open" label="Homework" color={colors.secondary} onPress={() => navigation.navigate('ComingSoon', { moduleName: 'Homework' })} />
-          <GridItem icon="book" label="Study Material" color={colors.success} onPress={() => navigation.navigate('ComingSoon', { moduleName: 'Study Material' })} />
+          <GridItem icon="file-text" label="Assignment" color={colors.purple} onPress={() => navigation.navigate('CourseWork', { moduleType: 'assignment' })} />
+          <GridItem icon="book-open" label="Homework" color={colors.secondary} onPress={() => navigation.navigate('CourseWork', { moduleType: 'homework' })} />
+          <GridItem icon="book" label="Study Material" color={colors.success} onPress={() => navigation.navigate('CourseWork', { moduleType: 'study_material' })} />
           <GridItem icon="dollar-sign" label="Payroll" color={colors.info || '#17a2b8'} onPress={() => navigation.navigate('PayrollScreen')} />
           <GridItem icon="calendar" label="Leaves" color={colors.warning} onPress={() => navigation.navigate('LeavesScreen')} />
           <View style={{ width: '31%' }} />

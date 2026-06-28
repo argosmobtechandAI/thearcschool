@@ -154,6 +154,7 @@ const AdminLayout = () => {
               <NavLink to="/attendance" style={navLinkStyle}><UserCheck size={16} /> Attendance</NavLink>
               <NavLink to="/circulars" style={navLinkStyle}><FileText size={16} /> Circulars</NavLink>
               <NavLink to="/classes" style={navLinkStyle}><BookOpen size={16} /> Classes</NavLink>
+              <NavLink to="/coursework" style={navLinkStyle}><FileText size={16} /> Coursework</NavLink>
               <NavLink to="/communication/inbox" style={navLinkStyle}>
                 <MessageSquare size={16} /> Communication
               </NavLink>

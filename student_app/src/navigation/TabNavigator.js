@@ -17,6 +17,7 @@ import DateSheetScreen from '../features/academics/DateSheetScreen';
 import FeesScreen from '../features/finance/FeesScreen';
 import NotificationsScreen from '../features/notifications/NotificationsScreen';
 import CircularsScreen from '../features/circulars/CircularsScreen';
+import CourseWorkScreen from '../features/coursework/CourseWorkScreen';
 
 const Tab = createBottomTabNavigator();
 
@@ -79,6 +80,7 @@ const TabNavigator = () => {
       <Tab.Screen name="Fees" component={FeesScreen} options={{ tabBarItemStyle: { display: 'none' } }} />
       <Tab.Screen name="Notifications" component={NotificationsScreen} options={{ tabBarItemStyle: { display: 'none' } }} />
       <Tab.Screen name="Circulars" component={CircularsScreen} options={{ tabBarItemStyle: { display: 'none' } }} />
+      <Tab.Screen name="CourseWork" component={CourseWorkScreen} options={{ tabBarItemStyle: { display: 'none' } }} />
     </Tab.Navigator>
   );
 };

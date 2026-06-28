@@ -13,6 +13,7 @@ import ChangePasswordScreen from '../features/profile/ChangePasswordScreen';
 import ConsentsScreen from '../features/consents/ConsentsScreen';
 import ThoughtScreen from '../features/thoughts/ThoughtScreen';
 import GalleryScreen from '../features/gallery/GalleryScreen';
+import CourseWorkScreen from '../features/coursework/CourseWorkScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -39,6 +40,7 @@ const RootNavigator = () => {
               <Stack.Screen name="Thought" component={ThoughtScreen} />
               <Stack.Screen name="Main" component={MainScreen} />
               <Stack.Screen name="Gallery" component={GalleryScreen} />
+              <Stack.Screen name="CourseWork" component={CourseWorkScreen} />
               <Stack.Screen name="LiveChatScreen" component={LiveChatScreen} />
               <Stack.Screen name="ChangePassword" component={ChangePasswordScreen} />
               <Stack.Screen 

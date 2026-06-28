@@ -15,7 +15,9 @@ const storage = multer.diskStorage({
   destination: function (req, file, cb) {
     const rawCategory = req.query.category || "general";
     let category = "general";
-    if (rawCategory === "school" || rawCategory === "school_info") {
+    if (rawCategory.startsWith("class_")) {
+      category = rawCategory;
+    } else if (rawCategory === "school" || rawCategory === "school_info") {
       category = "school_info";
     } else if (rawCategory === "exam" || rawCategory === "exams") {
       category = "exams";

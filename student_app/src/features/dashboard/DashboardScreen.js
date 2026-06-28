@@ -497,7 +497,7 @@ const DashboardScreen = ({ navigation }) => {
               <View style={styles.gridItem}><QuickAction title="Fees" iconName="credit-card" color="#EF4444" onPress={() => navigation.navigate('Fees')} /></View>
               <View style={styles.gridItem}><QuickAction title="Timetable" iconName="calendar" color="#8B5CF6" onPress={() => navigation.navigate('Class')} /></View>
               <View style={styles.gridItem}><QuickAction title="Grades" iconName="award" color="#EAB308" onPress={() => navigation.navigate('Result')} /></View>
-              <View style={styles.gridItem}><QuickAction title="Consents" iconName="check-square" color="#4F46E5" onPress={() => navigation.navigate('Consents')} /></View>
+              <View style={styles.gridItem}><QuickAction title="Coursework" iconName="book-open" color="#4F46E5" onPress={() => navigation.navigate('CourseWork')} /></View>
               <View style={styles.gridItem}><QuickAction title="Chat" iconName="message-square" color="#14B8A6" onPress={() => navigation.navigate('Communication')} /></View>
               <View style={styles.gridItem}><QuickAction title="Notices" iconName="bell" color="#F43F5E" onPress={() => navigation.navigate('Notifications')} /></View>
               <View style={styles.gridItem}><QuickAction title="Calendar" iconName="file-text" color="#06B6D4" onPress={() => navigation.navigate('AcademicCalendar')} /></View>
