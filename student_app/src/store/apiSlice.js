@@ -18,7 +18,7 @@ export const apiSlice = createApi({
       return headers;
     },
   }),
-  tagTypes: ['Dashboard', 'Academics', 'Attendance', 'Notifications', 'Chats', 'LiveChat', 'Quote', 'Rewards', 'Timetable', 'CourseWork', 'Events', 'Fees', 'Consents', 'Circulars', 'Gallery'],
+  tagTypes: ['Dashboard', 'Academics', 'Attendance', 'Notifications', 'Chats', 'LiveChat', 'Quote', 'Rewards', 'Timetable', 'CourseWork', 'Events', 'Fees', 'Consents', 'Circulars', 'Gallery', 'Settings'],
   endpoints: (builder) => ({
     // Auth endpoints
     login: builder.mutation({
@@ -57,6 +57,11 @@ export const apiSlice = createApi({
         params,
       }),
       providesTags: ['Attendance'],
+    }),
+
+    getNewsletters: builder.query({
+      query: () => '/student_app/newsletters',
+      providesTags: ['Newsletters'],
     }),
 
     getTimetable: builder.query({
@@ -134,6 +139,11 @@ export const apiSlice = createApi({
       }),
     }),
     
+    getSettings: builder.query({
+      query: () => '/student_app/settings',
+      providesTags: ['Settings'],
+    }),
+    
     getNotifications: builder.query({
       query: () => '/student_app/notifications',
       providesTags: ['Notifications'],
@@ -191,6 +201,7 @@ export const {
   useGetDashboardQuery,
   useGetAcademicsQuery,
   useGetAttendanceQuery,
+  useGetNewslettersQuery,
   useGetTimetableQuery,
   useGetCourseWorkQuery,
   useGetQuoteQuery,
@@ -213,4 +224,5 @@ export const {
   useGetStudentOfWeekQuery,
   useGetCircularsQuery,
   useGetGalleryItemsQuery,
+  useGetSettingsQuery,
 } = apiSlice;

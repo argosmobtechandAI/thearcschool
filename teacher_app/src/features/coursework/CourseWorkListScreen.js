@@ -1,16 +1,19 @@
 import React, { useState } from 'react';
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity,
-  Modal, TextInput, ScrollView, ActivityIndicator, Alert, Platform
+  Modal, TextInput, ScrollView, ActivityIndicator, Alert, Platform, Linking
 } from 'react-native';
+import { useSelector } from 'react-redux';
 import Icon from 'react-native-vector-icons/Feather';
 import { pick, isCancel } from '@react-native-documents/picker';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { colors, shadows } from '../../theme/colors';
 import CustomHeader from '../../components/CustomHeader';
+import CustomModal from '../../components/CustomModal';
 import {
   useGetCoursesQuery,
   useCreateCourseMutation,
+  useUpdateCourseMutation,
   useDeleteCourseMutation,
   useGetTeacherClassesQuery,
   useGetTeacherProfileQuery
@@ -28,12 +31,15 @@ const getDayName = (dateString) => {
 };
 
 const CourseWorkListScreen = ({ route, navigation }) => {
+  const scrollViewRef = React.useRef(null);
   const [activeTab, setActiveTab] = useState(route.params?.moduleType || 'assignment'); // 'assignment', 'homework', 'study_material'
   const [subjectFilter, setSubjectFilter] = useState('All');
   const [filterMenuVisible, setFilterMenuVisible] = useState(false);
   
   const [selectedClassId, setSelectedClassId] = useState('all');
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editId, setEditId] = useState(null);
   const [uploadingFile, setUploadingFile] = useState(false);
   const [fileDetails, setFileDetails] = useState(null);
   const [showSubjectDropdown, setShowSubjectDropdown] = useState(false);
@@ -41,6 +47,34 @@ const CourseWorkListScreen = ({ route, navigation }) => {
   // Date picker states
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [datePickerField, setDatePickerField] = useState('date'); // 'date' or 'duedate'
+  const [hasSubmitted, setHasSubmitted] = useState(false);
+  const [alertConfig, setAlertConfig] = useState({
+    visible: false,
+    type: 'default',
+    title: '',
+    message: '',
+    onConfirm: null,
+    onCancel: null,
+    confirmText: 'OK',
+    cancelText: null
+  });
+
+  const showAlert = (type, title, message, onConfirm = null, confirmText = 'OK', onCancel = null, cancelText = null) => {
+    setAlertConfig({
+      visible: true,
+      type,
+      title,
+      message,
+      onConfirm,
+      onCancel,
+      confirmText,
+      cancelText
+    });
+  };
+
+  const hideAlert = () => {
+    setAlertConfig(prev => ({ ...prev, visible: false }));
+  };
 
   // Form State matching structured format
   const [formData, setFormData] = useState({
@@ -64,6 +98,15 @@ const CourseWorkListScreen = ({ route, navigation }) => {
   const classes = classesRes?.classes || [];
   const { data: profileRes } = useGetTeacherProfileQuery();
   const teacherSubjects = profileRes?.data?.subjects || [];
+  
+  const { activeClassId } = useSelector(state => state.app);
+
+  React.useEffect(() => {
+    if (activeClassId && !formData.classId) {
+      setFormData(prev => ({ ...prev, classId: activeClassId }));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeClassId]);
 
   const getSubjectsList = () => {
     if (formData.classId) {
@@ -82,6 +125,7 @@ const CourseWorkListScreen = ({ route, navigation }) => {
   };
   
   const [createCourse, { isLoading: creatingCourse }] = useCreateCourseMutation();
+  const [updateCourse, { isLoading: updatingCourse }] = useUpdateCourseMutation();
   const [deleteCourse] = useDeleteCourseMutation();
 
   // Filter courses locally by coursework type and subject filter
@@ -100,20 +144,22 @@ const CourseWorkListScreen = ({ route, navigation }) => {
       setFileDetails(res);
     } catch (err) {
       if (!isCancel(err)) {
-        Alert.alert('Error', 'Failed to pick document: ' + err.message);
+        showAlert('error', 'Error', 'Failed to pick document: ' + err.message);
       }
     }
   };
 
   const handleSave = async () => {
+    setHasSubmitted(true);
     if (!formData.title || !formData.subject || !formData.classId) {
-      Alert.alert('Validation Error', 'Title, Subject and Class are required.');
+      showAlert('warning', 'Validation Error', 'Title, Subject and Class are required.');
+      scrollViewRef.current?.scrollTo({ y: 0, animated: true });
       return;
     }
 
     const selectedClass = classes.find(c => c.classId === formData.classId);
     if (!selectedClass) {
-      Alert.alert('Error', 'Invalid class selected.');
+      showAlert('error', 'Error', 'Invalid class selected.');
       return;
     }
 
@@ -146,7 +192,7 @@ const CourseWorkListScreen = ({ route, navigation }) => {
           fileUrl = uploadRes.data.url;
         }
       } catch (err) {
-        Alert.alert('Upload Failed', 'Failed to upload attachment: ' + (err.response?.data?.message || err.message));
+        showAlert('error', 'Upload Failed', 'Failed to upload attachment: ' + (err.response?.data?.message || err.message));
         setUploadingFile(false);
         return;
       } finally {
@@ -176,10 +222,18 @@ const CourseWorkListScreen = ({ route, navigation }) => {
     };
 
     try {
-      const res = await createCourse(payload).unwrap();
+      let res;
+      if (isEditing) {
+        res = await updateCourse({ id: editId, data: payload }).unwrap();
+      } else {
+        res = await createCourse(payload).unwrap();
+      }
+      
       if (res.success) {
-        Alert.alert('Success', 'Coursework created successfully!');
+        showAlert('success', 'Success', `Coursework ${isEditing ? 'updated' : 'created'} successfully!`, hideAlert);
         setIsModalOpen(false);
+        setIsEditing(false);
+        setEditId(null);
         setFormData({
           title: '',
           subject: '',
@@ -199,29 +253,50 @@ const CourseWorkListScreen = ({ route, navigation }) => {
         refetch();
       }
     } catch (err) {
-      Alert.alert('Error', err.data?.message || err.message || 'Failed to save coursework.');
+      console.error(err);
+      showAlert('error', 'Error', err.data?.message || err.message || 'Failed to save coursework.');
     }
   };
 
+  const handleEdit = (item) => {
+    setIsEditing(true);
+    setEditId(item.id);
+    setFormData({
+      title: item.title || '',
+      subject: item.subject || '',
+      classId: item.class_id || '',
+      chapter: item.chapter || '',
+      duedate: item.duedate || '',
+      date: item.date || new Date().toISOString().split('T')[0],
+      day: item.day || getDayName(item.date || new Date().toISOString().split('T')[0]),
+      topics_taught: item.topics_taught || '',
+      unit: item.unit || '',
+      lesson_no: item.lesson_no || '',
+      page_number: item.page_number || '',
+      others: item.others || '',
+      homework: item.homework || '',
+    });
+    setFileDetails(null); // File uploading might need careful handling, keep it null to not overwrite unless new file picked
+    setIsModalOpen(true);
+  };
+
   const handleDelete = (id) => {
-    Alert.alert(
-      'Confirm Delete',
-      'Are you sure you want to delete this coursework?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await deleteCourse(id).unwrap();
-              refetch();
-            } catch (err) {
-              Alert.alert('Error', 'Failed to delete coursework.');
-            }
-          }
+    showAlert(
+      'warning',
+      'Delete Coursework',
+      'Are you sure you want to delete this item? This action cannot be undone.',
+      async () => {
+        hideAlert();
+        try {
+          await deleteCourse(id).unwrap();
+          refetch();
+        } catch (err) {
+          showAlert('error', 'Error', 'Failed to delete coursework.');
         }
-      ]
+      },
+      'Delete',
+      hideAlert,
+      'Cancel'
     );
   };
 
@@ -261,9 +336,14 @@ const CourseWorkListScreen = ({ route, navigation }) => {
             <Text style={styles.cardClass}>Class {cls ? `${cls.className}-${cls.section}` : item.class || 'N/A'}</Text>
             <Text style={styles.cardSubject}>📚 {item.subject}</Text>
           </View>
-          <TouchableOpacity onPress={() => handleDelete(item.id)} style={styles.deleteBtn}>
-            <Icon name="trash-2" size={16} color={colors.danger} />
-          </TouchableOpacity>
+          <View style={{ flexDirection: 'row', gap: 10 }}>
+            <TouchableOpacity onPress={() => handleEdit(item)} style={styles.editBtn}>
+              <Icon name="edit-2" size={16} color={colors.primary} />
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => handleDelete(item.id)} style={styles.deleteBtn}>
+              <Icon name="trash-2" size={16} color={colors.danger} />
+            </TouchableOpacity>
+          </View>
         </View>
 
         <Text style={styles.cardTitle}>{item.title}</Text>
@@ -278,8 +358,27 @@ const CourseWorkListScreen = ({ route, navigation }) => {
           {item.homework && <Text style={styles.detailText}>◻️ <Text style={styles.bold}>Homework:</Text> {item.homework}</Text>}
           {item.duedate && <Text style={styles.detailText}>◻️ <Text style={styles.bold}>Submission Date:</Text> {item.duedate}</Text>}
           {item.others && <Text style={styles.detailText}>▫️ <Text style={styles.bold}>Notes:</Text> {item.others}</Text>}
-          {item.file_url && <Text style={styles.attachmentText}>📎 <Text style={styles.bold}>Attachment:</Text> {item.file_url.split('/').pop()}</Text>}
         </View>
+
+        {item.file_url && (
+          <View style={{ marginTop: 10 }}>
+            <TouchableOpacity onPress={async () => {
+              try {
+                const formattedUrl = item.file_url.startsWith('http') ? item.file_url : `https://${item.file_url}`;
+                const supported = await Linking.canOpenURL(formattedUrl);
+                if (supported) {
+                  await Linking.openURL(formattedUrl);
+                } else {
+                  showAlert('error', 'Error', 'Cannot open this file type on this device.');
+                }
+              } catch (err) {
+                showAlert('error', 'Error', 'Could not open attachment link.');
+              }
+            }}>
+              <Text style={styles.attachmentText}>📎 <Text style={styles.bold}>Attachment:</Text> {item.file_url.split('/').pop()}</Text>
+            </TouchableOpacity>
+          </View>
+        )}
       </View>
     );
   };
@@ -343,28 +442,42 @@ const CourseWorkListScreen = ({ route, navigation }) => {
       )}
 
       {/* Floating Add Button */}
-      <TouchableOpacity style={styles.fab} onPress={() => setIsModalOpen(true)}>
+      <TouchableOpacity 
+        style={styles.fab} 
+        onPress={() => {
+          setIsEditing(false);
+          setEditId(null);
+          setHasSubmitted(false);
+          let initialClassId = '';
+          if (selectedClassId && selectedClassId !== 'all') {
+            initialClassId = selectedClassId;
+          } else if (classes && classes.length === 1) {
+            initialClassId = classes[0].classId;
+          }
+          setFormData(prev => ({ ...prev, classId: initialClassId || activeClassId, subject: '', date: new Date().toISOString().split('T')[0], day: getDayName(new Date().toISOString().split('T')[0]) }));
+          setIsModalOpen(true);
+        }}
+      >
         <Icon name="plus" size={24} color="#fff" />
       </TouchableOpacity>
 
       {/* Structured coursework creator Modal */}
-      <Modal visible={isModalOpen} animationType="slide" transparent>
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Add {getHeaderTitle()}</Text>
-              <TouchableOpacity onPress={() => setIsModalOpen(false)}>
-                <Icon name="x" size={24} color={colors.text} />
-              </TouchableOpacity>
-            </View>
-
-            <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.formScroll} showsVerticalScrollIndicator={false}>
+      <CustomModal
+        visible={isModalOpen}
+        onClose={() => { setIsModalOpen(false); setIsEditing(false); setEditId(null); }}
+        title={`${isEditing ? 'Edit' : 'Add'} ${getHeaderTitle()}`}
+        primaryButtonText={creatingCourse || uploadingFile || updatingCourse ? 'Saving...' : 'Save'}
+        onPrimaryPress={handleSave}
+        secondaryButtonText="Cancel"
+        onSecondaryPress={() => { setIsModalOpen(false); setIsEditing(false); setEditId(null); }}
+      >
+        <ScrollView ref={scrollViewRef} keyboardShouldPersistTaps="handled" style={{ maxHeight: 400, width: '100%' }} contentContainerStyle={styles.formScroll} showsVerticalScrollIndicator={false}>
               
               {/* Title Input */}
               <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>✍️ Title</Text>
+                <Text style={[styles.inputLabel, hasSubmitted && !formData.title && { color: colors.danger }]}>✍️ Title *</Text>
                 <TextInput
-                  style={styles.textInput}
+                  style={[styles.textInput, hasSubmitted && !formData.title && { borderColor: colors.danger }]}
                   value={formData.title}
                   onChangeText={(val) => setFormData(prev => ({ ...prev, title: val }))}
                   placeholder="e.g. Weekly Math Assignment"
@@ -399,25 +512,31 @@ const CourseWorkListScreen = ({ route, navigation }) => {
 
               {/* Class Dropdown Selection */}
               <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>👉 Select Class & Section</Text>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginVertical: 6 }}>
-                  {classes.map(c => (
-                    <TouchableOpacity
-                      key={c.classId}
-                      style={[styles.miniButton, formData.classId === c.classId && styles.miniButtonActive]}
-                      onPress={() => setFormData(prev => ({ ...prev, classId: c.classId, subject: '' }))}
-                    >
-                      <Text style={[styles.miniButtonText, formData.classId === c.classId && styles.miniButtonTextActive]}>Class {c.className}-{c.section}</Text>
-                    </TouchableOpacity>
-                  ))}
-                </ScrollView>
+                <Text style={[styles.inputLabel, hasSubmitted && !formData.classId && { color: colors.danger }]}>👉 Select Class & Section *</Text>
+                {classes.length === 0 ? (
+                  <Text style={{ color: colors.danger, fontSize: 13, marginVertical: 6 }}>
+                    No classes assigned. Please contact the administrator to assign classes to your profile.
+                  </Text>
+                ) : (
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginVertical: 6 }}>
+                    {classes.map(c => (
+                      <TouchableOpacity
+                        key={c.classId}
+                        style={[styles.miniButton, formData.classId === c.classId && styles.miniButtonActive]}
+                        onPress={() => setFormData(prev => ({ ...prev, classId: c.classId, subject: '' }))}
+                      >
+                        <Text style={[styles.miniButtonText, formData.classId === c.classId && styles.miniButtonTextActive]}>Class {c.className}-{c.section}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </ScrollView>
+                )}
               </View>
 
               {/* Subject Dropdown Selector */}
               <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>📚 Subject</Text>
+                <Text style={[styles.inputLabel, hasSubmitted && !formData.subject && { color: colors.danger }]}>📚 Subject *</Text>
                 <TouchableOpacity 
-                  style={styles.dropdownSelector} 
+                  style={[styles.dropdownSelector, hasSubmitted && !formData.subject && { borderColor: colors.danger }]} 
                   onPress={() => setShowSubjectDropdown(!showSubjectDropdown)}
                 >
                   <Text style={[styles.dropdownSelectorText, !formData.subject && { color: colors.textMuted }]}>
@@ -515,7 +634,7 @@ const CourseWorkListScreen = ({ route, navigation }) => {
               </View>
 
               {/* Homework & Due Date (Only shown if NOT study material) */}
-              {moduleType !== 'study_material' && (
+              {activeTab !== 'study_material' && (
                 <>
                   <View style={styles.inputGroup}>
                     <Text style={styles.inputLabel}>◻️ Homework</Text>
@@ -556,36 +675,12 @@ const CourseWorkListScreen = ({ route, navigation }) => {
               </View>
 
               <View style={{ height: 20 }} />
-
-              {/* Action Buttons */}
-              <View style={styles.actionRow}>
-                <TouchableOpacity
-                  style={[styles.btn, styles.btnCancel]}
-                  onPress={() => setIsModalOpen(false)}
-                >
-                  <Text style={styles.btnCancelText}>Cancel</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.btn, styles.btnSave]}
-                  onPress={handleSave}
-                  disabled={creatingCourse || uploadingFile}
-                >
-                  {creatingCourse || uploadingFile ? (
-                    <ActivityIndicator size="small" color="#fff" />
-                  ) : (
-                    <Text style={styles.btnSaveText}>Save</Text>
-                  )}
-                </TouchableOpacity>
-              </View>
-
             </ScrollView>
-          </View>
-        </View>
-      </Modal>
+      </CustomModal>
 
       <Modal visible={filterMenuVisible} transparent={true} animationType="fade">
         <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setFilterMenuVisible(false)}>
-          <View style={[styles.modalContent, { marginTop: 'auto', marginBottom: 0, borderBottomLeftRadius: 0, borderBottomRightRadius: 0, paddingBottom: 40 }]}>
+          <View style={[styles.modalContent, { height: undefined, marginTop: 'auto', marginBottom: 0, borderBottomLeftRadius: 0, borderBottomRightRadius: 0, paddingBottom: 40 }]}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Filter by Subject</Text>
               <TouchableOpacity onPress={() => setFilterMenuVisible(false)}>

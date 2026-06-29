@@ -24,18 +24,28 @@ export const getAllInfo = async (req, res) => {
   }
 };
 
+export const getSettings = async (req, res) => {
+  try {
+    const { data, error } = await supabase.from("school_settings").select("*").limit(1).single();
+    if (error && error.code !== 'PGRST116') throw error; // Ignore not found error
+    return res.status(200).json({ success: true, data: data || {} });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
 // ---------------- SETTINGS (Social Links) ----------------
 export const updateSettings = async (req, res) => {
-  const { instagram_url, whatsapp_url, linkedin_url, twitter_url, late_fee_penalty } = req.body;
+  const { instagram_url, whatsapp_url, linkedin_url, twitter_url, facebook_url, youtube_url, website_url, late_fee_penalty } = req.body;
   try {
     // Check if settings exist
     const { data: existing } = await supabase.from("school_settings").select("id").limit(1).single();
     
     let result;
     if (existing?.id) {
-      result = await supabase.from("school_settings").update({ instagram_url, whatsapp_url, linkedin_url, twitter_url, late_fee_penalty, updated_at: new Date() }).eq("id", existing.id).select();
+      result = await supabase.from("school_settings").update({ instagram_url, whatsapp_url, linkedin_url, twitter_url, facebook_url, youtube_url, website_url, late_fee_penalty, updated_at: new Date() }).eq("id", existing.id).select();
     } else {
-      result = await supabase.from("school_settings").insert([{ instagram_url, whatsapp_url, linkedin_url, twitter_url, late_fee_penalty }]).select();
+      result = await supabase.from("school_settings").insert([{ instagram_url, whatsapp_url, linkedin_url, twitter_url, facebook_url, youtube_url, website_url, late_fee_penalty }]).select();
     }
 
     if (result.error) throw result.error;
@@ -122,6 +132,16 @@ export const deleteNewsletter = async (req, res) => {
     const { error } = await supabase.from("school_newsletters").delete().eq("id", id);
     if (error) throw error;
     return res.status(200).json({ success: true, message: "Newsletter deleted successfully" });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+export const getNewsletters = async (req, res) => {
+  try {
+    const { data, error } = await supabase.from("school_newsletters").select("*").order("created_at", { ascending: false });
+    if (error) throw error;
+    return res.status(200).json({ success: true, data });
   } catch (error) {
     return res.status(500).json({ success: false, message: error.message });
   }

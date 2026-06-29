@@ -14,6 +14,7 @@ import { getDashboardData } from "./dashboardController.js";
 import { registerToken, getNotificationHistory, markAsRead } from "../shared/notifications/controller.js";
 import { getQuote } from "./quotesController.js";
 import { getRewards } from "./rewardsController.js";
+import { getNewsletters, getSettings } from "../shared/info/controller.js";
 
 const studentRouter = Router();
 
@@ -29,6 +30,7 @@ studentRouter.get("/timetable", getStudentTimetable);
 
 // Read-only global access
 studentRouter.get("/events", getPlannerEvents);
+studentRouter.get("/newsletters", getNewsletters);
 
 // Notifications
 studentRouter.post('/notifications/register-token', registerToken);
@@ -54,5 +56,7 @@ studentRouter.post("/auth/change-password", changePassword);
 // Consents
 import consentRouter from "../shared/consents/routes.js";
 studentRouter.use("/consents", consentRouter);
+// Info / Settings
+studentRouter.get("/settings", getSettings);
 
 export default studentRouter;

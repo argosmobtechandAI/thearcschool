@@ -524,6 +524,7 @@ const DashboardScreen = ({ navigation }) => {
           <GridItem icon="clock" label="Date Sheet" color={colors.info || '#17a2b8'} onPress={() => navigation.navigate('DateSheetScreen')} />
           <GridItem icon="image" label="Gallery" color={colors.pink || '#EC4899'} onPress={() => navigation.navigate('Gallery')} />
           <GridItem icon="edit-3" label="Grades" color={colors.warning} onPress={() => navigation.navigate('Work', { screen: 'ExamsList' })} />
+          <GridItem icon="file-text" label="Newsletters" color={colors.info || '#17a2b8'} onPress={() => navigation.navigate('Newsletters')} />
           <GridItem icon="user" label="Profile" color={colors.pink} onPress={() => navigation.navigate('Profile')} />
           <GridItem icon="award" label="Results" color={colors.danger} onPress={() => navigation.navigate('Work', { screen: 'ResultsHome' })} />
           <GridItem icon="users" label="Students" color={colors.success} onPress={() => navigation.navigate('StudentsList')} />

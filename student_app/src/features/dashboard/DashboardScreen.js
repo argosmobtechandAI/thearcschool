@@ -502,6 +502,8 @@ const DashboardScreen = ({ navigation }) => {
               <View style={styles.gridItem}><QuickAction title="Notices" iconName="bell" color="#F43F5E" onPress={() => navigation.navigate('Notifications')} /></View>
               <View style={styles.gridItem}><QuickAction title="Calendar" iconName="file-text" color="#06B6D4" onPress={() => navigation.navigate('AcademicCalendar')} /></View>
               <View style={styles.gridItem}><QuickAction title="Exams" iconName="edit-3" color="#F97316" onPress={() => navigation.navigate('DateSheet')} /></View>
+              <View style={styles.gridItem}><QuickAction title="Newsletters" iconName="book" color="#8B5CF6" onPress={() => navigation.navigate('Newsletters')} /></View>
+              <View style={styles.gridItem}><QuickAction title="Gallery" iconName="image" color="#EC4899" onPress={() => navigation.navigate('Gallery')} /></View>
             </View>
           </View>
 
@@ -708,8 +710,8 @@ const styles = StyleSheet.create({
 
   // Quick Action Grid
   stripContainer: { marginBottom: 16, paddingHorizontal: 16 },
-  gridContent: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', gap: 12 },
-  gridItem: { width: '22%', alignItems: 'center', marginBottom: 8 },
+  gridContent: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' },
+  gridItem: { width: '23%', alignItems: 'center', marginBottom: 16 },
   quickActionContainer: { alignItems: 'center' },
   quickActionBtn: { alignItems: 'center' },
   quickActionIconBox: { 

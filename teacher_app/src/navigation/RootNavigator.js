@@ -42,6 +42,7 @@ import StudentAcademicHistoryScreen from '../features/grading/StudentAcademicHis
 import NotificationsScreen from '../features/notifications/NotificationsScreen';
 import CircularsScreen from '../features/circulars/CircularsScreen';
 import GalleryScreen from '../features/gallery/GalleryScreen';
+import NewslettersScreen from '../features/newsletters/NewslettersScreen';
 
 // Grading / Course Work
 import ExamsListScreen from '../features/grading/ExamsListScreen';
@@ -73,6 +74,7 @@ const DashboardStack = () => (
     <Stack.Screen name="ChangePassword" component={ChangePasswordScreen} />
     <Stack.Screen name="Circulars" component={CircularsScreen} />
     <Stack.Screen name="Gallery" component={GalleryScreen} />
+    <Stack.Screen name="Newsletters" component={NewslettersScreen} />
     <Stack.Screen name="CourseWork" component={CourseWorkListScreen} />
   </Stack.Navigator>
 );

@@ -1,11 +1,12 @@
 import React, { createContext, useContext, useState, useRef, useCallback } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, TouchableWithoutFeedback,
-  ScrollView, Animated, Dimensions, Modal, StatusBar, Image,
+  ScrollView, Animated, Dimensions, Modal, StatusBar, Image, Linking,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSelector, useDispatch } from 'react-redux';
 import Icon from 'react-native-vector-icons/Feather';
+import FAIcon from 'react-native-vector-icons/FontAwesome5';
 import * as Keychain from 'react-native-keychain';
 import { logout } from '../store/authSlice';
 import { colors } from '../theme/colors';
@@ -42,7 +43,7 @@ const DrawerItem = ({ icon, label, onPress, color = colors.textMuted, badgeCount
 
 // ─── Drawer Content (rendered inside Modal) ──────────────────────────────────
 
-import { useGetNotificationsQuery, useGetDashboardQuery } from '../store/apiSlice';
+import { useGetDashboardQuery, useGetNotificationsQuery, useGetSettingsQuery } from '../store/apiSlice';
 
 const DrawerContent = ({ close }) => {
   const { user } = useSelector(state => state.auth);
@@ -55,6 +56,9 @@ const DrawerContent = ({ close }) => {
   const { data: dashboardData } = useGetDashboardQuery();
   const profile = dashboardData?.data?.profile;
 
+  const { data: settingsData } = useGetSettingsQuery();
+  const settings = settingsData?.data || {};
+
   const initials = (profile?.name || user?.name || 'S')
     .split(' ').map(p => p[0]).slice(0, 2).join('').toUpperCase();
 
@@ -65,6 +69,15 @@ const DrawerContent = ({ close }) => {
         navigationRef.navigate(screen);
       }
     }, 250);
+  };
+
+  const openLink = (url) => {
+    if (!url) return;
+    let finalUrl = url.trim();
+    if (!finalUrl.startsWith('http://') && !finalUrl.startsWith('https://')) {
+      finalUrl = 'https://' + finalUrl;
+    }
+    Linking.openURL(finalUrl).catch(e => console.log('Error opening URL', e));
   };
 
   const handleLogout = async () => {
@@ -117,12 +130,32 @@ const DrawerContent = ({ close }) => {
 
       {/* Footer */}
       <View style={styles.footer}>
-        <View style={styles.socialRow}>
-          <Icon name="facebook" size={20} color={colors.textMuted} />
-          <Icon name="youtube" size={20} color={colors.textMuted} />
-          <Icon name="globe" size={20} color={colors.textMuted} />
-          <Icon name="twitter" size={20} color={colors.textMuted} />
-          <Icon name="instagram" size={20} color={colors.textMuted} />
+        <View style={styles.socialContainer}>
+          <View style={styles.socialRow}>
+            <TouchableOpacity onPress={() => openLink(settings.facebook_url)} style={styles.iconTap}>
+              <FAIcon name="facebook" size={26} color="#3b82f6" brand solid />
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => openLink(settings.instagram_url)} style={styles.iconTap}>
+              <FAIcon name="instagram" size={26} color="#ec4899" brand solid />
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => openLink(settings.twitter_url)} style={styles.iconTap}>
+              <FAIcon name="twitter" size={26} color="#0ea5e9" brand solid />
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => openLink(settings.linkedin_url)} style={styles.iconTap}>
+              <FAIcon name="linkedin" size={26} color="#3b82f6" brand solid />
+            </TouchableOpacity>
+          </View>
+          <View style={styles.socialRow}>
+            <TouchableOpacity onPress={() => openLink(settings.youtube_url)} style={styles.iconTap}>
+              <FAIcon name="youtube" size={26} color="#ef4444" brand solid />
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => openLink(settings.whatsapp_url)} style={styles.iconTap}>
+              <FAIcon name="whatsapp" size={26} color="#22c55e" brand solid />
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => openLink(settings.website_url)} style={styles.iconTap}>
+              <FAIcon name="globe" size={26} color="#6366f1" solid />
+            </TouchableOpacity>
+          </View>
         </View>
         <Text style={styles.versionText}>Version : 1.0.0</Text>
 
@@ -287,8 +320,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: colors.surface,
   },
+  socialContainer: {
+    marginBottom: 20,
+    alignItems: 'center',
+    gap: 20,
+  },
   socialRow: {
-    flexDirection: 'row', gap: 24, marginBottom: 16,
+    flexDirection: 'row', gap: 28, justifyContent: 'center', alignItems: 'center'
+  },
+  iconTap: {
+    padding: 4,
   },
   versionText: {
     fontSize: 14, color: colors.text, fontWeight: '600', marginBottom: 16,

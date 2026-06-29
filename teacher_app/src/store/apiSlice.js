@@ -56,9 +56,36 @@ export const apiSlice = createApi({
       }),
       invalidatesTags: ['Courses'],
     }),
+    updateCourse: builder.mutation({
+      query: ({ id, data }) => ({
+        url: `/teacher_app/course/${id}`,
+        method: 'PUT',
+        body: { data },
+      }),
+      invalidatesTags: ['Courses'],
+    }),
     getEvents: builder.query({
       query: (classId) => `/teacher_app/events${classId ? `?classId=${classId}` : ''}`,
       providesTags: ['Events'],
+    }),
+    getNewsletters: builder.query({
+      query: () => `/teacher_app/newsletters`,
+      providesTags: ['Newsletters'],
+    }),
+    addNewsletter: builder.mutation({
+      query: (data) => ({
+        url: '/teacher_app/newsletters',
+        method: 'POST',
+        body: data,
+      }),
+      invalidatesTags: ['Newsletters'],
+    }),
+    deleteNewsletter: builder.mutation({
+      query: (id) => ({
+        url: `/teacher_app/newsletters/${id}`,
+        method: 'DELETE',
+      }),
+      invalidatesTags: ['Newsletters'],
     }),
     getAttendance: builder.query({
       query: (params) => ({
@@ -172,6 +199,9 @@ export const {
   useCreateCourseMutation,
   useDeleteCourseMutation,
   useGetEventsQuery,
+  useGetNewslettersQuery,
+  useAddNewsletterMutation,
+  useDeleteNewsletterMutation,
   useGetAttendanceQuery,
   useChangePasswordMutation,
   useSubmitBulkAttendanceMutation,

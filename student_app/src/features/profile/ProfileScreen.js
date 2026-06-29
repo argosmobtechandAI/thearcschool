@@ -101,14 +101,6 @@ const ProfileScreen = ({ navigation }) => {
             <Text style={styles.cardTitle}>Quick Actions</Text>
             <TouchableOpacity
               style={styles.actionRow}
-              onPress={() => navigation.navigate('Rewards')}
-            >
-              <Icon name="star" size={18} color={theme.colors.warning} />
-              <Text style={styles.actionLabel}>My Rewards & Badges</Text>
-              <Icon name="chevron-right" size={16} color={theme.colors.textMuted} />
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.actionRow}
               onPress={() => navigation.navigate('Notifications')}
             >
               <Icon name="bell" size={18} color={theme.colors.primary} />

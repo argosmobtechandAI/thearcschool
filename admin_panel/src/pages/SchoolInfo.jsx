@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { useDispatch, useSelector } from "react-redux";
+import { useNavigate } from "react-router-dom";
 import { fetchUsers, fetchClasses, fetchInfo } from "../features/dataSlice";
 import { 
     uploadFile, updateSettings, 
@@ -12,9 +13,10 @@ import { Link2, Trophy, Image as ImageIcon, FileText, Plus, Trash2, Edit, CheckC
 const SchoolInfo = () => {
     const { infoSettings, infoGallery, infoNewsletters, users, classes } = useSelector((state) => state.data);
     const dispatch = useDispatch();
+    const navigate = useNavigate();
 
     const [modal, setModal] = useState(null);
-    const [social, setNewSocial] = useState({ instagram_url: "", whatsapp_url: "", linkedin_url: "", twitter_url: "", late_fee_penalty: 10 });
+    const [social, setNewSocial] = useState({ instagram_url: "", whatsapp_url: "", linkedin_url: "", twitter_url: "", facebook_url: "", youtube_url: "", website_url: "", late_fee_penalty: 10 });
 
     useEffect(() => {
         if (!users || users.length === 0) dispatch(fetchUsers());
@@ -113,7 +115,7 @@ const SchoolInfo = () => {
                         </div>
                         <button onClick={() => { 
                             setModal("social"); 
-                            setNewSocial(infoSettings || { instagram_url: "", whatsapp_url: "", linkedin_url: "", twitter_url: "", late_fee_penalty: 10 }); 
+                            setNewSocial(infoSettings || { instagram_url: "", whatsapp_url: "", linkedin_url: "", twitter_url: "", facebook_url: "", youtube_url: "", website_url: "", late_fee_penalty: 10 }); 
                         }} className="btn btn-primary" style={{ display: "flex", alignItems: "center", gap: "0.5rem", fontSize: "0.875rem", padding: "0.5rem 1rem" }}>
                             <Edit size={16} /> Edit Settings
                         </button>
@@ -121,10 +123,13 @@ const SchoolInfo = () => {
                     <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
                         {infoSettings ? (
                             <div style={{ display: "flex", flexWrap: "wrap", gap: "0.75rem", padding: "1rem", background: "var(--bg-secondary)", border: "1px solid var(--glass-border)", borderRadius: "12px" }}>
+                                {infoSettings.facebook_url && <a href={infoSettings.facebook_url} target="_blank" rel="noreferrer" style={{ padding: "0.25rem 0.75rem", background: "rgba(59, 130, 246, 0.1)", color: "#3b82f6", borderRadius: "8px", fontSize: "0.875rem", fontWeight: "600", textDecoration: "none" }}>Facebook</a>}
                                 {infoSettings.instagram_url && <a href={infoSettings.instagram_url} target="_blank" rel="noreferrer" style={{ padding: "0.25rem 0.75rem", background: "rgba(236, 72, 153, 0.1)", color: "#ec4899", borderRadius: "8px", fontSize: "0.875rem", fontWeight: "600", textDecoration: "none" }}>Instagram</a>}
                                 {infoSettings.whatsapp_url && <a href={infoSettings.whatsapp_url} target="_blank" rel="noreferrer" style={{ padding: "0.25rem 0.75rem", background: "rgba(34, 197, 94, 0.1)", color: "#22c55e", borderRadius: "8px", fontSize: "0.875rem", fontWeight: "600", textDecoration: "none" }}>WhatsApp</a>}
                                 {infoSettings.linkedin_url && <a href={infoSettings.linkedin_url} target="_blank" rel="noreferrer" style={{ padding: "0.25rem 0.75rem", background: "rgba(59, 130, 246, 0.1)", color: "#3b82f6", borderRadius: "8px", fontSize: "0.875rem", fontWeight: "600", textDecoration: "none" }}>LinkedIn</a>}
                                 {infoSettings.twitter_url && <a href={infoSettings.twitter_url} target="_blank" rel="noreferrer" style={{ padding: "0.25rem 0.75rem", background: "rgba(14, 165, 233, 0.1)", color: "#0ea5e9", borderRadius: "8px", fontSize: "0.875rem", fontWeight: "600", textDecoration: "none" }}>Twitter</a>}
+                                {infoSettings.youtube_url && <a href={infoSettings.youtube_url} target="_blank" rel="noreferrer" style={{ padding: "0.25rem 0.75rem", background: "rgba(239, 68, 68, 0.1)", color: "#ef4444", borderRadius: "8px", fontSize: "0.875rem", fontWeight: "600", textDecoration: "none" }}>YouTube</a>}
+                                {infoSettings.website_url && <a href={infoSettings.website_url} target="_blank" rel="noreferrer" style={{ padding: "0.25rem 0.75rem", background: "rgba(99, 102, 241, 0.1)", color: "#6366f1", borderRadius: "8px", fontSize: "0.875rem", fontWeight: "600", textDecoration: "none" }}>Website</a>}
                             </div>
                         ) : (
                             <p style={{ fontSize: "0.875rem", color: "var(--text-secondary)", padding: "1rem", textAlign: "center", border: "1px dashed var(--glass-border)", borderRadius: "12px" }}>No social links added yet.</p>
@@ -137,31 +142,20 @@ const SchoolInfo = () => {
 
             {/* GALLERY */}
             <section className="glass-panel" style={{ padding: "1.5rem" }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.5rem" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                     <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
                         <div style={{ padding: "0.5rem", background: "rgba(99, 102, 241, 0.1)", color: "#6366f1", borderRadius: "12px" }}><ImageIcon size={20} /></div>
                         <h2 style={{ fontSize: "1.25rem", fontWeight: "700", color: "var(--text-primary)" }}>School Gallery</h2>
                     </div>
                     <div>
-                        <input type="file" id="galUploadDirect" accept="image/*" style={{ display: "none" }} onChange={handleUploadGallery} />
-                        <label htmlFor="galUploadDirect" className="btn btn-primary" style={{ display: "inline-flex", alignItems: "center", gap: "0.5rem", fontSize: "0.875rem", padding: "0.5rem 1rem", cursor: "pointer" }}>
-                            <Plus size={16} /> Upload Media
-                        </label>
+                        <button onClick={() => navigate('/gallery')} className="btn btn-primary" style={{ display: "inline-flex", alignItems: "center", gap: "0.5rem", fontSize: "0.875rem", padding: "0.5rem 1rem", cursor: "pointer" }}>
+                            Manage Gallery
+                        </button>
                     </div>
                 </div>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))", gap: "1rem" }}>
-                    {infoGallery?.length > 0 && infoGallery.map((glry) => (
-                        <div key={glry.id} style={{ position: "relative", borderRadius: "12px", overflow: "hidden", border: "1px solid var(--glass-border)", background: "var(--bg-primary)", aspectRatio: "1/1" }}>
-                            <img src={glry.image_url} alt="Gallery" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                            <div style={{ position: "absolute", top: "0.5rem", right: "0.5rem" }}>
-                                <button onClick={() => handleDelete('gallery', glry.id)} style={{ background: "#ef4444", color: "white", padding: "0.5rem", borderRadius: "50%", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                                    <Trash2 size={16} />
-                                </button>
-                            </div>
-                        </div>
-                    ))}
-                </div>
-                {(!infoGallery || infoGallery.length === 0) && <p style={{ fontSize: "0.875rem", color: "var(--text-secondary)", padding: "2rem", textAlign: "center", border: "1px dashed var(--glass-border)", borderRadius: "12px" }}>No images in gallery.</p>}
+                <p style={{ fontSize: "0.875rem", color: "var(--text-secondary)", marginTop: "1rem", textAlign: "left" }}>
+                    The school gallery is now managed centrally. Click the button above to go to the Gallery Management page.
+                </p>
             </section>
 
             {/* NEWSLETTER */}
@@ -221,7 +215,7 @@ const SchoolInfo = () => {
                                         <input type="number" min="0" placeholder="e.g. 10" value={social?.late_fee_penalty || 0} onChange={(e) => setNewSocial({ ...social, late_fee_penalty: Number(e.target.value) })} style={{ width: "100%", border: "1px solid var(--glass-border)", borderRadius: "8px", padding: "0.75rem", outline: "none", fontSize: "0.875rem", background: "var(--bg-primary)", color: "var(--text-primary)" }} />
                                     </div>
                                     <hr style={{ border: "none", borderTop: "1px solid var(--glass-border)", margin: "0.5rem 0" }} />
-                                    {[{ name: "Instagram", variable: "instagram_url", color: "#ec4899" }, { name: "Whatsapp", variable: "whatsapp_url", color: "#22c55e" }, { name: "Linkedin", variable: "linkedin_url", color: "#3b82f6" }, { name: "Twitter", variable: "twitter_url", color: "#0ea5e9" }].map((item) => (
+                                    {[{ name: "Facebook", variable: "facebook_url", color: "#3b82f6" }, { name: "Instagram", variable: "instagram_url", color: "#ec4899" }, { name: "Whatsapp", variable: "whatsapp_url", color: "#22c55e" }, { name: "Linkedin", variable: "linkedin_url", color: "#3b82f6" }, { name: "Twitter", variable: "twitter_url", color: "#0ea5e9" }, { name: "YouTube", variable: "youtube_url", color: "#ef4444" }, { name: "Website", variable: "website_url", color: "#6366f1" }].map((item) => (
                                         <div key={item.variable}>
                                             <label style={{ fontSize: "0.875rem", fontWeight: "700", color: item.color, marginBottom: "0.5rem", display: "block" }}>{item.name}</label>
                                             <input type="url" placeholder={`https://${item.name.toLowerCase()}.com/...`} value={social?.[item.variable] || ""} onChange={(e) => setNewSocial({ ...social, [item.variable]: e.target.value })} style={{ width: "100%", border: "1px solid var(--glass-border)", borderRadius: "8px", padding: "0.75rem", outline: "none", fontSize: "0.875rem", background: "var(--bg-primary)", color: "var(--text-primary)" }} />

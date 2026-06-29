@@ -31,7 +31,7 @@ export const createCourse = async (req, res) => {
       .from("course")
       .select("*")
       .match({
-        dueDate: data.dueDate,
+        duedate: data.duedate || data.dueDate || null,
         chapter: data.chapter,
         title: data.title,
         class_id: classId,

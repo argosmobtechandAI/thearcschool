@@ -15,6 +15,7 @@ import notificationsRouter from "../shared/notifications/routes.js";
 import passwordRoutes from "./passwordRoutes.js";
 import { getTeacherProfile } from "./controller.js";
 import { getClassPerformance } from "./performanceController.js";
+import { getNewsletters, addNewsletter, deleteNewsletter } from "../shared/info/controller.js";
 
 const teacherRouter = Router();
 
@@ -51,8 +52,11 @@ teacherRouter.get("/classes/:id/performance", getClassPerformance);
 // Teacher Profile / Assignments
 teacherRouter.get("/profile", getTeacherProfile);
 
-// Events & Info (Read-only)
+// Events & Info
 teacherRouter.get("/events", getPlannerEvents);
+teacherRouter.get("/newsletters", getNewsletters);
+teacherRouter.post("/newsletters", addNewsletter);
+teacherRouter.delete("/newsletters/:id", deleteNewsletter);
 
 // Complaints / Disciplinary Notes
 import { getComplaints } from "../shared/complaints/controller.js";

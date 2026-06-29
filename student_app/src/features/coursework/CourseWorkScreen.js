@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  RefreshControl, ActivityIndicator, Modal, FlatList, Alert
+  RefreshControl, ActivityIndicator, Modal, FlatList, Alert, Linking
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Feather';
 import RNFS from 'react-native-fs';
@@ -64,23 +64,17 @@ const CourseWorkScreen = () => {
 
   const handleDownload = async (fileUrl) => {
     if (!fileUrl) return;
-    const fileName = fileUrl.split('/').pop();
-    const localPath = `${RNFS.DocumentDirectoryPath}/${fileName}`;
-
     try {
       setDownloadingFile(fileUrl);
-      const downloadResult = await RNFS.downloadFile({
-        fromUrl: fileUrl,
-        toFile: localPath,
-      }).promise;
-
-      if (downloadResult.statusCode === 200) {
-        await FileViewer.open(localPath);
+      const formattedUrl = fileUrl.startsWith('http') ? fileUrl : `https://${fileUrl}`;
+      const supported = await Linking.canOpenURL(formattedUrl);
+      if (supported) {
+        await Linking.openURL(formattedUrl);
       } else {
-        Alert.alert('Download Failed', `Server returned status: ${downloadResult.statusCode}`);
+        Alert.alert('Error', 'Cannot open this file type on this device.');
       }
     } catch (err) {
-      Alert.alert('Error', 'Could not open attachment. Make sure you have a compatible PDF/Word reader installed.');
+      Alert.alert('Error', 'Could not open attachment link.');
     } finally {
       setDownloadingFile(null);
     }
