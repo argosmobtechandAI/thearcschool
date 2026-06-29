@@ -10,49 +10,54 @@ export const generateToken = async (data, type) => {
 };
 
 export const calculateStudentScore = async (student) => {
-  const sevenDaysAgo = new Date();
-  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+  try {
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
 
-  // Attendance Score
-  let attendanceCount = 0;
+    // Attendance Score
+    let attendanceCount = 0;
 
-  if (Array.isArray(student?.attendance)) {
-    attendanceCount = student.attendance.filter(
-      (a) => new Date(a.date) >= sevenDaysAgo && a.status === "present"
-    ).length;
-  }
+    if (Array.isArray(student?.attendance)) {
+      attendanceCount = student.attendance.filter(
+        (a) => new Date(a.date) >= sevenDaysAgo && a.status === "present"
+      ).length;
+    }
 
-  // Complaint Count
-  let complaintCount = 0;
+    // Complaint Count
+    let complaintCount = 0;
 
-  if (Array.isArray(student?.complaints) && student.complaints.length > 0) {
-    // Convert to numbers and remove invalid values
-    const complaintIds = student.complaints
-      .map((id) => Number(id))
-      .filter((id) => !isNaN(id));
+    if (Array.isArray(student?.complaints) && student.complaints.length > 0) {
+      // Convert to numbers and remove invalid values
+      const complaintIds = student.complaints
+        .map((id) => Number(id))
+        .filter((id) => !isNaN(id));
 
-    if (complaintIds.length > 0) {
-      const { data: complaints, error } = await supabase
-        .from("complaints")
-        .select("*")
-        .in("id", complaintIds);
+      if (complaintIds.length > 0) {
+        const { data: complaints, error } = await supabase
+          .from("complaints")
+          .select("*")
+          .in("id", complaintIds);
 
-      if (!error && complaints) {
-        complaintCount = complaints.filter(
-          (c) => new Date(c.date) >= sevenDaysAgo
-        ).length;
+        if (!error && complaints) {
+          complaintCount = complaints.filter(
+            (c) => new Date(c.date) >= sevenDaysAgo
+          ).length;
+        } else {
+          complaintCount = 0;
+        }
       } else {
         complaintCount = 0;
       }
     } else {
       complaintCount = 0;
     }
-  } else {
-    complaintCount = 0;
+
+    // Final Score Formula
+    const score = attendanceCount * 10 - complaintCount * 5;
+
+    return score;
+  } catch (error) {
+    console.error("Error calculating student score:", error);
+    return 0; // Return a default score on failure
   }
-
-  // Final Score Formula
-  const score = attendanceCount * 10 - complaintCount * 5;
-
-  return score;
 };

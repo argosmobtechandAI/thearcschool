@@ -45,12 +45,16 @@ const ProfileScreen = ({ navigation }) => {
   }, [profileData]);
 
   const handleLogout = async () => {
-    await Keychain.resetGenericPassword();
-    await AsyncStorage.removeItem('@auth_user');
-    await AsyncStorage.removeItem('@auth_token');
-    dispatch(apiSlice.util.resetApiState());
-    dispatch(clearAppState());
-    dispatch(logout());
+    try {
+      await Keychain.resetGenericPassword();
+      await AsyncStorage.removeItem('@auth_user');
+      await AsyncStorage.removeItem('@auth_token');
+      dispatch(apiSlice.util.resetApiState());
+      dispatch(clearAppState());
+      dispatch(logout());
+    } catch (e) {
+      console.error("Error during logout:", e);
+    }
   };
 
   const InfoCard = ({ icon, title, value, color }) => (

@@ -27,15 +27,23 @@ export const createCourse = async (req, res) => {
     const classId = classData[0].id;
 
     // 1️⃣ Check Existing Course (Assignment)
-    const { data: existingcourse, error: checkError } = await supabase
+    let query = supabase
       .from("course")
       .select("*")
       .match({
-        duedate: data.duedate || data.dueDate || null,
         chapter: data.chapter,
         title: data.title,
         class_id: classId,
       });
+
+    const dueDateVal = data.duedate || data.dueDate || null;
+    if (dueDateVal) {
+      query = query.eq('duedate', dueDateVal);
+    } else {
+      query = query.is('duedate', null);
+    }
+
+    const { data: existingcourse, error: checkError } = await query;
 
     if (checkError) throw checkError;
 
@@ -130,6 +138,10 @@ export const getcourse = async (req, res) => {
   try {
     let query = supabase.from("course").select("*, class(name, section), solution:course_submissions(*)");
 
+    if (req.query.classId) {
+      query = query.eq("class_id", req.query.classId);
+    }
+
     if (req.user && req.user.type === 'teacher') {
       const [{ data: classTeachers }, { data: subjectTeachers }] = await Promise.all([
         supabase.from("class_teachers").select("class_id").eq("teacher_id", req.user.id),
@@ -179,6 +191,11 @@ export const updatecourse = async (req, res) => {
 
   try {
     const updateData = { ...data };
+    
+    // Convert empty strings to null for date fields to avoid type errors
+    if (updateData.date === "") updateData.date = null;
+    if (updateData.duedate === "") updateData.duedate = null;
+    
     if (updateData.class && updateData.section) {
         const { data: classData } = await supabase.from("class").select("id").match({ name: updateData.class, section: updateData.section });
         if (classData && classData.length > 0) {
@@ -306,9 +323,29 @@ export const getStudentCourses = async (req, res) => {
 
     if (error) throw error;
 
+    const courseIds = courses.map(c => c.id);
+    let submittedCourseIds = new Set();
+    
+    if (courseIds.length > 0) {
+      const { data: submissions } = await supabase
+        .from("course_submissions")
+        .select("course_id")
+        .eq("student_id", userId)
+        .in("course_id", courseIds);
+        
+      if (submissions) {
+        submittedCourseIds = new Set(submissions.map(s => s.course_id));
+      }
+    }
+
+    const mappedCourses = courses.map(c => ({
+      ...c,
+      isSubmitted: submittedCourseIds.has(c.id)
+    }));
+
     return res.status(200).json({
       success: true,
-      courses: courses || [],
+      courses: mappedCourses || [],
     });
   } catch (e) {
     return res.status(500).json({ success: false, message: e.message });

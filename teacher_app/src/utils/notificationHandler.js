@@ -102,7 +102,7 @@ export const getFCMToken = async () => {
     const token = await messaging().getToken();
     return token;
   } catch (error) {
-    console.error("Failed to get FCM token", error);
+    console.warn("Failed to get FCM token", error);
     return null;
   }
 };

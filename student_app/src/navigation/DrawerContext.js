@@ -81,9 +81,13 @@ const DrawerContent = ({ close }) => {
   };
 
   const handleLogout = async () => {
-    close();
-    await Keychain.resetGenericPassword();
-    dispatch(logout());
+    try {
+      close();
+      await Keychain.resetGenericPassword();
+      dispatch(logout());
+    } catch (e) {
+      console.error("Error during logout", e);
+    }
   };
 
   return (

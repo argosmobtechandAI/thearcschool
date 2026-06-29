@@ -32,8 +32,12 @@ const ProfileScreen = ({ navigation }) => {
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   
   const onRefresh = useCallback(async () => {
-        await refetch();
-      }, [refetch]);
+    try {
+      await refetch();
+    } catch (e) {
+      console.error("Error refreshing profile:", e);
+    }
+  }, [refetch]);
 
   const profile = data?.data?.profile || {};
   const classInfo = data?.data?.classInfo || {};
@@ -42,8 +46,12 @@ const ProfileScreen = ({ navigation }) => {
     .split(' ').map(p => p[0]).slice(0, 2).join('').toUpperCase();
 
   const handleLogout = async () => {
-    await Keychain.resetGenericPassword();
-    dispatch(logout());
+    try {
+      await Keychain.resetGenericPassword();
+      dispatch(logout());
+    } catch (e) {
+      console.error("Error logging out:", e);
+    }
   };
 
   return (

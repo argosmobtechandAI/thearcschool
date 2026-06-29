@@ -47,8 +47,12 @@ const FeesScreen = ({ navigation }) => {
   const availableYears = getAvailableYears();
 
   const onRefresh = useCallback(async () => {
-        await refetch();
-      }, [refetch]);
+    try {
+      await refetch();
+    } catch (e) {
+      console.error("Error refreshing fees:", e);
+    }
+  }, [refetch]);
 
   const fees = data?.fees || [];
   const feeStructure = data?.feeStructure || [];

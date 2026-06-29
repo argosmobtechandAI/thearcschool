@@ -620,7 +620,7 @@ const styles = StyleSheet.create({
   totalSub: { color: colors.surface + 'E6', fontSize: 13, marginTop: 2 },
   totalCount: { color: colors.surface, fontSize: 32, fontWeight: '900' },
 
-  gridContainer: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' },
+  gridContainer: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
   sectionTitle: { fontSize: 14, fontWeight: '800', color: colors.textMuted, marginBottom: 16, marginTop: 16, letterSpacing: 0.5 },
   gridItem: {
     width: '31%', backgroundColor: colors.surface,

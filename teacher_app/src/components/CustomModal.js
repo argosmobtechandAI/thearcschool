@@ -89,55 +89,57 @@ const CustomModal = ({
       animationType="none" // We handle animation manually
       onRequestClose={handleDismiss}
     >
-      <TouchableWithoutFeedback onPress={handleDismiss}>
-        <View style={styles.overlay}>
-          <TouchableWithoutFeedback>
-            <Animated.View 
-              style={[
-                styles.modalContainer, 
-                { 
-                  transform: [{ scale: scaleValue }],
-                  opacity: opacityValue 
-                }
-              ]}
-            >
-              {/* Optional Header Icon */}
-              {icon && (
-                <View style={[styles.iconContainer, { backgroundColor: color + '15' }]}>
-                  <Icon name={icon} size={32} color={color} />
-                </View>
-              )}
+      <TouchableOpacity 
+        style={styles.overlay} 
+        activeOpacity={1} 
+        onPressOut={handleDismiss}
+      >
+        <Animated.View 
+          style={[
+            styles.modalContainer, 
+            { 
+              transform: [{ scale: scaleValue }],
+              opacity: opacityValue 
+            }
+          ]}
+          onStartShouldSetResponder={() => true}
+          onTouchEnd={(e) => e.stopPropagation()}
+        >
+          {/* Optional Header Icon */}
+          {icon && (
+            <View style={[styles.iconContainer, { backgroundColor: color + '15' }]}>
+              <Icon name={icon} size={32} color={color} />
+            </View>
+          )}
 
-              {/* Title & Message */}
-              {title && <Text style={styles.title}>{title}</Text>}
-              {message && <Text style={styles.message}>{message}</Text>}
+          {/* Title & Message */}
+          {title && <Text style={styles.title}>{title}</Text>}
+          {message && <Text style={styles.message}>{message}</Text>}
 
-              {/* Custom Content */}
-              {children && <View style={styles.childrenContainer}>{children}</View>}
+          {/* Custom Content */}
+          {children && <View style={styles.childrenContainer}>{children}</View>}
 
-              {/* Buttons */}
-              <View style={styles.buttonContainer}>
-                {onSecondaryPress && (
-                  <TouchableOpacity 
-                    style={[styles.button, styles.secondaryButton]} 
-                    onPress={onSecondaryPress}
-                  >
-                    <Text style={styles.secondaryButtonText}>{secondaryButtonText}</Text>
-                  </TouchableOpacity>
-                )}
-                {onPrimaryPress && (
-                  <TouchableOpacity 
-                    style={[styles.button, { backgroundColor: color }]} 
-                    onPress={onPrimaryPress}
-                  >
-                    <Text style={styles.primaryButtonText}>{primaryButtonText}</Text>
-                  </TouchableOpacity>
-                )}
-              </View>
-            </Animated.View>
-          </TouchableWithoutFeedback>
-        </View>
-      </TouchableWithoutFeedback>
+          {/* Buttons */}
+          <View style={styles.buttonContainer}>
+            {onSecondaryPress && (
+              <TouchableOpacity 
+                style={[styles.button, styles.secondaryButton]} 
+                onPress={onSecondaryPress}
+              >
+                <Text style={styles.secondaryButtonText}>{secondaryButtonText}</Text>
+              </TouchableOpacity>
+            )}
+            {onPrimaryPress && (
+              <TouchableOpacity 
+                style={[styles.button, { backgroundColor: color }]} 
+                onPress={onPrimaryPress}
+              >
+                <Text style={styles.primaryButtonText}>{primaryButtonText}</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        </Animated.View>
+      </TouchableOpacity>
     </Modal>
   );
 };

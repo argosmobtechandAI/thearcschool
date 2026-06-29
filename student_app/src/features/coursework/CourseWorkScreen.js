@@ -61,6 +61,24 @@ const CourseWorkScreen = () => {
   })();
 
   const activeGroup = selectedSubject ? subjectGroups.find(g => g.name === selectedSubject) : null;
+  const [statusFilter, setStatusFilter] = useState('All'); // 'All', 'Pending', 'Submitted'
+  const [sortOrder, setSortOrder] = useState('Newest First'); // 'Newest First', 'Oldest First'
+
+  // Filter and sort active group items
+  const displayItems = (activeGroup?.items || [])
+    .filter(item => {
+      if (activeTab === 0) return true; // Study Material has no status filter
+      if (statusFilter === 'All') return true;
+      if (statusFilter === 'Pending' && !item.isSubmitted) return true;
+      if (statusFilter === 'Submitted' && item.isSubmitted) return true;
+      return false;
+    })
+    .sort((a, b) => {
+      const dateA = new Date(a.date || a.created_at || 0);
+      const dateB = new Date(b.date || b.created_at || 0);
+      if (sortOrder === 'Newest First') return dateB - dateA;
+      return dateA - dateB;
+    });
 
   const handleDownload = async (fileUrl) => {
     if (!fileUrl) return;
@@ -84,7 +102,16 @@ const CourseWorkScreen = () => {
     const isMaterial = item.type === 'study_material';
     return (
       <View style={styles.detailCard}>
-        <Text style={styles.detailTitle}>{item.title}</Text>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+          <Text style={[styles.detailTitle, { flex: 1 }]}>{item.title}</Text>
+          {!isMaterial && (
+            <View style={[styles.statusChip, { backgroundColor: item.isSubmitted ? colors.success + '20' : colors.warning + '20' }]}>
+              <Text style={[styles.statusChipText, { color: item.isSubmitted ? colors.success : colors.warning }]}>
+                {item.isSubmitted ? 'Submitted' : 'Pending'}
+              </Text>
+            </View>
+          )}
+        </View>
         
         {/* Structured layout exactly matching client requirements */}
         <View style={styles.clientFormatContainer}>
@@ -191,7 +218,7 @@ const CourseWorkScreen = () => {
               <TouchableOpacity
                 key={tab}
                 style={[styles.segmentTab, activeTab === i && styles.segmentTabActive]}
-                onPress={() => { setActiveTab(i); setSelectedSubject(null); }}
+                onPress={() => { setActiveTab(i); setSelectedSubject(null); setStatusFilter('All'); setSortOrder('Newest First'); }}
                 activeOpacity={0.8}
               >
                 <Text style={[styles.segmentText, activeTab === i && styles.segmentTextActive]}>
@@ -248,8 +275,36 @@ const CourseWorkScreen = () => {
                 </TouchableOpacity>
               </View>
 
+              {activeTab !== 0 && (
+                <View style={{ flexDirection: 'row', paddingHorizontal: 20, marginBottom: 12, gap: 8 }}>
+                  {['All', 'Pending', 'Submitted'].map(f => (
+                    <TouchableOpacity
+                      key={f}
+                      style={[styles.filterChip, statusFilter === f && styles.filterChipActive]}
+                      onPress={() => setStatusFilter(f)}
+                    >
+                      <Text style={[styles.filterChipText, statusFilter === f && styles.filterChipTextActive]}>{f}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              )}
+
+              {activeTab === 0 && (
+                <View style={{ flexDirection: 'row', paddingHorizontal: 20, marginBottom: 12, gap: 8 }}>
+                  {['Newest First', 'Oldest First'].map(s => (
+                    <TouchableOpacity
+                      key={s}
+                      style={[styles.filterChip, sortOrder === s && styles.filterChipActive]}
+                      onPress={() => setSortOrder(s)}
+                    >
+                      <Text style={[styles.filterChipText, sortOrder === s && styles.filterChipTextActive]}>{s}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              )}
+
               <FlatList
-                data={activeGroup.items}
+                data={displayItems}
                 keyExtractor={(item) => item.id.toString()}
                 renderItem={renderDetailItem}
                 contentContainerStyle={{ paddingBottom: 40 }}
@@ -320,6 +375,14 @@ const styles = StyleSheet.create({
   modalContent: { backgroundColor: '#fff', borderTopLeftRadius: 24, borderTopRightRadius: 24, height: '80%', padding: 20 },
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
   modalTitle: { fontSize: 18, fontWeight: '700', color: colors.text, fontFamily: theme.typography.fontFamily.heading },
+
+  filterChip: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16, backgroundColor: colors.border, borderWidth: 1, borderColor: colors.border },
+  filterChipActive: { backgroundColor: colors.primary + '15', borderColor: colors.primary },
+  filterChipText: { fontSize: 12, fontWeight: '600', color: colors.textMuted },
+  filterChipTextActive: { color: colors.primary },
+  
+  statusChip: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8 },
+  statusChipText: { fontSize: 11, fontWeight: '700' },
 
   detailCard: { backgroundColor: '#f8fafc', borderWidth: 1, borderColor: colors.border, borderRadius: 16, padding: 16, marginBottom: 16 },
   detailTitle: { fontSize: 16, fontWeight: '700', color: colors.text, marginBottom: 12, fontFamily: theme.typography.fontFamily.bold },

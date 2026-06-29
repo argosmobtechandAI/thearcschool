@@ -48,6 +48,9 @@ const CourseWorkListScreen = ({ route, navigation }) => {
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [datePickerField, setDatePickerField] = useState('date'); // 'date' or 'duedate'
   const [hasSubmitted, setHasSubmitted] = useState(false);
+  const [dateFilter, setDateFilter] = useState('All Time'); // 'All Time', 'Last 7 Days', 'This Month', 'Previous Month'
+  const [searchQuery, setSearchQuery] = useState('');
+  
   const [alertConfig, setAlertConfig] = useState({
     visible: false,
     type: 'default',
@@ -128,10 +131,36 @@ const CourseWorkListScreen = ({ route, navigation }) => {
   const [updateCourse, { isLoading: updatingCourse }] = useUpdateCourseMutation();
   const [deleteCourse] = useDeleteCourseMutation();
 
-  // Filter courses locally by coursework type and subject filter
   const filteredCourses = (coursesData?.courses || []).filter(c => {
     if (c.type !== activeTab) return false;
     if (subjectFilter !== 'All' && c.subject !== subjectFilter) return false;
+    if (selectedClassId !== 'all' && c.class_id !== selectedClassId) return false;
+    
+    // Search filter
+    if (searchQuery.trim() !== '') {
+      const query = searchQuery.toLowerCase();
+      const matchTitle = c.title && c.title.toLowerCase().includes(query);
+      const matchChapter = c.chapter && c.chapter.toLowerCase().includes(query);
+      if (!matchTitle && !matchChapter) return false;
+    }
+    
+    // Date filter
+    if (dateFilter !== 'All Time' && c.date) {
+      const cDate = new Date(c.date);
+      const today = new Date();
+      if (dateFilter === 'Last 7 Days') {
+        const sevenDaysAgo = new Date();
+        sevenDaysAgo.setDate(today.getDate() - 7);
+        if (cDate < sevenDaysAgo) return false;
+      } else if (dateFilter === 'This Month') {
+        if (cDate.getMonth() !== today.getMonth() || cDate.getFullYear() !== today.getFullYear()) return false;
+      } else if (dateFilter === 'Previous Month') {
+        const prevMonth = new Date();
+        prevMonth.setMonth(today.getMonth() - 1);
+        if (cDate.getMonth() !== prevMonth.getMonth() || cDate.getFullYear() !== prevMonth.getFullYear()) return false;
+      }
+    }
+    
     return true;
   });
 
@@ -422,6 +451,17 @@ const CourseWorkListScreen = ({ route, navigation }) => {
         </TouchableOpacity>
       </View>
 
+      {/* Search Bar */}
+      <View style={{ paddingHorizontal: 16, paddingVertical: 10, backgroundColor: colors.surface, borderBottomWidth: 1, borderBottomColor: colors.border }}>
+        <TextInput
+          style={{ backgroundColor: colors.background, borderRadius: 12, paddingHorizontal: 16, paddingVertical: 10, color: colors.text, fontSize: 14 }}
+          placeholder="Search by title or chapter..."
+          placeholderTextColor={colors.textMuted}
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+        />
+      </View>
+
       {coursesLoading ? (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={colors.primary} />
@@ -454,7 +494,22 @@ const CourseWorkListScreen = ({ route, navigation }) => {
           } else if (classes && classes.length === 1) {
             initialClassId = classes[0].classId;
           }
-          setFormData(prev => ({ ...prev, classId: initialClassId || activeClassId, subject: '', date: new Date().toISOString().split('T')[0], day: getDayName(new Date().toISOString().split('T')[0]) }));
+          setFormData({
+            title: '',
+            subject: '',
+            classId: initialClassId || activeClassId,
+            chapter: '',
+            duedate: '',
+            date: new Date().toISOString().split('T')[0],
+            day: getDayName(new Date().toISOString().split('T')[0]),
+            topics_taught: '',
+            unit: '',
+            lesson_no: '',
+            page_number: '',
+            others: '',
+            homework: '',
+          });
+          setFileDetails(null);
           setIsModalOpen(true);
         }}
       >
@@ -471,7 +526,7 @@ const CourseWorkListScreen = ({ route, navigation }) => {
         secondaryButtonText="Cancel"
         onSecondaryPress={() => { setIsModalOpen(false); setIsEditing(false); setEditId(null); }}
       >
-        <ScrollView ref={scrollViewRef} keyboardShouldPersistTaps="handled" style={{ maxHeight: 400, width: '100%' }} contentContainerStyle={styles.formScroll} showsVerticalScrollIndicator={false}>
+        <ScrollView ref={scrollViewRef} keyboardShouldPersistTaps="handled" style={{ maxHeight: 500, width: '100%' }} contentContainerStyle={styles.formScroll} showsVerticalScrollIndicator={true}>
               
               {/* Title Input */}
               <View style={styles.inputGroup}>
@@ -682,12 +737,13 @@ const CourseWorkListScreen = ({ route, navigation }) => {
         <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setFilterMenuVisible(false)}>
           <View style={[styles.modalContent, { height: undefined, marginTop: 'auto', marginBottom: 0, borderBottomLeftRadius: 0, borderBottomRightRadius: 0, paddingBottom: 40 }]}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Filter by Subject</Text>
+              <Text style={styles.modalTitle}>Filters</Text>
               <TouchableOpacity onPress={() => setFilterMenuVisible(false)}>
                 <Icon name="x" size={24} color={colors.text} />
               </TouchableOpacity>
             </View>
-            <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 300 }}>
+            <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 350 }}>
+              <Text style={{ fontSize: 12, fontWeight: '800', color: colors.textMuted, letterSpacing: 1, marginBottom: 8 }}>SUBJECT</Text>
               <TouchableOpacity
                 style={[styles.dropdownItem, subjectFilter === 'All' && styles.dropdownItemActive]}
                 onPress={() => { setSubjectFilter('All'); setFilterMenuVisible(false); }}
@@ -705,6 +761,18 @@ const CourseWorkListScreen = ({ route, navigation }) => {
                   {subjectFilter === sub && <Icon name="check" size={16} color={colors.primary} />}
                 </TouchableOpacity>
               ))}
+              
+              <Text style={{ fontSize: 12, fontWeight: '800', color: colors.textMuted, letterSpacing: 1, marginTop: 24, marginBottom: 8 }}>DATE</Text>
+              {['All Time', 'Last 7 Days', 'This Month', 'Previous Month'].map((df, idx) => (
+                <TouchableOpacity
+                  key={idx}
+                  style={[styles.dropdownItem, dateFilter === df && styles.dropdownItemActive]}
+                  onPress={() => { setDateFilter(df); setFilterMenuVisible(false); }}
+                >
+                  <Text style={[styles.dropdownItemText, dateFilter === df && styles.dropdownItemTextActive]}>{df}</Text>
+                  {dateFilter === df && <Icon name="check" size={16} color={colors.primary} />}
+                </TouchableOpacity>
+              ))}
             </ScrollView>
           </View>
         </TouchableOpacity>
@@ -718,6 +786,19 @@ const CourseWorkListScreen = ({ route, navigation }) => {
           onChange={onChangeDate}
         />
       )}
+
+      {/* Alert Modal */}
+      <CustomModal
+        visible={alertConfig.visible}
+        type={alertConfig.type}
+        title={alertConfig.title}
+        message={alertConfig.message}
+        primaryButtonText={alertConfig.confirmText}
+        onPrimaryPress={alertConfig.onConfirm}
+        secondaryButtonText={alertConfig.cancelText}
+        onSecondaryPress={alertConfig.onCancel}
+        onClose={hideAlert}
+      />
     </View>
   );
 };
@@ -739,12 +820,13 @@ const styles = StyleSheet.create({
   loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   listContent: { padding: 16, paddingBottom: 80 },
   card: { backgroundColor: colors.surface, borderRadius: 16, padding: 16, marginBottom: 16, ...shadows.card },
-  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
-  cardMeta: { flexDirection: 'row', gap: 10 },
+  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 },
+  cardMeta: { flexDirection: 'row', gap: 10, flexWrap: 'wrap', flex: 1, paddingRight: 10 },
   cardClass: { fontSize: 12, fontWeight: '700', color: colors.primary, backgroundColor: colors.primary + '15', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 },
-  cardSubject: { fontSize: 12, fontWeight: '700', color: colors.textMuted },
+  cardSubject: { fontSize: 12, fontWeight: '700', color: colors.textMuted, marginTop: 2 },
+  editBtn: { padding: 6 },
   deleteBtn: { padding: 6 },
-  cardTitle: { fontSize: 16, fontWeight: '700', color: colors.text, marginBottom: 10 },
+  cardTitle: { fontSize: 18, fontWeight: '700', color: colors.text, marginTop: 4, marginBottom: 14 },
   
   detailsBlock: { backgroundColor: colors.borderLight, borderRadius: 10, padding: 12, gap: 6 },
   detailText: { fontSize: 13, color: colors.textMuted },

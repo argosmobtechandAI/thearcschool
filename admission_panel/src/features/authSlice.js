@@ -1,7 +1,16 @@
 import { createSlice } from "@reduxjs/toolkit";
 
+const safeJsonParse = (item) => {
+  try {
+    return item ? JSON.parse(item) : null;
+  } catch (e) {
+    console.error("Error parsing adminUser from localStorage", e);
+    return null;
+  }
+};
+
 const initialState = {
-  user: JSON.parse(localStorage.getItem("adminUser")) || null,
+  user: safeJsonParse(localStorage.getItem("adminUser")),
   token: localStorage.getItem("adminToken") || null,
   isAuthenticated: !!localStorage.getItem("adminToken"),
 };

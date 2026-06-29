@@ -76,9 +76,14 @@ const TimetableScreen = ({ navigation }) => {
   const { data, isLoading, refetch } = useGetTimetableQuery(activeClassId || '');
 
   const onRefresh = async () => {
-    setRefreshing(true);
-    await refetch();
-    setRefreshing(false);
+    try {
+      setRefreshing(true);
+      await refetch();
+      setRefreshing(false);
+    } catch (e) {
+      console.error("Error refreshing timetable:", e);
+      setRefreshing(false);
+    }
   };
 
   const timeTables = data?.timeTables || [];

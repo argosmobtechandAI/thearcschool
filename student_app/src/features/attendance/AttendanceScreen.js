@@ -17,8 +17,12 @@ const AttendanceScreen = ({ navigation }) => {
   const { data: eventsData, refetch: refetchEvents } = useGetEventsQuery();
 
   const onRefresh = useCallback(async () => {
-        await Promise.all([refetch(), refetchEvents()]);
-      }, [refetch, refetchEvents]);
+    try {
+      await Promise.all([refetch(), refetchEvents()]);
+    } catch (e) {
+      console.error("Error refreshing attendance data:", e);
+    }
+  }, [refetch, refetchEvents]);
 
   // Backend returns data.attendance OR data.records — support both
   const allRecords = data?.attendance || data?.records || [];

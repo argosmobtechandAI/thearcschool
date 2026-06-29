@@ -76,13 +76,18 @@ export const markNotificationsAsRead = () => api.patch('/admin_panel/notificatio
 
 // File Upload API (proxied through backend — NO direct Supabase access)
 export const uploadFile = async (file, bucket = "school", category = "") => {
-  const formData = new FormData();
-  formData.append("file", file);
-  formData.append("bucket", bucket);
-  const response = await api.post(`/upload/file?category=${category || bucket}`, formData, {
-    headers: { "Content-Type": "multipart/form-data" },
-  });
-  return response.data.url;
+  try {
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("bucket", bucket);
+    const response = await api.post(`/upload/file?category=${category || bucket}`, formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+    return response.data.url;
+  } catch (error) {
+    console.error("Error uploading file:", error);
+    throw error;
+  }
 };
 
 // Consents API

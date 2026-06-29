@@ -76,7 +76,11 @@ const TimetableScreen = ({ route, navigation }) => {
   }, [route?.params?.date]);
 
   const onRefresh = async () => {
-    await refetch();
+    try {
+      await refetch();
+    } catch (e) {
+      console.error("Error refreshing timetable:", e);
+    }
   };
 
   const timeTables = data?.timeTables || [];

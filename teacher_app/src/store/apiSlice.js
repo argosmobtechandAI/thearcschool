@@ -197,6 +197,7 @@ export const {
   useGetExamsQuery,
   useGetCoursesQuery,
   useCreateCourseMutation,
+  useUpdateCourseMutation,
   useDeleteCourseMutation,
   useGetEventsQuery,
   useGetNewslettersQuery,
