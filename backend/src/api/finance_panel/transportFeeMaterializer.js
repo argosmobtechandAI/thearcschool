@@ -43,7 +43,7 @@ export const autoMaterializeTransportFees = async () => {
       const mIndex = (3 + i) % 12;
       const mYear = (3 + i) > 11 ? sessionStartYear + 1 : sessionStartYear;
       const feeTitle = `Transport Fee - ${monthNames[mIndex]} ${mYear}`;
-      const dueDate = new Date(mYear, mIndex, 10).toISOString().split('T')[0];
+      const dueDate = `${mYear}-${String(mIndex + 1).padStart(2, '0')}-10`;
 
       for (const s of students) {
         let amount = s.bus_fee;
