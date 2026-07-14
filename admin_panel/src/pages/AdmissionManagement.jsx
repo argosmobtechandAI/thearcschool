@@ -119,6 +119,7 @@ const AdmissionManagement = () => {
         phone: String(user.phone),
         monthly_fee: user.monthly_fee || 0,
         bus_fee: user.bus_fee || 0,
+        bus_start_date: user.bus_start_date || "",
         address: "",
         links: { fb: "", insta: "", linkdIn: "", twitter: "" },
       };
@@ -147,7 +148,7 @@ const AdmissionManagement = () => {
 
   const closeModal = () => {
     setEditingId(null);
-    setFormData({ name: "", email: "", parent: "", parentEmail: "", phone: "", status: "Pending", dob: "", gender: "", documents: [], monthly_fee: "", bus_fee: "", assigned_to: "", avatar_url: "" });
+    setFormData({ name: "", email: "", parent: "", parentEmail: "", phone: "", status: "Pending", dob: "", gender: "", documents: [], monthly_fee: "", bus_fee: "", bus_start_date: "", assigned_to: "", avatar_url: "" });
     setSelectedFiles({ aadhar: null, pan: null, birthCertificate: null, avatar: null });
     setOpenModal(false);
   };
@@ -173,6 +174,8 @@ const AdmissionManagement = () => {
       gender: user.gender,
       documents: user.documents || [],
       monthly_fee: user.monthly_fee || "",
+      bus_fee: user.bus_fee || "",
+      bus_start_date: user.bus_start_date || "",
       assigned_to: user.assigned_to || "",
       avatar_url: avatarDoc ? avatarDoc.url : "",
     });
@@ -488,6 +491,16 @@ const AdmissionManagement = () => {
                   <label style={{ display: "block", marginBottom: "0.5rem", fontSize: "0.875rem" }}>Monthly Fee</label>
                   <input type="number" className="input-glass" value={formData.monthly_fee} onChange={(e) => setFormData({ ...formData, monthly_fee: e.target.value })} />
                 </div>
+                <div>
+                  <label style={{ display: "block", marginBottom: "0.5rem", fontSize: "0.875rem" }}>Bus Fee / month</label>
+                  <input type="number" className="input-glass" value={formData.bus_fee} onChange={(e) => setFormData({ ...formData, bus_fee: e.target.value })} />
+                </div>
+                {Number(formData.bus_fee) > 0 && (
+                  <div>
+                    <label style={{ display: "block", marginBottom: "0.5rem", fontSize: "0.875rem" }}>Bus Start Date</label>
+                    <input type="date" className="input-glass" value={formData.bus_start_date} onChange={(e) => setFormData({ ...formData, bus_start_date: e.target.value })} />
+                  </div>
+                )}
                 <div>
                   <label style={{ display: "block", marginBottom: "0.5rem", fontSize: "0.875rem" }}>Assign Counselor</label>
                   <select className="input-glass" value={formData.assigned_to} onChange={(e) => setFormData({ ...formData, assigned_to: e.target.value })}>

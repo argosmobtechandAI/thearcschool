@@ -2,11 +2,12 @@ import React, { useEffect, useState, useMemo } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { fetchUsers, fetchClasses } from "../features/dataSlice";
 import { useSearchParams, useNavigate } from "react-router-dom";
-import { ArrowLeft, Receipt, PlusCircle, Printer } from "lucide-react";
+import { ArrowLeft, Receipt, PlusCircle, Printer, Trash2, Edit } from "lucide-react";
 import TableFilterHeader from "../components/TableFilterHeader";
 import { useSortableData } from "../hooks/useSortableData";
 import { exportToExcel, exportToPDF, generateReceiptPDF } from "../utils/exportUtils";
 import StudentLedgerModal from "../components/StudentLedgerModal";
+import PaymentSelectionModal from "../components/PaymentSelectionModal";
 import { toast } from "react-toastify";
 import api from "../services/api";
 
@@ -31,8 +32,11 @@ const DashboardMetrics = () => {
   const [isLedgerModalOpen, setIsLedgerModalOpen] = useState(false);
   const [studentLedger, setStudentLedger] = useState({ fees: [], payments: [] });
   const [ledgerLoading, setLedgerLoading] = useState(false);
-  const [paymentForm, setPaymentForm] = useState({ feeId: "", amount: "", paymentMode: "Cash", remarks: "" });
+  const [paymentForm, setPaymentForm] = useState({ feeIds: [], amount: "", paymentMode: "Cash", remarks: "" });
   const [isPaying, setIsPaying] = useState(false);
+
+  const [isEditPaymentModalOpen, setIsEditPaymentModalOpen] = useState(false);
+  const [editingPayment, setEditingPayment] = useState(null);
 
   const [paymentsData, setPaymentsData] = useState([]);
   const [loadingPayments, setLoadingPayments] = useState(false);
@@ -83,7 +87,51 @@ const DashboardMetrics = () => {
           if (endDate) params.append("endDate", endDate);
           const res = await api.get(`/finance_panel/getAllPayments?${params.toString()}`);
           if (res.data.success) {
-            setPaymentsData(res.data.payments);
+            const grouped = res.data.payments.reduce((acc, curr) => {
+              if (curr.receipt_id) {
+                if (!acc[curr.receipt_id]) {
+                  acc[curr.receipt_id] = {
+                    ...curr,
+                    amount_paid: 0,
+                    remarks: [],
+                    isGrouped: true,
+                    groupedPayments: []
+                  };
+                }
+                acc[curr.receipt_id].amount_paid += Number(curr.amount_paid || 0);
+                
+                let title = 'General Fee';
+                if (curr.fee?.title) title = curr.fee.title;
+                else if (curr.fee_title) title = curr.fee_title;
+                else if (curr.remarks && curr.remarks.startsWith("Fee Payment: ")) {
+                   title = curr.remarks.replace("Fee Payment: ", "").trim();
+                }
+                title = title.replace(/\(\+₹0 Late Fee\)/g, "").replace(/\(\+Rs\. 0 Late Fee\)/g, "").trim();
+                if (title.includes(",")) {
+                   // legacy
+                   acc[curr.receipt_id].remarks.push(...title.split(",").map(s => s.trim()));
+                } else {
+                   acc[curr.receipt_id].remarks.push(title);
+                }
+                
+                acc[curr.receipt_id].groupedPayments.push(curr);
+              } else {
+                acc[`no-receipt-${curr.id}`] = curr;
+              }
+              return acc;
+            }, {});
+
+            const processedPayments = Object.values(grouped).map(p => {
+              if (p.isGrouped) {
+                return {
+                  ...p,
+                  remarks: [...new Set(p.remarks)].join(", ")
+                };
+              }
+              return p;
+            }).sort((a,b) => new Date(b.created_at) - new Date(a.created_at));
+
+            setPaymentsData(processedPayments);
           }
         } catch (error) {
           toast.error("Failed to load payments ledger");
@@ -108,16 +156,8 @@ const DashboardMetrics = () => {
   const processedData = useMemo(() => {
     let data = users.filter(u => u.type === "student");
 
-    // Filter by createdAt for active students / exempted
-    if ((currentView === "students" || currentView === "exempted") && (startDate || endDate)) {
-      data = data.filter(s => {
-        if (!s.created_at) return true;
-        const d = new Date(s.created_at);
-        if (startDate && d < new Date(`${startDate}T00:00:00.000Z`)) return false;
-        if (endDate && d > new Date(`${endDate}T23:59:59.999Z`)) return false;
-        return true;
-      });
-    }
+    // Removed date filtering for students/exempted so it doesn't hide students
+    // when a date range (like "Today") is selected for checking payments.
 
     const enriched = data.map(s => {
       let className = "N/A";
@@ -304,41 +344,104 @@ const DashboardMetrics = () => {
 
   const handlePaymentSubmit = async (e) => {
     e.preventDefault();
-    if (!paymentForm.feeId || !paymentForm.amount) {
-      return toast.error("Please fill all required fields");
+    if (!paymentForm.feeIds || paymentForm.feeIds.length === 0 || !paymentForm.amount) {
+      return toast.error("Please select at least one fee and enter an amount");
     }
-
-    const selectedFee = studentLedger.fees.find(f => f.id === paymentForm.feeId);
-    const feeTitle = selectedFee ? selectedFee.fee?.title : undefined;
 
     setIsPaying(true);
     try {
+        let remainingAmount = Number(paymentForm.amount);
+        let totalPaymentAmount = 0;
+        const feeTitles = [];
+        
+        for (const feeId of paymentForm.feeIds) {
+            const feeObj = studentLedger.fees.find(f => f.id === feeId);
+            if (!feeObj) continue;
+            
+            const dueAmount = Number(feeObj.fee?.amount || 0) - Number(feeObj.total_paid_amount || 0);
+            if (remainingAmount <= 0) break;
+            
+            const paymentAmount = Math.min(remainingAmount, dueAmount);
+            totalPaymentAmount += paymentAmount;
+            feeTitles.push(feeObj.fee?.title || "Fee");
+            remainingAmount -= paymentAmount;
+        }
+
+        if (totalPaymentAmount === 0) {
+            setIsPaying(false);
+            return toast.error("Invalid payment configuration");
+        }
+
+        const consolidatedPayload = [{
+            feeId: paymentForm.feeIds[0],
+            amount: totalPaymentAmount,
+            title: feeTitles.join(", ")
+        }];
+
       const res = await api.post("/finance_panel/logPayment", {
         data: {
           studentId: selectedStudent.id,
           paymentMode: paymentForm.paymentMode,
           remarks: paymentForm.remarks,
-          payments: [{
-            feeId: paymentForm.feeId,
-            amount: Number(paymentForm.amount),
-            title: feeTitle
-          }]
+          payments: consolidatedPayload
         }
       });
       if (res.data.success) {
         toast.success("Payment recorded successfully");
         setRefreshTrigger(prev => prev + 1);
         
-        const feeDetails = studentLedger.fees.find(f => f.fee_id === paymentForm.feeId)?.fee;
-        const completePayment = { ...res.data.payments[0], fee: feeDetails };
-        generateReceiptPDF(completePayment, selectedStudent);
+        const completePayments = res.data.payments.map((p, idx) => ({
+            ...p,
+            fee_title: consolidatedPayload[idx]?.title || p.remarks,
+            fee: { title: consolidatedPayload[idx]?.title || "Fee" }
+        }));
+        generateReceiptPDF(completePayments, selectedStudent);
 
-        setPaymentForm({ feeId: "", amount: "", paymentMode: "Cash", remarks: "" });
+        setPaymentForm({ feeIds: [], amount: "", paymentMode: "Cash", remarks: "" });
         setIsPaymentModalOpen(false);
         dispatch(fetchUsers());
       }
     } catch (err) {
       toast.error(err.response?.data?.message || "Failed to log payment");
+    } finally {
+      setIsPaying(false);
+    }
+  };
+
+  const handleDeletePayment = async (paymentId) => {
+    if (!window.confirm("Are you sure you want to delete this payment? This action cannot be undone and will recalculate dues.")) return;
+    try {
+      const res = await api.delete(`/finance_panel/payments/${paymentId}`);
+      if (res.data.success) {
+        toast.success("Payment deleted successfully");
+        setRefreshTrigger(prev => prev + 1);
+        dispatch(fetchUsers());
+      }
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Failed to delete payment");
+    }
+  };
+
+  const handleEditPaymentSubmit = async (e) => {
+    e.preventDefault();
+    if (!editingPayment.amount_paid) return toast.error("Amount is required");
+
+    setIsPaying(true);
+    try {
+      const res = await api.put(`/finance_panel/payments/${editingPayment.id}`, {
+        amount_paid: Number(editingPayment.amount_paid),
+        payment_mode: editingPayment.payment_mode,
+        remarks: editingPayment.remarks
+      });
+      if (res.data.success) {
+        toast.success("Payment updated successfully");
+        setIsEditPaymentModalOpen(false);
+        setEditingPayment(null);
+        setRefreshTrigger(prev => prev + 1);
+        dispatch(fetchUsers());
+      }
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Failed to update payment");
     } finally {
       setIsPaying(false);
     }
@@ -488,7 +591,18 @@ const DashboardMetrics = () => {
                     {selectedColumns.includes("studentName") && <td style={{ padding: "0.5rem 1rem", fontWeight: "500", color: "var(--text-primary)" }}>{p.student?.name || "N/A"}</td>}
                     {selectedColumns.includes("admissionNumber") && <td style={{ padding: "0.5rem 1rem", color: "var(--text-secondary)", fontSize: "0.875rem" }}>{p.student?.admission_number || "-"}</td>}
                     {selectedColumns.includes("class_name") && <td style={{ padding: "0.5rem 1rem", color: "var(--text-secondary)", fontSize: "0.875rem" }}>{p.className || "-"}</td>}
-                    {selectedColumns.includes("feeTitle") && <td style={{ padding: "0.5rem 1rem", color: "var(--text-secondary)" }}>{p.fee?.title || p.remarks || "N/A"}</td>}
+                    {selectedColumns.includes("feeTitle") && (
+                      <td 
+                        style={{ padding: "0.5rem 1rem", color: "var(--text-secondary)", maxWidth: "250px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
+                        title={p.fee?.title || p.remarks || "N/A"}
+                      >
+                        {(() => {
+                           let text = p.fee?.title || p.remarks || "N/A";
+                           if (typeof text === 'string' && text.startsWith("Fee Payment: ")) text = text.replace("Fee Payment: ", "");
+                           return text;
+                        })()}
+                      </td>
+                    )}
                     {selectedColumns.includes("amount") && <td style={{ padding: "0.5rem 1rem", color: "#10b981", fontWeight: "500" }}>₹{p.amount_paid}</td>}
                     {selectedColumns.includes("mode") && (
                       <td style={{ padding: "0.5rem 1rem" }}>
@@ -497,9 +611,21 @@ const DashboardMetrics = () => {
                     )}
                     {selectedColumns.includes("actions") && (
                       <td style={{ padding: "0.5rem 1rem", textAlign: "right" }}>
-                        <button onClick={() => generateReceiptPDF(p, p.student)} className="btn-ghost" style={{ display: "inline-flex", alignItems: "center", padding: "0.5rem 1rem", borderRadius: "6px", fontSize: "0.875rem", color: "var(--accent-primary)", fontWeight: "500" }}>
-                          <Printer size={16} style={{ marginRight: "0.5rem" }} /> Print Receipt
-                        </button>
+                        <div style={{ display: "flex", gap: "0.5rem", justifyContent: "flex-end" }}>
+                          <button onClick={() => generateReceiptPDF(p.isGrouped ? p.groupedPayments : p, p.student, p.receipts)} className="btn-ghost" style={{ display: "inline-flex", alignItems: "center", padding: "0.5rem 1rem", borderRadius: "6px", fontSize: "0.875rem", color: "var(--accent-primary)", fontWeight: "500" }}>
+                            <Printer size={16} style={{ marginRight: "0.5rem" }} /> Print Receipt
+                          </button>
+                          {isFinanceTeam && (
+                            <>
+                              <button onClick={() => { setEditingPayment(p); setIsEditPaymentModalOpen(true); }} className="btn-ghost" style={{ padding: "0.5rem", color: "#3b82f6", borderRadius: "6px" }} title="Edit Payment">
+                                <Edit size={16} />
+                              </button>
+                              <button onClick={() => handleDeletePayment(p.id)} className="btn-ghost" style={{ padding: "0.5rem", color: "#ef4444", borderRadius: "6px" }} title="Delete Payment">
+                                <Trash2 size={16} />
+                              </button>
+                            </>
+                          )}
+                        </div>
                       </td>
                     )}
                   </tr>
@@ -616,71 +742,55 @@ const DashboardMetrics = () => {
         </div>
       </div>
 
-      {/* Payment Modal */}
-      {isPaymentModalOpen && selectedStudent && (
-        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 50 }}>
-          <div className="glass-panel modal-content animate-fade-in" style={{ width: "100%", maxWidth: "500px", padding: "2rem" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.5rem" }}>
-              <h2 style={{ fontSize: "1.25rem", fontWeight: "700" }}>Log Payment for {selectedStudent.name}</h2>
-              <button onClick={() => setIsPaymentModalOpen(false)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: "1.5rem", color: "var(--text-secondary)" }}>&times;</button>
+      {/* New sophisticated Payment Modal */}
+      <PaymentSelectionModal 
+        isOpen={isPaymentModalOpen} 
+        onClose={() => setIsPaymentModalOpen(false)} 
+        selectedStudent={selectedStudent} 
+        onPaymentSuccess={() => setRefreshTrigger(prev => prev + 1)}
+      />
+      {/* Edit Payment Modal */}
+      {isEditPaymentModalOpen && editingPayment && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 50, padding: "1rem" }}>
+          <div className="glass-panel modal-content animate-fade-in" style={{ width: "100%", maxWidth: "500px", display: "flex", flexDirection: "column", padding: "2rem" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.5rem", flexShrink: 0 }}>
+              <h2 style={{ fontSize: "1.25rem", fontWeight: "700" }}>Edit Payment</h2>
+              <button onClick={() => { setIsEditPaymentModalOpen(false); setEditingPayment(null); }} style={{ background: "none", border: "none", cursor: "pointer", fontSize: "1.5rem", color: "var(--text-secondary)" }}>&times;</button>
             </div>
-
-            {ledgerLoading ? (
-              <p style={{ textAlign: "center", padding: "2rem" }}>Checking dues...</p>
-            ) : selectedStudent.fee_exempted ? (
-              <div style={{ padding: "2rem", textAlign: "center", background: "rgba(16, 185, 129, 0.1)", borderRadius: "8px", color: "#10b981" }}>
-                <p style={{ fontWeight: "600" }}>Student is fee exempted.</p>
-                <button onClick={() => setIsPaymentModalOpen(false)} className="btn-ghost" style={{ marginTop: "1rem" }}>Close</button>
-              </div>
-            ) : studentLedger.fees.filter(f => f.status !== "paid").length === 0 ? (
-              <div style={{ padding: "2rem", textAlign: "center", background: "rgba(0, 0, 0, 0.02)", borderRadius: "8px", color: "var(--text-secondary)" }}>
-                <p style={{ fontWeight: "500" }}>No pending dues. All clear!</p>
-                <button onClick={() => setIsPaymentModalOpen(false)} className="btn-ghost" style={{ marginTop: "1rem" }}>Close</button>
-              </div>
-            ) : (
-              <form onSubmit={handlePaymentSubmit} style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+            <form onSubmit={handleEditPaymentSubmit} style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
                 <div>
-                  <label style={{ display: "block", fontSize: "0.875rem", marginBottom: "0.5rem" }}>Select Fee</label>
-                  <select required className="input-glass" style={{ width: "100%" }} value={paymentForm.feeId} onChange={e => setPaymentForm({...paymentForm, feeId: e.target.value})}>
-                    <option value="">-- Choose Fee --</option>
-                    {studentLedger.fees.filter(f => f.status !== "paid").map(f => (
-                      <option key={f.id} value={f.id}>{f.fee?.title} (Due: ₹{Number(f.fee?.amount || 0) - Number(f.total_paid_amount || 0)})</option>
-                    ))}
+                  <label style={{ display: "block", fontSize: "0.875rem", marginBottom: "0.5rem" }}>Amount Paid (₹)</label>
+                  <input type="number" required min="1" className="input-glass" style={{ width: "100%" }} value={editingPayment.amount_paid} onChange={e => setEditingPayment({...editingPayment, amount_paid: e.target.value})} />
+                </div>
+                <div>
+                  <label style={{ display: "block", fontSize: "0.875rem", marginBottom: "0.5rem" }}>Payment Mode</label>
+                  <select className="input-glass" style={{ width: "100%" }} value={editingPayment.payment_mode} onChange={e => setEditingPayment({...editingPayment, payment_mode: e.target.value})}>
+                    <option value="Cash">Cash</option>
+                    <option value="Cheque">Cheque</option>
+                    <option value="Online">Online / UPI</option>
+                    <option value="Bank Transfer">Bank Transfer</option>
+                    <option value="Concession">Concession / Discount</option>
                   </select>
                 </div>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
-                  <div>
-                    <label style={{ display: "block", fontSize: "0.875rem", marginBottom: "0.5rem" }}>Amount Paying (₹)</label>
-                    <input type="number" required min="1" className="input-glass" style={{ width: "100%" }} value={paymentForm.amount} onChange={e => setPaymentForm({...paymentForm, amount: e.target.value})} />
-                  </div>
-                  <div>
-                    <label style={{ display: "block", fontSize: "0.875rem", marginBottom: "0.5rem" }}>Payment Mode</label>
-                      <select className="input-glass" style={{ width: "100%" }} value={paymentForm.paymentMode} onChange={e => setPaymentForm({...paymentForm, paymentMode: e.target.value})}>
-                        <option value="Cash">Cash</option>
-                        <option value="Cheque">Cheque</option>
-                        <option value="Online">Online / UPI</option>
-                        <option value="Bank Transfer">Bank Transfer</option>
-                        <option value="Concession">Concession / Discount</option>
-                      </select>
-                  </div>
-                </div>
-                <div>
-                  <label style={{ display: "block", fontSize: "0.875rem", marginBottom: "0.5rem" }}>Remarks / Ref No (Optional)</label>
-                  <input type="text" className="input-glass" style={{ width: "100%" }} value={paymentForm.remarks} onChange={e => setPaymentForm({...paymentForm, remarks: e.target.value})} />
-                </div>
-                <div style={{ display: "flex", gap: "1rem", marginTop: "0.5rem" }}>
-                  <button type="button" onClick={() => setIsPaymentModalOpen(false)} className="btn btn-ghost" style={{ flex: 1, justifyContent: "center", border: "1px solid var(--glass-border)" }}>
-                    Cancel
-                  </button>
-                  <button type="submit" disabled={isPaying} className="btn btn-primary" style={{ flex: 1, justifyContent: "center" }}>
-                    {isPaying ? "Processing..." : "Submit Payment"}
-                  </button>
-                </div>
-              </form>
-            )}
+              </div>
+              <div>
+                <label style={{ display: "block", fontSize: "0.875rem", marginBottom: "0.5rem" }}>Remarks</label>
+                <input type="text" className="input-glass" style={{ width: "100%" }} value={editingPayment.remarks || ""} onChange={e => setEditingPayment({...editingPayment, remarks: e.target.value})} />
+              </div>
+              <div style={{ display: "flex", gap: "1rem", marginTop: "0.5rem" }}>
+                <button type="button" onClick={() => { setIsEditPaymentModalOpen(false); setEditingPayment(null); }} className="btn btn-ghost" style={{ flex: 1, justifyContent: "center", border: "1px solid var(--glass-border)" }}>
+                  Cancel
+                </button>
+                <button type="submit" disabled={isPaying} className="btn btn-primary" style={{ flex: 1, justifyContent: "center" }}>
+                  {isPaying ? "Saving..." : "Save Changes"}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
+
       <StudentLedgerModal 
         isOpen={isLedgerModalOpen} 
         onClose={() => setIsLedgerModalOpen(false)} 

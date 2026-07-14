@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Clock, CheckCircle, Printer } from "lucide-react";
+import { Clock, CheckCircle, Printer, Bus, Edit2, Save, X } from "lucide-react";
 import { generateReceiptPDF } from "../utils/exportUtils";
 import api from "../services/api";
 import { toast } from "react-toastify";
@@ -7,6 +7,10 @@ import { toast } from "react-toastify";
 const StudentLedgerModal = ({ isOpen, onClose, student }) => {
   const [ledgerLoading, setLedgerLoading] = useState(false);
   const [studentLedger, setStudentLedger] = useState({ fees: [], payments: [] });
+  const [studentDetails, setStudentDetails] = useState({});
+  const [isEditingTransport, setIsEditingTransport] = useState(false);
+  const [transportForm, setTransportForm] = useState({ bus_fee: "", bus_start_date: "" });
+  const [updatingTransport, setUpdatingTransport] = useState(false);
 
   useEffect(() => {
     if (isOpen && student?.id) {
@@ -20,11 +24,34 @@ const StudentLedgerModal = ({ isOpen, onClose, student }) => {
       const response = await api.get(`/finance_panel/getStudentLedger/${studentId}`);
       if (response.data.success) {
         setStudentLedger(response.data.data);
+        if (response.data.data.studentDetails) {
+            setStudentDetails(response.data.data.studentDetails);
+            setTransportForm({
+                bus_fee: response.data.data.studentDetails.bus_fee || "",
+                bus_start_date: response.data.data.studentDetails.bus_start_date || ""
+            });
+        }
       }
     } catch (error) {
       toast.error("Failed to load student ledger");
     } finally {
       setLedgerLoading(false);
+    }
+  };
+
+  const handleUpdateTransport = async () => {
+    try {
+        setUpdatingTransport(true);
+        const res = await api.put(`/finance_panel/student/${student.id}/busFee`, transportForm);
+        if (res.data.success) {
+            toast.success("Transport details updated");
+            setIsEditingTransport(false);
+            fetchLedger(student.id);
+        }
+    } catch (error) {
+        toast.error("Failed to update transport details");
+    } finally {
+        setUpdatingTransport(false);
     }
   };
 
@@ -44,6 +71,64 @@ const StudentLedgerModal = ({ isOpen, onClose, student }) => {
             </span>
           )}
         </div>
+
+        {/* Transport Settings Section */}
+        {!student.fee_exempted && (
+          <div style={{ marginBottom: "2rem", padding: "1rem", background: "rgba(0,0,0,0.02)", borderRadius: "8px", border: "1px solid var(--glass-border)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
+              <div style={{ background: "rgba(59, 130, 246, 0.1)", color: "#3b82f6", padding: "0.5rem", borderRadius: "50%" }}>
+                <Bus size={20} />
+              </div>
+              <div>
+                <div style={{ fontWeight: "600", fontSize: "0.875rem", color: "var(--text-primary)" }}>Transport & Bus Fee</div>
+                {!isEditingTransport ? (
+                  <div style={{ fontSize: "0.75rem", color: "var(--text-secondary)", marginTop: "2px" }}>
+                    {studentDetails.bus_fee > 0 ? (
+                      <>Fee: ₹{studentDetails.bus_fee}/month | Start: {studentDetails.bus_start_date ? new Date(studentDetails.bus_start_date).toLocaleDateString() : "N/A"}</>
+                    ) : (
+                      <>Not using transport service</>
+                    )}
+                  </div>
+                ) : (
+                  <div style={{ display: "flex", gap: "0.5rem", marginTop: "0.5rem", alignItems: "center" }}>
+                    <input 
+                      type="number" 
+                      placeholder="Bus Fee (₹)" 
+                      className="input-glass" 
+                      style={{ padding: "0.25rem 0.5rem", fontSize: "0.75rem", width: "100px", minHeight: "30px" }} 
+                      value={transportForm.bus_fee} 
+                      onChange={(e) => setTransportForm({...transportForm, bus_fee: e.target.value})} 
+                    />
+                    <input 
+                      type="date" 
+                      className="input-glass" 
+                      style={{ padding: "0.25rem 0.5rem", fontSize: "0.75rem", minHeight: "30px" }} 
+                      value={transportForm.bus_start_date} 
+                      onChange={(e) => setTransportForm({...transportForm, bus_start_date: e.target.value})} 
+                    />
+                  </div>
+                )}
+              </div>
+            </div>
+            
+            <div style={{ display: "flex", gap: "0.5rem" }}>
+              {!isEditingTransport ? (
+                <button onClick={() => setIsEditingTransport(true)} className="btn-ghost" style={{ display: "flex", alignItems: "center", gap: "0.25rem", fontSize: "0.75rem", padding: "0.25rem 0.5rem", borderRadius: "4px", color: "var(--text-secondary)" }}>
+                  <Edit2 size={14} /> Edit
+                </button>
+              ) : (
+                <>
+                  <button onClick={() => setIsEditingTransport(false)} className="btn-ghost" style={{ display: "flex", alignItems: "center", gap: "0.25rem", fontSize: "0.75rem", padding: "0.25rem 0.5rem", borderRadius: "4px", color: "var(--text-secondary)" }}>
+                    <X size={14} /> Cancel
+                  </button>
+                  <button onClick={handleUpdateTransport} disabled={updatingTransport} className="btn-primary" style={{ display: "flex", alignItems: "center", gap: "0.25rem", fontSize: "0.75rem", padding: "0.25rem 0.5rem", borderRadius: "4px" }}>
+                    <Save size={14} /> {updatingTransport ? "Saving..." : "Save"}
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+        )}
 
         {ledgerLoading ? (
           <p style={{ textAlign: "center", padding: "2rem" }}>Loading ledger...</p>
@@ -102,14 +187,13 @@ const StudentLedgerModal = ({ isOpen, onClose, student }) => {
                     </div>
                     {p.remarks && <div style={{ fontSize: "0.75rem", color: "var(--text-secondary)", marginTop: "0.25rem", fontStyle: "italic" }}>Note: {p.remarks}</div>}
                     
-                    <button 
-                      onClick={() => generateReceiptPDF(p, student)}
-                      className="btn-ghost" 
-                      style={{ position: "absolute", bottom: "1rem", right: "1rem", padding: "4px", color: "var(--accent-primary)" }}
-                      title="Download Receipt"
-                    >
-                      <Printer size={16} />
-                    </button>
+                    <div style={{ display: "flex", gap: "0.5rem" }}>
+                      <button className="btn-ghost" style={{ position: "absolute", bottom: "1rem", right: "1rem", padding: "0.5rem", color: "var(--accent-primary)" }} title="Print Receipt"
+                        onClick={() => generateReceiptPDF(p, student, p.receipts)}
+                      >
+                        <Printer size={16} />
+                      </button>
+                    </div>
                   </div>
                 )) : (
                   <p style={{ color: "var(--text-secondary)", fontSize: "0.875rem", padding: "1rem", background: "rgba(0, 0, 0, 0.02)", borderRadius: "8px", border: "1px dashed var(--glass-border)", textAlign: "center" }}>No payments recorded yet.</p>

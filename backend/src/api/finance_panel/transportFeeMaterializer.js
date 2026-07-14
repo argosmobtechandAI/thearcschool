@@ -11,17 +11,12 @@ export const autoMaterializeTransportFees = async () => {
     let sessionStartYear = currentYear;
     if (currentMonth < 3) sessionStartYear -= 1;
 
-    let monthsPassed = 0;
-    if (currentYear === sessionStartYear && currentMonth >= 3) {
-      monthsPassed = currentMonth - 3 + 1;
-    } else if (currentYear === sessionStartYear + 1 && currentMonth < 3) {
-      monthsPassed = 9 + currentMonth + 1;
-    }
+    let monthsPassed = 12; // Always materialize for the full year
 
     // Fetch all active students with bus_fee > 0
     const { data: students, error: studentError } = await supabase
       .from("user")
-      .select("id, bus_fee")
+      .select("id, bus_fee, bus_start_date")
       .eq("type", "student")
       .gt("bus_fee", 0);
 
@@ -35,7 +30,7 @@ export const autoMaterializeTransportFees = async () => {
       .select("student_id, fee_id, fee!inner(title)")
       .like("fee.title", "Transport Fee - %");
 
-    const existingFeeSet = new Set((existingFees || []).map(f => `${f.student_id}-${f.fee?.title}`));
+    const existingFeeSet = new Set((existingFees || []).map(f => `${f.student_id}-${(f.fee?.title || "").replace(" (Pro-rated)", "")}`));
 
     const feeRecordsNeeded = new Map(); // key: "Title-Amount", value: { title, amount, dueDate }
 
@@ -47,10 +42,33 @@ export const autoMaterializeTransportFees = async () => {
       const dueDate = new Date(mYear, mIndex, 10).toISOString().split('T')[0];
 
       for (const s of students) {
+        let amount = s.bus_fee;
+        let finalFeeTitle = feeTitle;
+
+        if (s.bus_start_date) {
+           const startDate = new Date(s.bus_start_date);
+           const startYear = startDate.getFullYear();
+           const startMonth = startDate.getMonth();
+           
+           if (mYear < startYear || (mYear === startYear && mIndex < startMonth)) {
+             continue; // Skip months before start date
+           }
+           
+           if (mYear === startYear && mIndex === startMonth) {
+             const startDay = startDate.getDate();
+             if (startDay > 1) {
+                const daysInMonth = new Date(mYear, mIndex + 1, 0).getDate();
+                const daysUsed = daysInMonth - startDay + 1;
+                amount = Math.round((s.bus_fee * daysUsed) / daysInMonth);
+                finalFeeTitle = `${feeTitle} (Pro-rated)`;
+             }
+           }
+        }
+
         if (!existingFeeSet.has(`${s.id}-${feeTitle}`)) {
-          const key = `${feeTitle}-${s.bus_fee}`;
+          const key = `${finalFeeTitle}-${amount}`;
           if (!feeRecordsNeeded.has(key)) {
-            feeRecordsNeeded.set(key, { title: feeTitle, amount: s.bus_fee, due_date: dueDate, fee_type: "Monthly" });
+            feeRecordsNeeded.set(key, { title: finalFeeTitle, amount: amount, due_date: dueDate, fee_type: "Monthly" });
           }
         }
       }
@@ -97,8 +115,31 @@ export const autoMaterializeTransportFees = async () => {
       const feeTitle = `Transport Fee - ${monthNames[mIndex]} ${mYear}`;
 
       for (const s of students) {
-        if (!existingFeeSet.has(`${s.id}-${feeTitle}`)) {
-          const feeId = feeTemplateMap.get(`${feeTitle}-${s.bus_fee}`);
+        let amount = s.bus_fee;
+        let finalFeeTitle = feeTitle;
+
+        if (s.bus_start_date) {
+           const startDate = new Date(s.bus_start_date);
+           const startYear = startDate.getFullYear();
+           const startMonth = startDate.getMonth();
+           
+           if (mYear < startYear || (mYear === startYear && mIndex < startMonth)) {
+             continue; // Skip months before start date
+           }
+           
+           if (mYear === startYear && mIndex === startMonth) {
+             const startDay = startDate.getDate();
+             if (startDay > 1) {
+                const daysInMonth = new Date(mYear, mIndex + 1, 0).getDate();
+                const daysUsed = daysInMonth - startDay + 1;
+                amount = Math.round((s.bus_fee * daysUsed) / daysInMonth);
+                finalFeeTitle = `${feeTitle} (Pro-rated)`;
+             }
+           }
+        }
+
+        if (!existingFeeSet.has(`${s.id}-${finalFeeTitle}`)) {
+          const feeId = feeTemplateMap.get(`${finalFeeTitle}-${amount}`);
           if (feeId) {
             studentFeesToInsert.push({
               student_id: s.id,
@@ -107,7 +148,7 @@ export const autoMaterializeTransportFees = async () => {
               total_paid_amount: 0
             });
             // Mark as added to avoid duplicates in the same run if any logic overlaps
-            existingFeeSet.add(`${s.id}-${feeTitle}`);
+            existingFeeSet.add(`${s.id}-${finalFeeTitle}`);
           }
         }
       }

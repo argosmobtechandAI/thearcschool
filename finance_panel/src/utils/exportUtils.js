@@ -62,71 +62,155 @@ export const exportToPDF = (columns, data, fileName = "export", title = "Exporte
 
 /**
  * Generate a PDF receipt for a fee payment
- * @param {Object} payment - Payment details object
+ * @param {Object|Array} paymentsInput - Payment details object or array of payment objects
  * @param {Object} student - Student details object
  */
-export const generateReceiptPDF = async (payment, student) => {
+export const generateReceiptPDF = async (paymentsInput, student, receipt) => {
     try {
-        if (!payment || !student) return;
+        if (!paymentsInput || !student) return;
 
-        const doc = new jsPDF();
-        const pageWidth = doc.internal.pageSize.getWidth();
-        doc.addImage(letterheadBase64, 'PNG', 0, 0, pageWidth, 40);
+        // Normalize to array
+        const payments = Array.isArray(paymentsInput) ? paymentsInput : [paymentsInput];
+        if (payments.length === 0) return;
 
-        // Receipt Title
-        doc.setFontSize(16);
-        doc.setTextColor(0);
-        doc.text("FEE RECEIPT", 105, 50, { align: "center" });
-        
-        doc.setLineWidth(0.5);
-        doc.line(14, 55, 196, 55);
+        const firstPayment = payments[0];
 
-        // Receipt details
-        doc.setFontSize(11);
-        doc.text(`Receipt No: RCT-${payment.id?.substring(0, 8).toUpperCase() || Date.now()}`, 14, 65);
-        doc.text(`Date: ${new Date(payment.created_at || Date.now()).toLocaleDateString()}`, 140, 65);
-        
-        doc.text(`Student Name: ${student.name || 'N/A'}`, 14, 80);
-        doc.text(`Admission No: ${student.admission_number || 'N/A'}`, 140, 80);
-        
+        const doc = new jsPDF('landscape', 'mm', 'a4');
+        const halfWidth = 297 / 2; // 148.5
+
         const sanitize = (str) => str ? str.replace(/₹/g, 'Rs. ') : str;
 
+        const feeTitlesArray = payments.flatMap(p => {
+            let title = 'General Fee';
+            if (p.fee?.title) {
+                title = p.fee.title;
+            } else if (p.fee_title) {
+                title = p.fee_title;
+            } else if (p.remarks && p.remarks.startsWith("Fee Payment: ")) {
+                title = p.remarks.replace("Fee Payment: ", "").trim();
+            }
+            
+            // Clean up any zero late fees from older generated data
+            title = title.replace(/\(\+₹0 Late Fee\)/g, "").replace(/\(\+Rs\. 0 Late Fee\)/g, "").trim();
+            
+            // Handle legacy records that combined multiple fees with commas
+            if (title.includes(",")) {
+                return title.split(",").map(s => s.trim());
+            }
+            return [`${title} (Rs. ${p.amount_paid || 0})`];
+        });
+
+        const feeTitles = feeTitlesArray.map(s => `• ${sanitize(s)}`).join("\n");
+        
+        const totalAmountPaid = payments.reduce((sum, p) => sum + Number(p.amount_paid || 0), 0);
+        const paymentMode = sanitize(firstPayment.payment_mode || 'Cash');
+
         const tableData = [
-            ["Fee Type:", sanitize(payment.fee?.title || 'General Fee')],
-            ["Payment Mode:", sanitize(payment.payment_mode || 'Cash')],
-            ["Amount Paid:", `Rs. ${payment.amount_paid}/-`],
+            ["Fee Type(s):", feeTitles, "", "Fee Type(s):", feeTitles],
+            ["Payment Mode:", paymentMode, "", "Payment Mode:", paymentMode],
+            ["Amount Paid:", `Rs. ${totalAmountPaid}/-`, "", "Amount Paid:", `Rs. ${totalAmountPaid}/-`],
         ];
-        if (payment.remarks) {
-            tableData.push(["Remarks:", sanitize(payment.remarks)]);
+        
+        let remarksText = receipt?.remarks ? sanitize(receipt.remarks) : "";
+        if (!remarksText) {
+            const customRemarks = payments.map(p => p.remarks).filter(r => r && !r.startsWith("Fee Payment: "));
+            if (customRemarks.length > 0) {
+                remarksText = sanitize([...new Set(customRemarks)].join("; "));
+            }
         }
+
+        if (remarksText) {
+            tableData.push(["Remarks:", remarksText, "", "Remarks:", remarksText]);
+        }
+
+        const drawHeadersAndFooter = (data) => {
+            const pageDoc = data.doc;
+            
+            // Draw Dashed Line in Middle
+            pageDoc.setLineWidth(0.5);
+            pageDoc.setLineDashPattern([2, 2], 0);
+            pageDoc.line(halfWidth, 5, halfWidth, 205);
+            pageDoc.setLineDashPattern([], 0); // reset
+            
+            const drawSideHeader = (offsetX, isSchoolCopy) => {
+                // Letterhead
+                pageDoc.addImage(letterheadBase64, 'PNG', offsetX, 0, halfWidth, 40);
+
+                // Receipt Title
+                pageDoc.setFontSize(14);
+                pageDoc.setTextColor(0);
+                pageDoc.text("FEE RECEIPT", offsetX + halfWidth / 2, 50, { align: "center" });
+                
+                // Subtitle
+                pageDoc.setFontSize(10);
+                pageDoc.setTextColor(100);
+                pageDoc.text(isSchoolCopy ? "(School Copy)" : "(Parent Copy)", offsetX + halfWidth / 2, 55, { align: "center" });
+                
+                pageDoc.setLineWidth(0.5);
+                pageDoc.line(offsetX + 10, 60, offsetX + halfWidth - 10, 60);
+
+                // Receipt details
+                pageDoc.setFontSize(10);
+                pageDoc.setTextColor(0);
+                const receiptIdText = receipt?.receipt_number ? `REC-${String(receipt.receipt_number).padStart(6, '0')}` : `RCT-${firstPayment.id?.substring(0, 8).toUpperCase() || Date.now()}`;
+                pageDoc.text(`Receipt No: ${receiptIdText}`, offsetX + 10, 70);
+                pageDoc.text(`Date: ${new Date(receipt?.created_at || firstPayment.created_at || Date.now()).toLocaleDateString()}`, offsetX + halfWidth - 10, 70, { align: 'right' });
+                
+                pageDoc.text(`Student Name: ${student.name || 'N/A'}`, offsetX + 10, 80);
+                pageDoc.text(`Admission No: ${student.admission_number || 'N/A'}`, offsetX + halfWidth - 10, 80, { align: 'right' });
+                
+                pageDoc.setFontSize(8);
+                pageDoc.setTextColor(150);
+                pageDoc.text("This is a computer generated receipt.", offsetX + halfWidth / 2, 200, { align: "center" });
+            };
+            
+            drawSideHeader(0, true);
+            drawSideHeader(halfWidth, false);
+        };
 
         autoTable(doc, {
             startY: 90,
-            head: [["Payment Details", ""]],
+            head: [["Payment Details", "", "", "Payment Details", ""]],
             body: tableData,
             theme: 'grid',
-            headStyles: { fillColor: [240, 240, 240], textColor: [0, 0, 0], fontStyle: 'bold', fontSize: 12 },
-            bodyStyles: { fontSize: 11, textColor: [0, 0, 0] },
+            headStyles: { fillColor: [240, 240, 240], textColor: [0, 0, 0], fontStyle: 'bold', fontSize: 11 },
+            bodyStyles: { fontSize: 10, textColor: [0, 0, 0] },
             columnStyles: {
-                0: { fontStyle: 'bold', cellWidth: 40 },
-                1: { cellWidth: 140 }
+                0: { fontStyle: 'bold', cellWidth: 35 },
+                1: { cellWidth: halfWidth - 20 - 35 }, // 93.5
+                2: { cellWidth: 20 },
+                3: { fontStyle: 'bold', cellWidth: 35 },
+                4: { cellWidth: halfWidth - 20 - 35 } // 93.5
             },
-            margin: { left: 14, right: 14 }
+            margin: { top: 90, left: 10, right: 10, bottom: 40 }, // explicitly set top margin so subsequent pages don't overlap header
+            didDrawPage: drawHeadersAndFooter,
+            willDrawCell: (data) => {
+                // Hide borders and background for the gap column
+                if (data.column.index === 2) {
+                    data.cell.styles.lineWidth = 0;
+                    data.cell.styles.fillColor = [255, 255, 255];
+                    // Ensure text is also hidden just in case
+                    data.cell.styles.textColor = [255, 255, 255];
+                }
+            }
         });
 
-        const finalY = (doc.lastAutoTable?.finalY || doc.previousAutoTable?.finalY || 140) + 40;
+        const finalY = (doc.lastAutoTable?.finalY || 140) + 20;
         
-        // Footer signature
+        // Ensure finalY doesn't overlap the footer message at Y=200
+        const sigY = finalY > 190 ? 190 : finalY;
+        
+        // Footer signature on the very last page generated
         doc.setFontSize(10);
         doc.setFont("helvetica", "normal");
-        doc.text("Authorized Signatory", 150, finalY);
-        doc.line(140, finalY - 5, 190, finalY - 5);
+        doc.setTextColor(0);
+        doc.text("Authorized Signatory", halfWidth - 10, sigY, { align: 'right' });
+        doc.line(halfWidth - 50, sigY - 5, halfWidth - 10, sigY - 5);
         
-        doc.setFontSize(8);
-        doc.setTextColor(150);
-        doc.text("This is a computer generated receipt.", 105, 280, { align: "center" });
+        doc.text("Authorized Signatory", 297 - 10, sigY, { align: 'right' });
+        doc.line(297 - 50, sigY - 5, 297 - 10, sigY - 5);
 
-        doc.save(`Receipt_${student.name || 'Student'}_${payment.id?.substring(0,6) || ''}.pdf`);
+        doc.save(`Receipt_${student.name || 'Student'}_${firstPayment.id?.substring(0,6) || ''}.pdf`);
     } catch (error) {
         console.error("Error generating Receipt PDF", error);
         alert("Failed to generate PDF: " + error.message);

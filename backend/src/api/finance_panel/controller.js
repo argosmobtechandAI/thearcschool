@@ -1,4 +1,4 @@
-import { supabase } from "../../config/supabaseClient.js";
+import { supabase, supabaseAdmin } from "../../config/supabaseClient.js";
 
 export const getDashboardStats = async (req, res) => {
   try {
@@ -63,16 +63,7 @@ export const getDashboardStats = async (req, res) => {
     const currentMonth = today.getMonth();
     const currentYear = today.getFullYear();
     
-    let monthsPassed = 0;
-    if (currentYear === sessionStartYear && currentMonth >= 3) {
-      monthsPassed = currentMonth - 3 + 1; 
-    } else if (currentYear === sessionStartYear + 1 && currentMonth < 3) {
-      monthsPassed = 9 + currentMonth + 1; 
-    } else if (currentYear > sessionStartYear) {
-      monthsPassed = 12; 
-    }
-    if (monthsPassed > 12) monthsPassed = 12;
-    if (monthsPassed < 0) monthsPassed = 0;
+    let monthsPassed = 12; // Full academic year
 
     let balance = 0;
     
@@ -245,14 +236,7 @@ export const getStudentBalances = async (req, res) => {
     const currentMonth = referenceDate.getMonth();
     const currentYear = referenceDate.getFullYear();
     
-    let monthsPassed = 0;
-    if (currentYear === sessionStartYear && currentMonth >= 3) {
-      monthsPassed = currentMonth - 3 + 1; // Apr = 1
-    } else if (currentYear === sessionStartYear + 1 && currentMonth < 3) {
-      monthsPassed = 9 + currentMonth + 1; // Apr-Dec(9) + Jan-Mar
-    } else if (currentYear > sessionStartYear) {
-      monthsPassed = 12; // Whole year passed
-    }
+    let monthsPassed = 12; // Full academic year
     
     // If startDate is set and is later than April, we should theoretically subtract the start months,
     // but typically schools want to see outstanding balances. However, to respect the "Period Dues"
@@ -356,11 +340,19 @@ export const getStudentLedger = async (req, res) => {
     // 2. Map payments to dues using fee title in remarks
     // (This is now handled automatically inside calculateVirtualDues)
 
+    // 3. Fetch student bus details
+    const { data: studentDetails } = await supabase
+      .from("user")
+      .select("bus_fee, bus_start_date")
+      .eq("id", studentId)
+      .single();
+
     return res.status(200).json({
       success: true,
       data: {
         fees: virtualDues,
         payments: payments || [],
+        studentDetails: studentDetails || {}
       },
     });
   } catch (error) {
@@ -380,8 +372,34 @@ export const logPayment = async (req, res) => {
         return res.status(400).json({ success: false, message: "No payments provided" });
     }
 
+    const totalAmount = payments.reduce((sum, p) => sum + Number(p.amount), 0);
+
+    const { data: maxReceipt } = await supabaseAdmin
+      .from("receipts")
+      .select("receipt_number")
+      .order("receipt_number", { ascending: false })
+      .limit(1);
+      
+    const nextReceiptNumber = (maxReceipt && maxReceipt.length > 0) ? (maxReceipt[0].receipt_number + 1) : 1;
+
+    const { data: receiptRecord, error: receiptError } = await supabaseAdmin
+      .from("receipts")
+      .insert([{
+        receipt_number: nextReceiptNumber,
+        student_id: studentId,
+        total_amount: totalAmount,
+        payment_mode: paymentMode,
+        remarks: remarks || null,
+        collected_by: collectedBy
+      }])
+      .select()
+      .single();
+
+    if (receiptError) throw receiptError;
+
     const inserts = payments.map(p => ({
         student_id: studentId,
+        receipt_id: receiptRecord.id,
         fee_id: null,
         amount_paid: p.amount,
         payment_mode: paymentMode,
@@ -389,7 +407,7 @@ export const logPayment = async (req, res) => {
         collected_by: collectedBy
     }));
 
-    const { data: insertedPayments, error: insertError } = await supabase
+    const { data: insertedPayments, error: insertError } = await supabaseAdmin
       .from("payments_ledger")
       .insert(inserts)
       .select();
@@ -399,7 +417,96 @@ export const logPayment = async (req, res) => {
     return res.status(200).json({
       success: true,
       message: "Payment logged successfully",
+      receipt: receiptRecord,
       payments: insertedPayments,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
+export const updatePayment = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { amount_paid, payment_mode, remarks } = req.body;
+
+    if (!amount_paid || !payment_mode) {
+      return res.status(400).json({ success: false, message: "Amount and mode are required" });
+    }
+
+    const { data: updatedPayment, error } = await supabaseAdmin
+      .from("payments_ledger")
+      .update({ amount_paid, payment_mode, remarks })
+      .eq("id", id)
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    return res.status(200).json({
+      success: true,
+      message: "Payment updated successfully",
+      payment: updatedPayment
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
+export const deletePayment = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // 1. Fetch payment to get receipt_id and amount
+    const { data: payment, error: fetchError } = await supabaseAdmin
+      .from("payments_ledger")
+      .select("receipt_id, amount_paid")
+      .eq("id", id)
+      .single();
+
+    if (fetchError) throw fetchError;
+
+    // 2. Delete the payment
+    const { error: deleteError } = await supabaseAdmin
+      .from("payments_ledger")
+      .delete()
+      .eq("id", id);
+
+    if (deleteError) throw deleteError;
+
+    // 3. Handle receipt update or deletion
+    if (payment && payment.receipt_id) {
+      const { data: remainingPayments } = await supabaseAdmin
+        .from("payments_ledger")
+        .select("id")
+        .eq("receipt_id", payment.receipt_id)
+        .limit(1);
+
+      if (!remainingPayments || remainingPayments.length === 0) {
+        // No more payments for this receipt, mark receipt as voided but keep it for counter integrity
+        await supabaseAdmin.from("receipts").update({ total_amount: 0, remarks: "VOIDED" }).eq("id", payment.receipt_id);
+      } else {
+        // Other payments exist, just subtract the amount from the receipt total
+        // We'll calculate the actual new total
+        const { data: allRemaining } = await supabaseAdmin
+          .from("payments_ledger")
+          .select("amount_paid")
+          .eq("receipt_id", payment.receipt_id);
+          
+        const newTotal = (allRemaining || []).reduce((sum, p) => sum + Number(p.amount_paid || 0), 0);
+        await supabaseAdmin.from("receipts").update({ total_amount: newTotal }).eq("id", payment.receipt_id);
+      }
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "Payment deleted successfully"
     });
   } catch (error) {
     return res.status(500).json({
@@ -415,7 +522,7 @@ export const getAccountantStats = async (req, res) => {
 
     const { data: payments, error } = await supabase
       .from("payments_ledger")
-      .select("*, fee(*), student:user!student_id(id, name, admission_number)")
+      .select("*, fee(*), student:user!student_id(id, name, admission_number), receipts(*)")
       .eq("collected_by", id)
       .order("created_at", { ascending: false });
 
@@ -450,7 +557,7 @@ export const getAllPayments = async (req, res) => {
 
     let query = supabase
       .from("payments_ledger")
-      .select("*, fee(*), student:user!student_id(id, name, admission_number), collected_by(*)")
+      .select("*, fee(*), student:user!student_id(id, name, admission_number), collected_by(*), receipts(*)")
       .order("created_at", { ascending: false });
 
     if (startDate) query = query.gte("created_at", startDate);
@@ -783,6 +890,30 @@ export const toggleRevenueAccess = async (req, res) => {
     if (error) throw error;
     
     return res.status(200).json({ success: true, message: "Access updated", user: updatedUser });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+export const updateStudentBusFee = async (req, res) => {
+  try {
+    const { studentId } = req.params;
+    const { bus_fee, bus_start_date } = req.body;
+
+    const { data: updatedUser, error } = await supabase
+      .from("user")
+      .update({ 
+        bus_fee: bus_fee || 0,
+        bus_start_date: bus_start_date || null
+      })
+      .eq("id", studentId)
+      .eq("type", "student")
+      .select("id, name, bus_fee, bus_start_date")
+      .single();
+
+    if (error) throw error;
+
+    return res.status(200).json({ success: true, message: "Bus fee updated successfully", user: updatedUser });
   } catch (error) {
     return res.status(500).json({ success: false, message: error.message });
   }

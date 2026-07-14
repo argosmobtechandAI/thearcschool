@@ -3,7 +3,7 @@ import { useDispatch, useSelector } from "react-redux";
 import { useParams, useNavigate } from "react-router-dom";
 import { fetchUsers, fetchClasses } from "../features/dataSlice";
 import api from "../services/api";
-import { ChevronLeft, Phone, Mail, Hash, Calendar, MapPin, Receipt, CheckCircle, Clock } from "lucide-react";
+import { ChevronLeft, Phone, Mail, Hash, Calendar, MapPin, Receipt, CheckCircle, Clock, Bus, Edit2, Save, X } from "lucide-react";
 import { toast } from "react-toastify";
 
 const StudentFinanceDetails = () => {
@@ -16,6 +16,11 @@ const StudentFinanceDetails = () => {
   const [studentLedger, setStudentLedger] = useState({ fees: [], payments: [] });
   const [ledgerLoading, setLedgerLoading] = useState(false);
   const [balanceData, setBalanceData] = useState({ totalDue: 0, totalPaid: 0, balance: 0 });
+
+  const [studentDetails, setStudentDetails] = useState({});
+  const [isEditingTransport, setIsEditingTransport] = useState(false);
+  const [transportForm, setTransportForm] = useState({ bus_fee: "", bus_start_date: "" });
+  const [updatingTransport, setUpdatingTransport] = useState(false);
 
   useEffect(() => {
     if (users.length === 0) dispatch(fetchUsers());
@@ -42,6 +47,13 @@ const StudentFinanceDetails = () => {
         }
         if (ledgerRes.data.success) {
           setStudentLedger(ledgerRes.data.data);
+          if (ledgerRes.data.data.studentDetails) {
+            setStudentDetails(ledgerRes.data.data.studentDetails);
+            setTransportForm({
+                bus_fee: ledgerRes.data.data.studentDetails.bus_fee || "",
+                bus_start_date: ledgerRes.data.data.studentDetails.bus_start_date || ""
+            });
+          }
         }
       }).catch(err => {
         toast.error("Failed to load finance details");
@@ -50,6 +62,44 @@ const StudentFinanceDetails = () => {
       });
     }
   }, [activeStudent]);
+
+  const handleUpdateTransport = async () => {
+    if (!activeStudent) return;
+    try {
+        setUpdatingTransport(true);
+        const res = await api.put(`/finance_panel/student/${activeStudent.id}/busFee`, transportForm);
+        if (res.data.success) {
+            toast.success("Transport details updated");
+            setIsEditingTransport(false);
+            
+            // Reload just ledger and balance
+            setLedgerLoading(true);
+            const [balanceRes, ledgerRes] = await Promise.all([
+              api.post("/finance_panel/studentBalances", { students: [{ id: activeStudent.id, type: activeStudent.type, fee_exempted: activeStudent.fee_exempted, classes: activeStudent.classes, bus_fee: transportForm.bus_fee }] }),
+              api.get(`/finance_panel/getStudentLedger/${activeStudent.id}`)
+            ]);
+            
+            if (balanceRes.data.success && balanceRes.data.data.length > 0) {
+              setBalanceData(balanceRes.data.data[0]);
+            }
+            if (ledgerRes.data.success) {
+              setStudentLedger(ledgerRes.data.data);
+              if (ledgerRes.data.data.studentDetails) {
+                setStudentDetails(ledgerRes.data.data.studentDetails);
+                setTransportForm({
+                    bus_fee: ledgerRes.data.data.studentDetails.bus_fee || "",
+                    bus_start_date: ledgerRes.data.data.studentDetails.bus_start_date || ""
+                });
+              }
+            }
+        }
+    } catch (error) {
+        toast.error("Failed to update transport details");
+    } finally {
+        setUpdatingTransport(false);
+        setLedgerLoading(false);
+    }
+  };
 
   if (!activeStudent) {
     return <div style={{ padding: "2rem", textAlign: "center" }}>Loading student details...</div>;
@@ -143,6 +193,70 @@ const StudentFinanceDetails = () => {
           </div>
         </div>
       </div>
+
+      {/* Transport Settings Section */}
+      {!activeStudent.fee_exempted && (
+        <div style={{ marginBottom: "1.5rem", padding: "1.5rem", background: "var(--glass-bg)", borderRadius: "12px", border: "1px solid var(--glass-border)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
+            <div style={{ background: "rgba(59, 130, 246, 0.1)", color: "#3b82f6", padding: "0.75rem", borderRadius: "50%" }}>
+              <Bus size={24} />
+            </div>
+            <div>
+              <div style={{ fontWeight: "600", fontSize: "1.1rem", color: "var(--text-primary)" }}>Transport & Bus Fee</div>
+              {!isEditingTransport ? (
+                <div style={{ fontSize: "0.875rem", color: "var(--text-secondary)", marginTop: "4px" }}>
+                  {studentDetails.bus_fee > 0 ? (
+                    <>Fee: <span style={{fontWeight: 600}}>₹{studentDetails.bus_fee}/month</span> | Start Date: <span style={{fontWeight: 600}}>{studentDetails.bus_start_date ? new Date(studentDetails.bus_start_date).toLocaleDateString() : "N/A"}</span></>
+                  ) : (
+                    <>Not using transport service</>
+                  )}
+                </div>
+              ) : (
+                <div style={{ display: "flex", gap: "1rem", marginTop: "0.5rem", alignItems: "center" }}>
+                  <div>
+                    <label style={{ display: "block", fontSize: "0.75rem", color: "var(--text-secondary)", marginBottom: "2px" }}>Monthly Bus Fee (₹)</label>
+                    <input 
+                      type="number" 
+                      placeholder="Bus Fee" 
+                      className="input-glass" 
+                      style={{ padding: "0.5rem", fontSize: "0.875rem", width: "120px" }} 
+                      value={transportForm.bus_fee} 
+                      onChange={(e) => setTransportForm({...transportForm, bus_fee: e.target.value})} 
+                    />
+                  </div>
+                  <div>
+                    <label style={{ display: "block", fontSize: "0.75rem", color: "var(--text-secondary)", marginBottom: "2px" }}>Start Date</label>
+                    <input 
+                      type="date" 
+                      className="input-glass" 
+                      style={{ padding: "0.5rem", fontSize: "0.875rem" }} 
+                      value={transportForm.bus_start_date} 
+                      onChange={(e) => setTransportForm({...transportForm, bus_start_date: e.target.value})} 
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+          
+          <div style={{ display: "flex", gap: "0.5rem" }}>
+            {!isEditingTransport ? (
+              <button onClick={() => setIsEditingTransport(true)} className="btn-ghost" style={{ display: "flex", alignItems: "center", gap: "0.5rem", padding: "0.5rem 1rem", borderRadius: "8px", color: "var(--text-secondary)" }}>
+                <Edit2 size={16} /> Edit Transport
+              </button>
+            ) : (
+              <>
+                <button onClick={() => setIsEditingTransport(false)} className="btn-ghost" style={{ display: "flex", alignItems: "center", gap: "0.5rem", padding: "0.5rem 1rem", borderRadius: "8px", color: "var(--text-secondary)" }}>
+                  <X size={16} /> Cancel
+                </button>
+                <button onClick={handleUpdateTransport} disabled={updatingTransport} className="btn-primary" style={{ display: "flex", alignItems: "center", gap: "0.5rem", padding: "0.5rem 1rem", borderRadius: "8px" }}>
+                  <Save size={16} /> {updatingTransport ? "Saving..." : "Save Changes"}
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+      )}
 
       <div className="glass-panel" style={{ flex: 1, padding: "1.5rem", display: "flex", flexDirection: "column", overflow: "hidden" }}>
         <h2 style={{ fontSize: "1.25rem", fontWeight: "600", marginBottom: "1rem", borderBottom: "1px solid var(--glass-border)", paddingBottom: "0.5rem" }}>Payment History</h2>

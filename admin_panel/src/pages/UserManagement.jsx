@@ -61,6 +61,7 @@ const UserManagement = () => {
     father_name: "",
     mother_name: "",
     bus_fee: "",
+    bus_start_date: "",
     fee_exempted: false,
     admission_date: "",
     form_submitted: false,
@@ -255,6 +256,7 @@ const UserManagement = () => {
         { key: "alternate_number", label: "Alternate Number" },
         { key: "address", label: "Address" },
         { key: "bus_fee", label: "Bus Fee" },
+        { key: "bus_start_date", label: "Bus Start Date" },
         { key: "fee_exempted", label: "Fee Exempted" },
         { key: "form_submitted", label: "Form Submitted" },
         { key: "tc_received", label: "TC Received" },
@@ -304,6 +306,7 @@ const UserManagement = () => {
         father_name: user.father_name || "",
         mother_name: user.mother_name || "",
         bus_fee: user.bus_fee || "",
+        bus_start_date: user.bus_start_date || "",
         fee_exempted: user.fee_exempted || false,
         admission_date: user.admission_date || "",
         form_submitted: user.form_submitted || false,
@@ -338,7 +341,7 @@ const UserManagement = () => {
       setFormData({ 
         name: "", email: "", password: "password@1", phone: "", alternate_number: "", type: type, connections: [], classId: "", classes: [],
         avatar_url: "",
-        admission_number: "", house: "", father_name: "", mother_name: "", bus_fee: "", fee_exempted: false,
+        admission_number: "", house: "", father_name: "", mother_name: "", bus_fee: "", bus_start_date: "", fee_exempted: false,
         admission_date: "", form_submitted: false, address: "", dob: "", doj: "", father_spouse_name: "", leave_school: false, tc_received: false, tc_date: "",
         slc_received: false, slc_date: "", character_certificate_received: false, character_certificate_date: "",
         tc_document_url: "", slc_document_url: "", character_certificate_document_url: "",
@@ -640,6 +643,7 @@ const UserManagement = () => {
         addIfSelected("mother_name", u.mother_name || "N/A");
         addIfSelected("address", u.address || "N/A");
         addIfSelected("bus_fee", u.bus_fee || 0);
+        addIfSelected("bus_start_date", u.bus_start_date || "");
         addIfSelected("fee_exempted", u.fee_exempted ? "Yes" : "No");
         addIfSelected("form_submitted", u.form_submitted ? "Yes" : "No");
         addIfSelected("tc_received", u.tc_received ? `Yes (${u.tc_date || ''})` : "No");
@@ -677,6 +681,7 @@ const UserManagement = () => {
         addIfSelected("mother_name", u.mother_name || "N/A");
         addIfSelected("address", u.address || "N/A");
         addIfSelected("bus_fee", (u.bus_fee || 0).toString());
+        addIfSelected("bus_start_date", u.bus_start_date || "N/A");
         addIfSelected("form_submitted", u.form_submitted ? "Yes" : "No");
         addIfSelected("tc_received", u.tc_received ? `Yes (${u.tc_date || ''})` : "No");
         addIfSelected("slc_received", u.slc_received ? `Yes (${u.slc_date || ''})` : "No");
@@ -764,6 +769,7 @@ const UserManagement = () => {
       case "mother_name": return user.mother_name || "N/A";
       case "address": return user.address || "N/A";
       case "bus_fee": return user.bus_fee || "0";
+      case "bus_start_date": return user.bus_start_date ? new Date(user.bus_start_date).toLocaleDateString() : "-";
       case "fee_exempted": return user.fee_exempted ? <span style={{ color: "#10b981", fontWeight: "600" }}>Yes</span> : "No";
       case "form_submitted": return user.form_submitted ? "Yes" : "No";
       case "leave_school": return user.leave_school ? "Yes" : "No";
@@ -1297,11 +1303,17 @@ const UserManagement = () => {
 
                   <h3 style={{ fontSize: "1.1rem", fontWeight: "600", color: "var(--text-primary)", marginTop: "0.5rem" }}>Fees Setup</h3>
                   <p style={{ fontSize: "0.8rem", color: "var(--text-secondary)", marginBottom: "0.5rem" }}>Monthly, Annual, and One-Time fees are automatically calculated based on the assigned Class Fee Structure.</p>
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "1rem" }}>
                     <div>
                       <label style={{ display: "block", marginBottom: "0.5rem", fontSize: "0.875rem" }}>Bus Fee (₹) / month</label>
                       <input type="number" className="input-glass" value={formData.bus_fee} onChange={(e) => setFormData({ ...formData, bus_fee: e.target.value })} />
                     </div>
+                    {Number(formData.bus_fee) > 0 && (
+                      <div>
+                        <label style={{ display: "block", marginBottom: "0.5rem", fontSize: "0.875rem" }}>Bus Start Date</label>
+                        <input type="date" className="input-glass" value={formData.bus_start_date} onChange={(e) => setFormData({ ...formData, bus_start_date: e.target.value })} />
+                      </div>
+                    )}
                     <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginTop: "1.5rem" }}>
                       <input type="checkbox" id="fee_exempted" checked={formData.fee_exempted} onChange={(e) => setFormData({ ...formData, fee_exempted: e.target.checked })} />
                       <label htmlFor="fee_exempted" style={{ fontSize: "0.875rem", cursor: "pointer" }}>Fee Exempted (Full Waiver)</label>

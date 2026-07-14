@@ -28,7 +28,7 @@ const Ledger = () => {
   const [ledgerLoading, setLedgerLoading] = useState(false);
 
   const [paymentForm, setPaymentForm] = useState({
-    feeId: "",
+    feeIds: [],
     amount: "",
     paymentMode: "Cash",
     remarks: ""
@@ -183,37 +183,59 @@ const Ledger = () => {
 
   const handlePaymentSubmit = async (e) => {
     e.preventDefault();
-    if (!paymentForm.feeId || !paymentForm.amount) {
-      return toast.error("Please fill all required fields");
+    if (!paymentForm.feeIds || paymentForm.feeIds.length === 0 || !paymentForm.amount) {
+      return toast.error("Please select at least one fee and enter an amount");
     }
 
     setIsPaying(true);
     try {
-        // Automatically generate receipt
-        const feeDetails = studentLedger.fees.find(f => f.id === paymentForm.feeId)?.fee;
+        let remainingAmount = Number(paymentForm.amount);
+        let totalPaymentAmount = 0;
+        const feeTitles = [];
+        
+        for (const feeId of paymentForm.feeIds) {
+            const feeObj = studentLedger.fees.find(f => f.id === feeId);
+            if (!feeObj) continue;
+            
+            const dueAmount = Number(feeObj.fee?.amount || 0) - Number(feeObj.total_paid_amount || 0);
+            if (remainingAmount <= 0) break;
+            
+            const paymentAmount = Math.min(remainingAmount, dueAmount);
+            totalPaymentAmount += paymentAmount;
+            feeTitles.push(feeObj.fee?.title || "Fee");
+            remainingAmount -= paymentAmount;
+        }
+
+        if (totalPaymentAmount === 0) {
+            setIsPaying(false);
+            return toast.error("Invalid payment configuration");
+        }
+
+        const consolidatedPayload = [{
+            feeId: paymentForm.feeIds[0],
+            amount: totalPaymentAmount,
+            title: feeTitles.join(", ")
+        }];
+
         const res = await api.post("/finance_panel/logPayment", {
           data: {
             studentId: selectedStudent.id,
             paymentMode: paymentForm.paymentMode,
             remarks: paymentForm.remarks,
-            payments: [{
-                feeId: paymentForm.feeId,
-                amount: Number(paymentForm.amount),
-                title: feeDetails?.title
-            }]
+            payments: consolidatedPayload
           }
         });
       if (res.data.success) {
         toast.success("Payment recorded successfully");
         
-        const completePayment = {
-            ...res.data.payments[0],
-            fee: feeDetails,
-            fee_title: feeDetails?.title
-        };
-        generateReceiptPDF(completePayment, selectedStudent);
+        const completePayments = res.data.payments.map((p, idx) => ({
+            ...p,
+            fee_title: consolidatedPayload[idx]?.title || p.remarks,
+            fee: { title: consolidatedPayload[idx]?.title || "Fee" }
+        }));
+        generateReceiptPDF(completePayments, selectedStudent);
 
-        setPaymentForm({ feeId: "", amount: "", paymentMode: "Cash", remarks: "" });
+        setPaymentForm({ feeIds: [], amount: "", paymentMode: "Cash", remarks: "" });
         setIsPaymentModalOpen(false); // Close payment modal after success
         // Refresh ledger if the big modal is still somehow open
         if (isModalOpen) handleOpenLedger(selectedStudent);
@@ -402,9 +424,9 @@ const Ledger = () => {
       />
       {/* Payment Modal */}
       {isPaymentModalOpen && selectedStudent && (
-        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 50 }}>
-          <div className="glass-panel modal-content animate-fade-in" style={{ width: "100%", maxWidth: "500px", padding: "2rem" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.5rem" }}>
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 50, padding: "1rem" }}>
+          <div className="glass-panel modal-content animate-fade-in" style={{ width: "100%", maxWidth: "600px", maxHeight: "90vh", display: "flex", flexDirection: "column", padding: "2rem" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.5rem", flexShrink: 0 }}>
               <h2 style={{ fontSize: "1.25rem", fontWeight: "700" }}>Log Payment for {selectedStudent.name}</h2>
               <button onClick={() => setIsPaymentModalOpen(false)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: "1.5rem", color: "var(--text-secondary)" }}>&times;</button>
             </div>
@@ -422,17 +444,73 @@ const Ledger = () => {
                 <button onClick={() => setIsPaymentModalOpen(false)} className="btn-ghost" style={{ marginTop: "1rem" }}>Close</button>
               </div>
             ) : (
-              <form onSubmit={handlePaymentSubmit} style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
-                <div>
-                  <label style={{ display: "block", fontSize: "0.875rem", marginBottom: "0.5rem" }}>Select Fee</label>
-                  <select required className="input-glass" style={{ width: "100%" }} value={paymentForm.feeId} onChange={e => setPaymentForm({...paymentForm, feeId: e.target.value})}>
-                    <option value="">-- Choose Fee --</option>
-                    {studentLedger.fees.filter(f => f.status !== "paid").map(f => (
-                      <option key={f.id} value={f.id}>{f.fee?.title} (Due: ₹{Number(f.fee?.amount || 0) - Number(f.total_paid_amount || 0)})</option>
-                    ))}
-                  </select>
+              <form onSubmit={handlePaymentSubmit} style={{ display: "flex", flexDirection: "column", gap: "1rem", flex: 1, overflow: "hidden" }}>
+                <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.5rem", flexShrink: 0 }}>
+                    <label style={{ fontSize: "0.875rem" }}>Select Fee(s)</label>
+                    <label style={{ fontSize: "0.75rem", display: "flex", alignItems: "center", gap: "0.25rem", cursor: "pointer" }}>
+                      <input 
+                        type="checkbox" 
+                        checked={studentLedger.fees.filter(f => f.status !== "paid").length > 0 && paymentForm.feeIds.length === studentLedger.fees.filter(f => f.status !== "paid").length}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            const allFeeIds = studentLedger.fees.filter(f => f.status !== "paid").map(f => f.id);
+                            let totalAmt = 0;
+                            allFeeIds.forEach(id => {
+                              const fObj = studentLedger.fees.find(fee => fee.id === id);
+                              if (fObj) totalAmt += (Number(fObj.fee?.amount || 0) - Number(fObj.total_paid_amount || 0));
+                            });
+                            setPaymentForm({ ...paymentForm, feeIds: allFeeIds, amount: totalAmt });
+                          } else {
+                            setPaymentForm({ ...paymentForm, feeIds: [], amount: "" });
+                          }
+                        }}
+                      />
+                      Select All
+                    </label>
+                  </div>
+                  <div style={{ flex: 1, overflowY: "auto", border: "1px solid var(--glass-border)", borderRadius: "8px", padding: "0.5rem", background: "rgba(255,255,255,0.05)" }}>
+                    {studentLedger.fees.filter(f => f.status !== "paid").map(f => {
+                      const due = Number(f.fee?.amount || 0) - Number(f.total_paid_amount || 0);
+                      const isChecked = paymentForm.feeIds.includes(f.id);
+                      return (
+                        <label key={f.id} style={{ display: "flex", alignItems: "center", gap: "0.5rem", padding: "0.5rem", cursor: "pointer", borderBottom: "1px solid var(--glass-border)" }}>
+                          <input 
+                            type="checkbox" 
+                            checked={isChecked}
+                            onChange={(e) => {
+                              let newFeeIds = [...paymentForm.feeIds];
+                              if (e.target.checked) {
+                                newFeeIds.push(f.id);
+                              } else {
+                                newFeeIds = newFeeIds.filter(id => id !== f.id);
+                              }
+                              
+                              // Auto-calculate new total
+                              let newAmount = 0;
+                              newFeeIds.forEach(id => {
+                                const fObj = studentLedger.fees.find(fee => fee.id === id);
+                                if (fObj) newAmount += (Number(fObj.fee?.amount || 0) - Number(fObj.total_paid_amount || 0));
+                              });
+
+                              setPaymentForm({
+                                ...paymentForm, 
+                                feeIds: newFeeIds,
+                                amount: newAmount > 0 ? newAmount : ""
+                              });
+                            }}
+                          />
+                          <span style={{ flex: 1, fontSize: "0.875rem" }}>{f.fee?.title}</span>
+                          <span style={{ fontWeight: "600", fontSize: "0.875rem", color: "#ef4444" }}>₹{due}</span>
+                        </label>
+                      );
+                    })}
+                    {studentLedger.fees.filter(f => f.status !== "paid").length === 0 && (
+                      <div style={{ padding: "1rem", textAlign: "center", color: "var(--text-secondary)", fontSize: "0.875rem" }}>No pending fees</div>
+                    )}
+                  </div>
                 </div>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem", flexShrink: 0 }}>
                   <div>
                     <label style={{ display: "block", fontSize: "0.875rem", marginBottom: "0.5rem" }}>Amount Paying (₹)</label>
                     <input type="number" required min="1" className="input-glass" style={{ width: "100%" }} value={paymentForm.amount} onChange={e => setPaymentForm({...paymentForm, amount: e.target.value})} />
@@ -448,11 +526,11 @@ const Ledger = () => {
                       </select>
                   </div>
                 </div>
-                <div>
+                <div style={{ flexShrink: 0 }}>
                   <label style={{ display: "block", fontSize: "0.875rem", marginBottom: "0.5rem" }}>Remarks / Ref No (Optional)</label>
                   <input type="text" className="input-glass" style={{ width: "100%" }} value={paymentForm.remarks} onChange={e => setPaymentForm({...paymentForm, remarks: e.target.value})} />
                 </div>
-                <div style={{ display: "flex", gap: "1rem", marginTop: "0.5rem" }}>
+                <div style={{ display: "flex", gap: "1rem", marginTop: "0.5rem", flexShrink: 0 }}>
                   <button type="button" onClick={() => setIsPaymentModalOpen(false)} className="btn btn-ghost" style={{ flex: 1, justifyContent: "center", border: "1px solid var(--glass-border)" }}>
                     Cancel
                   </button>

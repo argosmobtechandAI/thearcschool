@@ -59,16 +59,7 @@ export const calculateVirtualDues = async (studentId, academicYear = getCurrentA
     if (!structAcademicYear) return;
     const sessionStartYear = parseInt(structAcademicYear.split("-")[0]);
     
-    let monthsPassed = 0;
-    if (currentYear === sessionStartYear && currentMonth >= 3) {
-      monthsPassed = currentMonth - 3 + 1; // Apr = 0+1=1, May = 1+1=2, etc.
-    } else if (currentYear === sessionStartYear + 1 && currentMonth < 3) {
-      monthsPassed = 9 + currentMonth + 1; // Apr-Dec (9) + Jan (1) = 10
-    } else if (currentYear > sessionStartYear) {
-      monthsPassed = 12; // Whole year passed
-    } else {
-      monthsPassed = 0; // Future year
-    }
+    let monthsPassed = 12; // Always generate for the full academic year so parents can pay in advance
 
     let frequency = 'monthly';
     let baseCategory = struct.fee_category;
@@ -208,7 +199,7 @@ export const calculateVirtualDues = async (studentId, academicYear = getCurrentA
   // 4. Match with payments
   const { data: payments, error: paymentsError } = await supabase
     .from("payments_ledger")
-    .select("*")
+    .select("*, receipts(*)")
     .eq("student_id", studentId);
 
   if (paymentsError) throw paymentsError;
@@ -246,9 +237,11 @@ export const calculateVirtualDues = async (studentId, academicYear = getCurrentA
        const daysLate = penaltyEndDayNumber - dueDayNumber;
        if (daysLate > 0) {
          const penalty = daysLate * lateFeePenaltyAmount;
-         due.fee.amount += penalty;
-         due.fee.penalty = penalty;
-         due.fee.title += ` (+₹${penalty} Late Fee)`;
+         if (penalty > 0) {
+           due.fee.amount += penalty;
+           due.fee.penalty = penalty;
+           due.fee.title += ` (+₹${penalty} Late Fee)`;
+         }
        }
     }
   });
@@ -304,7 +297,7 @@ export const calculateVirtualDues = async (studentId, academicYear = getCurrentA
     });
   }
 
-  const filteredVirtualDues = virtualDues.filter(due => due.academic_year === academicYear);
+  const filteredVirtualDues = virtualDues.filter(due => !due.academic_year || due.academic_year === academicYear);
   const filteredStructures = structures.filter(s => s.academic_year === academicYear);
 
   return { virtualDues: filteredVirtualDues, payments, structures: filteredStructures };
