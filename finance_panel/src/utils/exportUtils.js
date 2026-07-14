@@ -156,7 +156,11 @@ export const generateReceiptPDF = async (paymentsInput, student, receipt) => {
                 pageDoc.text(`Receipt No: ${receiptIdText}`, offsetX + 10, 70);
                 pageDoc.text(`Date: ${new Date(receipt?.created_at || firstPayment.created_at || Date.now()).toLocaleDateString()}`, offsetX + halfWidth - 10, 70, { align: 'right' });
                 
-                pageDoc.text(`Student Name: ${student.name || 'N/A'}`, offsetX + 10, 80);
+                let safeName = student.name || 'N/A';
+                if (safeName.length > 35) {
+                    safeName = safeName.substring(0, 32) + '...';
+                }
+                pageDoc.text(`Student Name: ${safeName}`, offsetX + 10, 80);
                 pageDoc.text(`Admission No: ${student.admission_number || 'N/A'}`, offsetX + halfWidth - 10, 80, { align: 'right' });
                 
                 pageDoc.setFontSize(8);

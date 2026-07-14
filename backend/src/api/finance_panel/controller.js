@@ -446,6 +446,16 @@ export const updatePayment = async (req, res) => {
 
     if (error) throw error;
 
+    if (updatedPayment && updatedPayment.receipt_id) {
+      const { data: allRemaining } = await supabaseAdmin
+        .from("payments_ledger")
+        .select("amount_paid")
+        .eq("receipt_id", updatedPayment.receipt_id);
+        
+      const newTotal = (allRemaining || []).reduce((sum, p) => sum + Number(p.amount_paid || 0), 0);
+      await supabaseAdmin.from("receipts").update({ total_amount: newTotal }).eq("id", updatedPayment.receipt_id);
+    }
+
     return res.status(200).json({
       success: true,
       message: "Payment updated successfully",
@@ -489,8 +499,8 @@ export const deletePayment = async (req, res) => {
         .limit(1);
 
       if (!remainingPayments || remainingPayments.length === 0) {
-        // No more payments for this receipt, mark receipt as voided but keep it for counter integrity
-        await supabaseAdmin.from("receipts").update({ total_amount: 0, remarks: "VOIDED" }).eq("id", payment.receipt_id);
+        // No more payments for this receipt, delete the receipt
+        await supabaseAdmin.from("receipts").delete().eq("id", payment.receipt_id);
       } else {
         // Other payments exist, just subtract the amount from the receipt total
         // We'll calculate the actual new total
