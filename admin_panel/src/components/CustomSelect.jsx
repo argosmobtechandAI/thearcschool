@@ -2,11 +2,16 @@ import React from 'react';
 import Select from 'react-select';
 
 const CustomSelect = ({ options, value, onChange, placeholder = "Search...", disabled = false, isMulti = false }) => {
+  // Sort options alphabetically by label
+  const sortedOptions = Array.isArray(options) ? [...options].sort((a, b) => {
+    return String((a && a.label) || '').localeCompare(String((b && b.label) || ''), undefined, { numeric: true, sensitivity: 'base' });
+  }) : [];
+
   let selectedOption;
   if (isMulti) {
-    selectedOption = options.filter(opt => (value || []).includes(opt.value));
+    selectedOption = sortedOptions.filter(opt => (value || []).includes(opt.value));
   } else {
-    selectedOption = options.find(opt => opt.value === value) || null;
+    selectedOption = sortedOptions.find(opt => opt.value === value) || null;
   }
 
   const handleChange = (selected) => {
@@ -19,7 +24,7 @@ const CustomSelect = ({ options, value, onChange, placeholder = "Search...", dis
 
   return (
     <Select
-      options={options}
+      options={sortedOptions}
       value={selectedOption}
       onChange={handleChange}
       isDisabled={disabled}

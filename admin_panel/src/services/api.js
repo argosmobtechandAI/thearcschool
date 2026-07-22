@@ -4,9 +4,6 @@ const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3002/api";
 
 const api = axios.create({
   baseURL: API_URL,
-  headers: {
-    "Content-Type": "application/json",
-  },
 });
 
 // Add a request interceptor to inject JWT
@@ -80,9 +77,7 @@ export const uploadFile = async (file, bucket = "school", category = "") => {
     const formData = new FormData();
     formData.append("file", file);
     formData.append("bucket", bucket);
-    const response = await api.post(`/upload/file?category=${category || bucket}`, formData, {
-      headers: { "Content-Type": "multipart/form-data" },
-    });
+    const response = await api.post(`/upload/file?category=${category || bucket}`, formData);
     return response.data.url;
   } catch (error) {
     console.error("Error uploading file:", error);
@@ -101,8 +96,6 @@ export const deleteConsent = (id) => api.delete(`/admin_panel/consents/admin/${i
 export const createCircular = (data) => api.post('/circulars', data);
 export const getCirculars = (params) => api.get('/circulars', { params });
 export const deleteCircular = (id) => api.delete(`/circulars/${id}`);
-export const uploadCircularFile = (formData) => api.post('/circulars/upload', formData, {
-  headers: { "Content-Type": "multipart/form-data" }
-});
+export const uploadCircularFile = (formData) => api.post('/circulars/upload', formData);
 
 export default api;

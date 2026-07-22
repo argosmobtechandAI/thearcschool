@@ -83,9 +83,13 @@ const TableFilterHeader = ({
 
         {/* Dynamic Dropdown Filters */}
         {filters.map((filter, index) => {
+          const sortedOptions = Array.isArray(filter.options) ? [...filter.options].sort((a, b) => {
+            return String((a && a.label) || '').localeCompare(String((b && b.label) || ''), undefined, { numeric: true, sensitivity: 'base' });
+          }) : [];
+
           const selectOptions = filter.label 
-            ? [{ value: "", label: filter.label }, ...filter.options]
-            : filter.options;
+            ? [{ value: "", label: filter.label }, ...sortedOptions]
+            : sortedOptions;
 
           const selectedOption = selectOptions.find(o => o.value === filter.value) || selectOptions[0];
 

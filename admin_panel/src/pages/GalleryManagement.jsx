@@ -50,9 +50,7 @@ const GalleryManagement = () => {
     try {
       setUploadingFile(true);
       setUploadStatus("Uploading to CDN...");
-      const res = await api.post('/upload/file?category=gallery', uploadForm, {
-        headers: { 'Content-Type': 'multipart/form-data' }
-      });
+      const res = await api.post('/upload/file?category=gallery', uploadForm);
       if (res.data?.success) {
         setFormData(prev => ({ ...prev, media_url: res.data.url }));
         setUploadStatus("File uploaded successfully!");

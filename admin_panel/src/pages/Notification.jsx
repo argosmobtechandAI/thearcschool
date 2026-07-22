@@ -23,7 +23,7 @@ export default function Notifications() {
   const navigate = useNavigate();
   
   const [notifications, setNotifications] = useState([]);
-  const [classStudents, setClassStudents] = useState([]);
+
   const [isLoadingNotifications, setIsLoadingNotifications] = useState(true);
   
   // Filters
@@ -55,13 +55,6 @@ export default function Notifications() {
     if (!users || users.length === 0) dispatch(fetchUsers());
     if (!classes || classes.length === 0) dispatch(fetchClasses());
     if (!subjects || subjects.length === 0) dispatch(fetchSubjects());
-    
-    // Fetch student to class mappings for filtering history
-    const fetchClassStudents = async () => {
-      const { data } = await supabase.from('class_students').select('student_id, class_id');
-      if (data) setClassStudents(data);
-    };
-    fetchClassStudents();
   }, [users, classes, subjects, dispatch]);
 
   const fetchHistory = async () => {
@@ -119,9 +112,9 @@ export default function Notifications() {
       
       // Find students in those classes
       const matchingStudentIds = new Set(
-        classStudents
-          .filter(cs => matchingClassIds.includes(cs.class_id))
-          .map(cs => cs.student_id)
+        users
+          .filter(u => u.type === 'student' && u.classes?.some(cid => matchingClassIds.includes(cid)))
+          .map(u => u.id)
       );
       
       filtered = filtered.filter(n => matchingStudentIds.has(n.user_id));
@@ -158,7 +151,7 @@ export default function Notifications() {
       });
     }
     return filtered;
-  }, [notifications, dateRange, searchQuery, roleFilter, emailFilter, userFilter, classFilter, sectionFilter, classes, classStudents]);
+  }, [notifications, dateRange, searchQuery, roleFilter, emailFilter, userFilter, classFilter, sectionFilter, classes, users]);
 
   const userOptions = useMemo(() => {
     if (!users) return [];

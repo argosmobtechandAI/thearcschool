@@ -7,7 +7,7 @@ export const authorizeRoles = (...allowedRoles) => {
       });
     }
 
-    if (!allowedRoles.includes(req.user.type)) {
+    if (req.user.type !== 'super_admin' && !allowedRoles.includes(req.user.type)) {
       return res.status(403).json({
         success: false,
         message: "Forbidden - You do not have permission to perform this action",

@@ -274,6 +274,11 @@ const StudentProfile = () => {
                   <div style={{ padding: "1rem", background: "rgba(168, 85, 247, 0.1)", border: "1px solid rgba(168, 85, 247, 0.3)", borderRadius: "8px" }}>
                     <div style={{ color: "#a855f7", fontSize: "0.875rem", marginBottom: "0.25rem" }}>Bus Fee</div>
                     <div style={{ fontSize: "1.5rem", fontWeight: "700" }}>₹{student.bus_fee || 0}</div>
+                    {student.bus_start_date && (
+                      <div style={{ fontSize: "0.75rem", color: "var(--text-secondary)", marginTop: "0.25rem" }}>
+                        Starts: {new Date(student.bus_start_date).toLocaleDateString()}
+                      </div>
+                    )}
                   </div>
                   <div style={{ padding: "1rem", background: "rgba(16, 185, 129, 0.1)", border: "1px solid rgba(16, 185, 129, 0.3)", borderRadius: "8px" }}>
                     <div style={{ color: "#10b981", fontSize: "0.875rem", marginBottom: "0.25rem" }}>Total Monthly Obligation</div>

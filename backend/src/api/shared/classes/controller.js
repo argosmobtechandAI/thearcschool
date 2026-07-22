@@ -75,9 +75,9 @@ export const getClasses = async (req, res)=>{
     try {
         // Fetch classes and related data separately to avoid schema cache issues
         const [{ data: classes, error }, { data: classStudentsData }, { data: classTeachersData }] = await Promise.all([
-            supabase.from("class").select("*"),
-            supabase.from("class_students").select("*"),
-            supabase.from("class_teachers").select("*")
+            supabase.from("class").select("id, name, section"),
+            supabase.from("class_students").select("class_id, student_id"),
+            supabase.from("class_teachers").select("class_id, teacher_id")
         ]);
             
         if (error) throw error;
@@ -125,8 +125,8 @@ export const getClassesById = async(req, res) =>{
 
         const [{ data: classes, error }, { data: classStudentsData }, { data: classTeachersData }] = await Promise.all([
             supabase.from("class").select("*").eq("id", id),
-            supabase.from("class_students").select("*").eq("class_id", id),
-            supabase.from("class_teachers").select("*").eq("class_id", id)
+            supabase.from("class_students").select("class_id, student_id").eq("class_id", id),
+            supabase.from("class_teachers").select("class_id, teacher_id").eq("class_id", id)
         ]);
             
         if (error) throw error;

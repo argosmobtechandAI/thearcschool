@@ -1,6 +1,20 @@
 import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
 import api, { getCommunication, getInfo, getResults, getSystemMonitorList } from "../services/api";
 
+const sortAlphabetically = (array, key1 = 'name', key2 = '') => {
+  if (!Array.isArray(array)) return array;
+  return [...array].sort((a, b) => {
+    const valA1 = String((a && a[key1]) || '');
+    const valB1 = String((b && b[key1]) || '');
+    const cmp1 = valA1.localeCompare(valB1, undefined, { numeric: true, sensitivity: 'base' });
+    if (cmp1 !== 0 || !key2) return cmp1;
+    
+    const valA2 = String((a && a[key2]) || '');
+    const valB2 = String((b && b[key2]) || '');
+    return valA2.localeCompare(valB2, undefined, { numeric: true, sensitivity: 'base' });
+  });
+};
+
 export const fetchUsers = createAsyncThunk(
   "data/fetchUsers",
   async (_, { rejectWithValue }) => {
@@ -205,7 +219,7 @@ export const dataSlice = createSlice({
       })
       .addCase(fetchUsers.fulfilled, (state, action) => {
         state.loadingUsers = false;
-        state.users = action.payload;
+        state.users = sortAlphabetically(action.payload, 'name');
       })
       .addCase(fetchUsers.rejected, (state, action) => {
         state.loadingUsers = false;
@@ -217,7 +231,7 @@ export const dataSlice = createSlice({
       })
       .addCase(fetchClasses.fulfilled, (state, action) => {
         state.loadingClasses = false;
-        state.classes = action.payload;
+        state.classes = sortAlphabetically(action.payload, 'name', 'section');
       })
       .addCase(fetchClasses.rejected, (state, action) => {
         state.loadingClasses = false;
@@ -234,7 +248,7 @@ export const dataSlice = createSlice({
       })
       .addCase(fetchFees.fulfilled, (state, action) => {
         state.loadingFees = false;
-        state.fees = action.payload;
+        state.fees = sortAlphabetically(action.payload, 'name');
       })
       .addCase(fetchFees.rejected, (state, action) => {
         state.loadingFees = false;
@@ -246,7 +260,7 @@ export const dataSlice = createSlice({
       })
       .addCase(fetchExams.fulfilled, (state, action) => {
         state.loadingExams = false;
-        state.exams = action.payload;
+        state.exams = sortAlphabetically(action.payload, 'name');
       })
       .addCase(fetchExams.rejected, (state, action) => {
         state.loadingExams = false;
@@ -270,7 +284,7 @@ export const dataSlice = createSlice({
       })
       .addCase(fetchCourses.fulfilled, (state, action) => {
         state.loadingCourses = false;
-        state.courses = action.payload;
+        state.courses = sortAlphabetically(action.payload, 'name');
       })
       .addCase(fetchCourses.rejected, (state, action) => {
         state.loadingCourses = false;
@@ -282,7 +296,7 @@ export const dataSlice = createSlice({
       })
       .addCase(fetchSubjects.fulfilled, (state, action) => {
         state.loadingSubjects = false;
-        state.subjects = action.payload;
+        state.subjects = sortAlphabetically(action.payload, 'name');
       })
       .addCase(fetchSubjects.rejected, (state, action) => {
         state.loadingSubjects = false;
@@ -294,7 +308,7 @@ export const dataSlice = createSlice({
       })
       .addCase(fetchRooms.fulfilled, (state, action) => {
         state.loadingRooms = false;
-        state.rooms = action.payload;
+        state.rooms = sortAlphabetically(action.payload, 'name');
       })
       .addCase(fetchRooms.rejected, (state, action) => {
         state.loadingRooms = false;

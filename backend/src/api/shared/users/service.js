@@ -343,9 +343,6 @@ export class UserService {
 
     // Fetch all related data in separate parallel queries
     const [
-      { data: gradesData },
-      { data: notificationsData },
-      { data: activitiesData },
       { data: classStudentsData },
       { data: classTeachersData },
       { data: teacherDetailsData },
@@ -353,15 +350,12 @@ export class UserService {
       { data: parentsData },
       { data: studentParentsData }
     ] = await Promise.all([
-      supabase.from("grades").select("*"),
-      supabase.from("notifications").select("*"),
-      supabase.from("activities").select("*"),
-      supabase.from("class_students").select("*"),
-      supabase.from("class_teachers").select("*"),
-      supabase.from("teacher_details").select("*"),
-      supabase.from("user_connections").select("*"),
-      supabase.from("parents").select("*").then(res => res.error ? { data: [] } : res).catch(() => ({ data: [] })),
-      supabase.from("student_parents").select("*").then(res => res.error ? { data: [] } : res).catch(() => ({ data: [] }))
+      supabase.from("class_students").select("class_id, student_id"),
+      supabase.from("class_teachers").select("class_id, teacher_id"),
+      supabase.from("teacher_details").select("user_id, doj, father_spouse_name"),
+      supabase.from("user_connections").select("parent_id, student_id"),
+      supabase.from("parents").select("id, father_name, mother_name, phone, alternate_number").then(res => res.error ? { data: [] } : res).catch(() => ({ data: [] })),
+      supabase.from("student_parents").select("parent_id, student_id").then(res => res.error ? { data: [] } : res).catch(() => ({ data: [] }))
     ]);
     
     const mappedUsers = users.map(user => {
@@ -383,10 +377,10 @@ export class UserService {
         ...user,
         connections,
         classes,
-        grade: (gradesData || []).filter(g => g.student_id === user.id),
+        grade: [],
         fees: [], // Virtual Ledger: Fees are calculated dynamically on the finance panel
-        notification: (notificationsData || []).filter(n => n.user_id === user.id),
-        activity: (activitiesData || []).filter(a => a.user_id === user.id)
+        notification: [],
+        activity: []
       };
       
       const tDetails = (teacherDetailsData || []).filter(t => t.user_id === user.id);
@@ -479,19 +473,19 @@ export class UserService {
   }
 
   static async deleteUser(id) {
-    // With ON DELETE CASCADE defined in the database schema, 
-    // simply deleting the user will automatically remove:
-    // - attendance, grades, student_fees, notifications, activities
-    // - user_connections, class_students, class_teachers, timeTable entries
+    // Delete from public.user first. 
+    // This handles the ON DELETE CASCADE for attendance, grades, connections, etc.
+    // We must do this manually because some users might not exist in auth.users due to bulk import fallbacks.
+    const { error } = await supabaseAdmin.from("user").delete().eq("id", id);
+    if (error) throw new Error("User deletion from public schema failed: " + error.message);
     
     // Also delete from auth.users if we have admin client
     if (supabaseAdmin) {
       const { error: authError } = await supabaseAdmin.auth.admin.deleteUser(id);
-      if (authError) throw new Error("Auth user deletion failed: " + authError.message);
-    } else {
-      // Fallback: just delete from public.user (cascade handles the rest)
-      const { error } = await supabase.from("user").delete().eq("id", id);
-      if (error) throw new Error("User deletion failed: " + error.message);
+      // Ignore if user not found in auth.users
+      if (authError && !authError.message.includes('User not found') && authError.status !== 404) {
+        throw new Error("Auth user deletion failed: " + authError.message);
+      }
     }
     
     return true;

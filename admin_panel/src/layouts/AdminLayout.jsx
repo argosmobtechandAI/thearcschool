@@ -135,7 +135,7 @@ const AdminLayout = () => {
             <LayoutDashboard size={16} /> Dashboard
           </NavLink>
           
-          {(user?.type === "admin" || user?.type === "principal") && (
+          {((user?.type === "admin" || user?.type === "super_admin") || user?.type === "principal") && (
             <>
               <NavGroup title="People" />
               <NavLink to="/users/parent" style={navLinkStyle}><Users size={16} /> Parents</NavLink>
@@ -147,7 +147,7 @@ const AdminLayout = () => {
             </>
           )}
           
-          {(user?.type === "admin" || user?.type === "principal") && (
+          {((user?.type === "admin" || user?.type === "super_admin") || user?.type === "principal") && (
             <>
               <NavGroup title="Academics" />
               <NavLink to="/admissions" style={navLinkStyle}><UserCheck size={16} /> Admissions Pipeline</NavLink>
@@ -170,18 +170,18 @@ const AdminLayout = () => {
             </>
           )}
 
-          {(user?.type === "admin" || user?.type === "principal" || user?.type === "finance") && (
+          {((user?.type === "admin" || user?.type === "super_admin") || user?.type === "principal" || user?.type === "finance") && (
             <>
               <NavGroup title="Management" />
-              {(user?.type === "admin" || user?.type === "principal") && (
+              {((user?.type === "admin" || user?.type === "super_admin") || user?.type === "principal") && (
                 <NavLink to="/annual-planner" style={navLinkStyle}><Calendar size={16} /> Annual Planner</NavLink>
               )}
               <NavLink to="/fees" style={navLinkStyle}><IndianRupee size={16} /> Fees</NavLink>
-              {(user?.type === "admin" || user?.type === "principal") && (
+              {((user?.type === "admin" || user?.type === "super_admin") || user?.type === "principal") && (
                 <NavLink to="/gallery" style={navLinkStyle}><ImageIcon size={16} /> Gallery</NavLink>
               )}
               <NavLink to="/pnl" style={navLinkStyle}><TrendingUp size={16} /> Profit & Loss</NavLink>
-              {(user?.type === "admin" || user?.type === "principal") && (
+              {((user?.type === "admin" || user?.type === "super_admin") || user?.type === "principal") && (
                 <>
                   <NavLink to="/rooms" style={navLinkStyle}><MapPin size={16} /> Rooms Management</NavLink>
                   <NavLink to="/spotlight" style={navLinkStyle}><Sparkles size={16} /> Spotlight of the Day</NavLink>
@@ -193,7 +193,7 @@ const AdminLayout = () => {
             </>
           )}
 
-          {(user?.type === "admin" || user?.type === "principal") && (
+          {((user?.type === "admin" || user?.type === "super_admin") || user?.type === "principal") && (
             <>
               <NavGroup title="Portals" />
               <a href="https://admission.thearcschool.in" target="_blank" rel="noopener noreferrer" style={{ ...navLinkStyle({ isActive: false }), color: "var(--text-secondary)" }}>

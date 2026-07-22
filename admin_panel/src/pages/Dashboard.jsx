@@ -188,7 +188,7 @@ const Dashboard = () => {
         </div>
       )}
 
-      {(user?.type === "admin" || user?.type === "principal") && (
+      {((user?.type === "admin" || user?.type === "super_admin") || user?.type === "principal") && (
         <>
           <h3 style={{ fontSize: "1.1rem", fontWeight: "700", marginBottom: "1rem", color: "var(--text-primary)", display: "flex", alignItems: "center", gap: "0.5rem" }}>
             <Users size={18} color="var(--accent-primary)"/> People Overview
@@ -204,7 +204,7 @@ const Dashboard = () => {
         </>
       )}
 
-      {(user?.type === "admin" || user?.type === "principal" || user?.type === "finance") && (
+      {((user?.type === "admin" || user?.type === "super_admin") || user?.type === "principal" || user?.type === "finance") && (
         <>
           <h3 style={{ fontSize: "1.1rem", fontWeight: "700", marginBottom: "1rem", color: "var(--text-primary)", display: "flex", alignItems: "center", gap: "0.5rem" }}>
             <CreditCard size={18} color="var(--accent-primary)"/> Operations & Financials
@@ -215,7 +215,7 @@ const Dashboard = () => {
               dispatch(setFeeStatusFilter("Defaulters"));
               navigate("/fees");
             }} />
-            {(user?.type === "admin" || user?.type === "principal") && (
+            {((user?.type === "admin" || user?.type === "super_admin") || user?.type === "principal") && (
               <>
                 <StatCard title="Active Classes" value={loading ? "..." : stats.activeClasses} icon={GraduationCap} color="14, 165, 233" onClick={() => navigate("/classes")} />
                 <StatCard title="Total Rooms" value={loading ? "..." : stats.totalRooms} icon={Building} color="99, 102, 241" onClick={() => navigate("/rooms")} />
@@ -227,7 +227,7 @@ const Dashboard = () => {
       )}
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
-        {(user?.type === "admin" || user?.type === "principal") && (
+        {((user?.type === "admin" || user?.type === "super_admin") || user?.type === "principal") && (
           <div className="glass-panel" style={{ padding: "1.5rem", display: "flex", flexDirection: "column" }}>
             <h3 style={{ fontSize: "1.25rem", fontWeight: "700", marginBottom: "1rem", paddingBottom: "1rem", borderBottom: "1px solid var(--glass-border)", display: "flex", alignItems: "center", gap: "0.5rem" }}>
               <UserCheck size={20} color="var(--accent-primary)" /> Student of the Week
@@ -263,7 +263,7 @@ const Dashboard = () => {
           </div>
         )}
 
-        {(user?.type === "admin" || user?.type === "principal") && (
+        {((user?.type === "admin" || user?.type === "super_admin") || user?.type === "principal") && (
           <div className="glass-panel" style={{ padding: "1.5rem" }}>
             <h3 style={{ fontSize: "1.25rem", fontWeight: "700", marginBottom: "1rem", paddingBottom: "1rem", borderBottom: "1px solid var(--glass-border)" }}>
               Topper of the Month

@@ -50,7 +50,7 @@ export const createNewUser = async (req, res) => {
 
 export const getAllNewUsers = async (req, res) => {
   try {
-    const { data: users, error } = await supabase.from("newUsers").select("*");
+    const { data: users, error } = await supabase.from("newUsers").select("id, name, email, phone, class_id, status, created_at, parent, assigned_to");
 
     if (error) throw error;
 

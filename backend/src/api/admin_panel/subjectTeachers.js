@@ -32,18 +32,36 @@ export const assignSubjectTeacher = async (req, res) => {
       return res.status(200).json({ success: true, message: "Assignment removed" });
     }
 
-    // Upsert assignment
-    const { data, error } = await supabaseAdmin
+    // Manual upsert logic since there is no unique constraint on (subject_id, class_id)
+    const { data: existing, error: fetchErr } = await supabaseAdmin
       .from("subject_teachers")
-      .upsert(
-        { subject_id: subjectId, class_id: classId, teacher_id: teacherId },
-        { onConflict: 'subject_id, class_id' }
-      )
-      .select();
+      .select("id")
+      .match({ subject_id: subjectId, class_id: classId });
 
-    if (error) throw error;
+    if (fetchErr) throw fetchErr;
 
-    return res.status(200).json({ success: true, message: "Teacher assigned successfully", data });
+    let resultData, resultError;
+
+    if (existing && existing.length > 0) {
+      const { data, error } = await supabaseAdmin
+        .from("subject_teachers")
+        .update({ teacher_id: teacherId })
+        .match({ subject_id: subjectId, class_id: classId })
+        .select();
+      resultData = data;
+      resultError = error;
+    } else {
+      const { data, error } = await supabaseAdmin
+        .from("subject_teachers")
+        .insert({ subject_id: subjectId, class_id: classId, teacher_id: teacherId })
+        .select();
+      resultData = data;
+      resultError = error;
+    }
+
+    if (resultError) throw resultError;
+
+    return res.status(200).json({ success: true, message: "Teacher assigned successfully", data: resultData });
   } catch (error) {
     return res.status(500).json({ success: false, message: error.message });
   }

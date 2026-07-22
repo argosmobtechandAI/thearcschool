@@ -100,7 +100,7 @@ const UserManagement = () => {
     setFormData((prev) => ({ ...prev, type: type }));
     const defaults = ["name", "email", "phone", "associations"];
     if (type === "student") defaults.unshift("admission_number");
-    if (type === "teacher") defaults.push("subjects", "doj", "father_spouse_name");
+    if (type === "teacher") defaults.push("subjects", "gender", "doj", "father_spouse_name");
     
     setSelectedColumns(defaults);
   }, [type]);
@@ -360,9 +360,7 @@ const UserManagement = () => {
     uploadData.append("file", file);
 
     try {
-      const res = await api.post(`/upload/file?category=${category}`, uploadData, {
-        headers: { "Content-Type": "multipart/form-data" }
-      });
+      const res = await api.post(`/upload/file?category=${category}`, uploadData);
       if (res.data.success) {
         setFormData(prev => ({ ...prev, [fieldName]: res.data.url }));
         toast.success("File uploaded successfully");
@@ -413,10 +411,27 @@ const UserManagement = () => {
       } else {
         const payload = { ...formData };
         delete payload.subjectAssignments;
-        await api.post("/admin_panel/users", { data: payload });
+        const res = await api.post("/admin_panel/users", { data: payload });
+        const newUserId = res.data?.data?.id || res.data?.id; 
+
+        // Sync subject assignments for the new teacher
+        if (formData.type === 'teacher' && formData.subjectAssignments) {
+          const newFlatAssignments = [];
+          formData.subjectAssignments.forEach(group => {
+            if (group.subjectId && group.classIds && group.classIds.length > 0) {
+              group.classIds.forEach(cid => {
+                newFlatAssignments.push({ subjectId: group.subjectId, classId: cid });
+              });
+            }
+          });
+          
+          for (let newAsgn of newFlatAssignments) {
+            await api.post(`/admin_panel/subjectTeachers/assign`, { data: { subjectId: newAsgn.subjectId, classId: newAsgn.classId, teacherId: newUserId } });
+          }
+          dispatch(fetchSubjectTeachers());
+        }
+
         toast.success("User created successfully");
-        // Note: For new users, we'd need the created ID to assign subjects.
-        // Currently subjects are only assigned when editing.
       }
       setIsModalOpen(false);
       dispatch(fetchUsers());

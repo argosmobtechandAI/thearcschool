@@ -44,7 +44,7 @@ const ProtectedRoute = ({ children, allowedRoles }) => {
   
   if (!isAuthenticated) return <Navigate to="/login" replace />;
   
-  if (allowedRoles && user && !allowedRoles.includes(user.type)) {
+  if (allowedRoles && user && user.type !== "super_admin" && !allowedRoles.includes(user.type)) {
     // If user tries to access a route they shouldn't, kick them to dashboard
     return <Navigate to="/dashboard" replace />;
   }
