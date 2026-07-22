@@ -86,7 +86,7 @@ const localizer = dateFnsLocalizer({
 })
 
 const getThisWeek = () => {
-  const curr = new Date(); 
+  const curr = new Date();
   const first = curr.getDate() - curr.getDay() + 1; // Monday
   const last = first + 6; // Sunday
   return { start: formatDate(new Date(curr.setDate(first))), end: formatDate(new Date(curr.setDate(last))) };
@@ -136,10 +136,10 @@ const CustomToolbar = (toolbar) => {
 const CustomEvent = ({ event }) => {
   if (event.resource?.isPlannerEvent) {
     let bgColor = "rgba(59, 130, 246, 0.8)"; // Event
-    if (event.resource.category === 'Holiday') bgColor = "rgba(16, 185, 129, 0.8)"; 
-    else if (event.resource.category === 'Exam') bgColor = "rgba(239, 68, 68, 0.8)"; 
-    else if (event.resource.category === 'PTM') bgColor = "rgba(245, 158, 11, 0.8)"; 
-    
+    if (event.resource.category === 'Holiday') bgColor = "rgba(16, 185, 129, 0.8)";
+    else if (event.resource.category === 'Exam') bgColor = "rgba(239, 68, 68, 0.8)";
+    else if (event.resource.category === 'PTM') bgColor = "rgba(245, 158, 11, 0.8)";
+
     return (
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', fontWeight: 'bold', backgroundColor: bgColor, color: 'white', borderRadius: '4px', padding: '2px 4px', fontSize: '0.8rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
         {event.title}
@@ -154,7 +154,7 @@ const CustomEvent = ({ event }) => {
       </div>
     );
   }
-  
+
   if (event.resource?.isBreak) {
     return (
       <div style={{ padding: '2px 4px', display: 'flex', flexDirection: 'column', justifyContent: 'center', height: '100%' }}>
@@ -207,7 +207,7 @@ export default function TimeTable() {
   const [openEditModal, setOpenEditModal] = useState(false);
   const [openAddSingleModal, setOpenAddSingleModal] = useState(false);
   const [openDuplicateModal, setOpenDuplicateModal] = useState(false);
-  const [duplicateConfig, setDuplicateConfig] = useState({ sourceDate: "", targetStartDate: "", targetEndDate: "", copyMode: "exact" });
+  const [duplicateConfig, setDuplicateConfig] = useState({ sourceDate: "", targetStartDate: "", targetEndDate: "", copyMode: "exact", selectedDays: [1, 2, 3, 4, 5] });
   const [loading, setLoading] = useState(false);
   const [editingPeriodId, setEditingPeriodId] = useState(null);
   const [plannerEvents, setPlannerEvents] = useState([]);
@@ -221,7 +221,7 @@ export default function TimeTable() {
     dispatch(fetchUsers());
     dispatch(fetchSubjects());
     dispatch(fetchRooms());
-    
+
     api.get('/admin_panel/planner').then(res => {
       setPlannerEvents(res.data.data || []);
     }).catch(console.error);
@@ -244,7 +244,7 @@ export default function TimeTable() {
 
   const sortedClasses = useMemo(() => {
     if (!classes) return [];
-    
+
     const classOrder = {
       'PLAY': 1,
       'NUR': 2,
@@ -256,10 +256,10 @@ export default function TimeTable() {
       const getOrder = (name) => {
         const strName = String(name).toUpperCase().trim();
         if (classOrder[strName]) return classOrder[strName];
-        
+
         const num = parseInt(strName, 10);
         if (!isNaN(num)) return 10 + num;
-        
+
         return 100; // fallback
       };
 
@@ -340,7 +340,7 @@ export default function TimeTable() {
   const dayPropGetter = (date) => {
     const pad = (n) => n.toString().padStart(2, '0');
     const dateStr = `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
-    
+
     const markType = getDayMarkType(dateStr);
     if (markType === 'Holiday' || markType === 'Public Holiday') {
       return { style: { backgroundColor: 'rgba(16, 185, 129, 0.1)' } }; // Light green tint
@@ -352,14 +352,14 @@ export default function TimeTable() {
   };
 
   const handleSelectEvent = (event) => {
-    if (event.resource?.isMark) return; 
+    if (event.resource?.isMark) return;
     handleEditClick(event.resource, event.resource.date);
   };
 
   const handleSelectSlot = ({ start, end, action }) => {
     const pad = (n) => n.toString().padStart(2, '0');
     const dateStr = `${start.getFullYear()}-${pad(start.getMonth() + 1)}-${pad(start.getDate())}`;
-    
+
     const initialTime = `${pad(start.getHours())}:${pad(start.getMinutes())}`;
     const finalTime = `${pad(end.getHours())}:${pad(end.getMinutes())}`;
 
@@ -376,11 +376,11 @@ export default function TimeTable() {
   };
 
   const handleEventDrop = async ({ event, start, end }) => {
-    if (event.resource?.isMark) return; 
+    if (event.resource?.isMark) return;
 
     const pad = (n) => n.toString().padStart(2, '0');
     const newDateStr = `${start.getFullYear()}-${pad(start.getMonth() + 1)}-${pad(start.getDate())}`;
-    
+
     const markType = getDayMarkType(newDateStr);
     if (markType === "Public Holiday" || markType === "Holiday" || markType === "Week Off") {
       return toast.error(`Cannot move period to a ${markType}.`);
@@ -442,7 +442,7 @@ export default function TimeTable() {
     const s = new Date(dateRange.start);
     const e = new Date(dateRange.end);
     const intervalDays = Math.round((e - s) / (1000 * 60 * 60 * 24)) + 1;
-    
+
     s.setDate(s.getDate() - intervalDays);
     e.setDate(e.getDate() - intervalDays);
     setDateRange({ start: formatDate(s), end: formatDate(e) });
@@ -456,7 +456,7 @@ export default function TimeTable() {
     const s = new Date(dateRange.start);
     const e = new Date(dateRange.end);
     const intervalDays = Math.round((e - s) / (1000 * 60 * 60 * 24)) + 1;
-    
+
     s.setDate(s.getDate() + intervalDays);
     e.setDate(e.getDate() + intervalDays);
     setDateRange({ start: formatDate(s), end: formatDate(e) });
@@ -559,7 +559,7 @@ export default function TimeTable() {
     const d = new Date(date);
     if (d.getDay() === 0) return "Week Off";
     if (plannerEvents.some(h => h.start_date === date && h.category === 'Holiday')) return "Public Holiday";
-    
+
     const period = activeTimeTable?.dates?.[date]?.find(p => p.subject === "Holiday" || p.subject === "Week Off");
     return period ? period.subject : null;
   };
@@ -571,11 +571,11 @@ export default function TimeTable() {
       plannerEvents.forEach(pe => {
         const targets = Array.isArray(pe.target_classes) ? pe.target_classes : [];
         const isTarget = targets.includes("All") || targets.some(t => {
-           const lower = t.toLowerCase();
-           return activeClassData.name?.toLowerCase().includes(lower) || 
-                  `${activeClassData.name} ${activeClassData.section}`.toLowerCase().includes(lower);
+          const lower = t.toLowerCase();
+          return activeClassData.name?.toLowerCase().includes(lower) ||
+            `${activeClassData.name} ${activeClassData.section}`.toLowerCase().includes(lower);
         });
-        
+
         if (isTarget) {
           events.push({
             id: `planner-${pe.id}`,
@@ -834,7 +834,8 @@ export default function TimeTable() {
         sourceDate: duplicateConfig.sourceDate,
         targetStartDate: duplicateConfig.targetStartDate,
         targetEndDate: duplicateConfig.targetEndDate,
-        copyMode: duplicateConfig.copyMode
+        copyMode: duplicateConfig.copyMode,
+        selectedDays: duplicateConfig.selectedDays
       });
       toast.success("Schedule duplicated successfully!");
       dispatch(fetchTimeTables());
@@ -853,7 +854,7 @@ export default function TimeTable() {
       visibleDates.forEach(date => {
         const markType = getDayMarkType(date);
         const period = activeTimeTable?.dates?.[date]?.find(p => p.time === time);
-        
+
         if (markType) {
           row[date] = markType.toUpperCase();
         } else if (period) {
@@ -878,7 +879,7 @@ export default function TimeTable() {
       visibleDates.forEach(date => {
         const markType = getDayMarkType(date);
         const period = activeTimeTable?.dates?.[date]?.find(p => p.time === time);
-        
+
         if (markType) {
           row.push(markType.toUpperCase());
         } else if (period) {
@@ -913,20 +914,20 @@ export default function TimeTable() {
               </button>
             </div>
           )}
-          <button 
+          <button
             onClick={() => {
               if (!selectedClass) {
                 toast.warn("Please select a class first.");
                 return;
               }
-              setDuplicateConfig({ sourceDate: formatDate(new Date()), targetStartDate: "", targetEndDate: "", copyMode: "exact" });
+              setDuplicateConfig({ sourceDate: formatDate(new Date()), targetStartDate: "", targetEndDate: "", copyMode: "exact", selectedDays: [1, 2, 3, 4, 5] });
               setOpenDuplicateModal(true);
-            }} 
+            }}
             className="btn btn-ghost" style={{ border: "1px solid var(--glass-border)", background: "rgba(255,255,255,0.05)" }}
           >
             <Copy size={18} /> Duplicate Schedule
           </button>
-          <button 
+          <button
             onClick={() => {
               if (!selectedClass) {
                 toast.warn("Please select a class first to add a timetable.");
@@ -934,7 +935,7 @@ export default function TimeTable() {
               }
               setNewTimeTable({ date: formatDate(new Date()), timeTables: [] });
               setOpenModal(true);
-            }} 
+            }}
             className="btn btn-primary"
           >
             <Plus size={18} /> Add Timetable
@@ -953,7 +954,7 @@ export default function TimeTable() {
               ))}
             </select>
           </div>
-          
+
         </div>
       </div>
 
@@ -1009,34 +1010,34 @@ export default function TimeTable() {
 
             <div style={{ marginBottom: "1.5rem" }}>
               <label style={{ display: "block", marginBottom: "0.5rem", fontSize: "0.875rem" }}>Date</label>
-              <input 
+              <input
                 type="date"
-                className="input-glass" 
-                value={newTimeTable.date} 
+                className="input-glass"
+                value={newTimeTable.date}
                 onChange={(e) => setNewTimeTable({ ...newTimeTable, date: e.target.value })}
               />
             </div>
 
             <div className="glass-card" style={{ padding: "1.5rem", marginBottom: "1.5rem" }}>
               <h3 style={{ fontSize: "1rem", fontWeight: "600", marginBottom: "1rem" }}>Add Period</h3>
-              
+
               <div style={{ display: "flex", gap: "1rem", marginBottom: "1rem", alignItems: "center" }}>
-                  <label style={{ display: "flex", alignItems: "center", gap: "0.5rem", cursor: "pointer", fontSize: "0.875rem", fontWeight: "500" }}>
-                      <input type="checkbox" checked={timeSubject.isBreak} onChange={(e) => setTimeSubject({...timeSubject, isBreak: e.target.checked})} style={{ width: "16px", height: "16px", accentColor: "var(--accent-primary)" }} />
-                      Mark as Break / Lunch
-                  </label>
+                <label style={{ display: "flex", alignItems: "center", gap: "0.5rem", cursor: "pointer", fontSize: "0.875rem", fontWeight: "500" }}>
+                  <input type="checkbox" checked={timeSubject.isBreak} onChange={(e) => setTimeSubject({ ...timeSubject, isBreak: e.target.checked })} style={{ width: "16px", height: "16px", accentColor: "var(--accent-primary)" }} />
+                  Mark as Break / Lunch
+                </label>
               </div>
 
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem", marginBottom: "1rem" }}>
-                <TimePicker 
-                  label="Start Time" 
-                  value={timeSubject.initialTime} 
-                  onChange={(val) => setTimeSubject({ ...timeSubject, initialTime: val })} 
+                <TimePicker
+                  label="Start Time"
+                  value={timeSubject.initialTime}
+                  onChange={(val) => setTimeSubject({ ...timeSubject, initialTime: val })}
                 />
-                <TimePicker 
-                  label="End Time" 
-                  value={timeSubject.finalTime} 
-                  onChange={(val) => setTimeSubject({ ...timeSubject, finalTime: val })} 
+                <TimePicker
+                  label="End Time"
+                  value={timeSubject.finalTime}
+                  onChange={(val) => setTimeSubject({ ...timeSubject, finalTime: val })}
                 />
               </div>
 
@@ -1046,7 +1047,7 @@ export default function TimeTable() {
                     <div style={{ marginBottom: "1rem", display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
                       <div>
                         <label style={{ display: "block", marginBottom: "0.5rem", fontSize: "0.75rem" }}>Teacher</label>
-                        <Select 
+                        <Select
                           styles={selectStyles}
                           options={allTeachers.map(t => ({ value: t.id, label: t.name }))}
                           value={allTeachers.map(t => ({ value: t.id, label: t.name })).find(opt => opt.value === timeSubject.teacher) || null}
@@ -1058,7 +1059,7 @@ export default function TimeTable() {
                       </div>
                       <div>
                         <label style={{ display: "block", marginBottom: "0.5rem", fontSize: "0.75rem" }}>Subject</label>
-                        <Select 
+                        <Select
                           styles={selectStyles}
                           options={subjectOptions}
                           value={timeSubject.subject ? { value: timeSubject.subject, label: timeSubject.subject } : null}
@@ -1071,7 +1072,7 @@ export default function TimeTable() {
                       </div>
                     </div>
                   )}
-                  
+
                   <div style={{ marginBottom: "1rem" }}>
                     <label style={{ display: "block", marginBottom: "0.5rem", fontSize: "0.75rem" }}>Room Number (Optional)</label>
                     <select className="input-glass" value={timeSubject.roomNumber} onChange={(e) => setTimeSubject({ ...timeSubject, roomNumber: e.target.value })}>
@@ -1126,22 +1127,22 @@ export default function TimeTable() {
             </h2>
 
             <div style={{ display: "flex", gap: "1rem", marginBottom: "1rem", alignItems: "center" }}>
-                <label style={{ display: "flex", alignItems: "center", gap: "0.5rem", cursor: "pointer", fontSize: "0.875rem", fontWeight: "500" }}>
-                    <input type="checkbox" checked={timeSubject.isBreak} onChange={(e) => setTimeSubject({...timeSubject, isBreak: e.target.checked})} style={{ width: "16px", height: "16px", accentColor: "var(--accent-primary)" }} />
-                    Mark as Break / Lunch
-                </label>
+              <label style={{ display: "flex", alignItems: "center", gap: "0.5rem", cursor: "pointer", fontSize: "0.875rem", fontWeight: "500" }}>
+                <input type="checkbox" checked={timeSubject.isBreak} onChange={(e) => setTimeSubject({ ...timeSubject, isBreak: e.target.checked })} style={{ width: "16px", height: "16px", accentColor: "var(--accent-primary)" }} />
+                Mark as Break / Lunch
+              </label>
             </div>
 
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem", marginBottom: "1rem" }}>
-              <TimePicker 
-                label="Start Time" 
-                value={timeSubject.initialTime} 
-                onChange={(val) => setTimeSubject({ ...timeSubject, initialTime: val })} 
+              <TimePicker
+                label="Start Time"
+                value={timeSubject.initialTime}
+                onChange={(val) => setTimeSubject({ ...timeSubject, initialTime: val })}
               />
-              <TimePicker 
-                label="End Time" 
-                value={timeSubject.finalTime} 
-                onChange={(val) => setTimeSubject({ ...timeSubject, finalTime: val })} 
+              <TimePicker
+                label="End Time"
+                value={timeSubject.finalTime}
+                onChange={(val) => setTimeSubject({ ...timeSubject, finalTime: val })}
               />
             </div>
 
@@ -1151,7 +1152,7 @@ export default function TimeTable() {
                   <div style={{ marginBottom: "1rem", display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
                     <div>
                       <label style={{ display: "block", marginBottom: "0.5rem", fontSize: "0.75rem" }}>Teacher</label>
-                      <Select 
+                      <Select
                         styles={selectStyles}
                         options={allTeachers.map(t => ({ value: t.id, label: t.name }))}
                         value={allTeachers.map(t => ({ value: t.id, label: t.name })).find(opt => opt.value === timeSubject.teacher) || null}
@@ -1163,7 +1164,7 @@ export default function TimeTable() {
                     </div>
                     <div>
                       <label style={{ display: "block", marginBottom: "0.5rem", fontSize: "0.75rem" }}>Subject</label>
-                      <Select 
+                      <Select
                         styles={selectStyles}
                         options={subjectOptions}
                         value={timeSubject.subject ? { value: timeSubject.subject, label: timeSubject.subject } : null}
@@ -1176,7 +1177,7 @@ export default function TimeTable() {
                     </div>
                   </div>
                 )}
-                
+
                 <div style={{ marginBottom: "1rem" }}>
                   <label style={{ display: "block", marginBottom: "0.5rem", fontSize: "0.75rem" }}>Room Number (Optional)</label>
                   <select className="input-glass" value={timeSubject.roomNumber} onChange={(e) => setTimeSubject({ ...timeSubject, roomNumber: e.target.value })}>
@@ -1190,10 +1191,10 @@ export default function TimeTable() {
             )}
 
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "1.5rem" }}>
-              <button 
-                type="button" 
-                onClick={() => handleDeletePeriod(timeSubject)} 
-                className="btn btn-ghost hover-bg" 
+              <button
+                type="button"
+                onClick={() => handleDeletePeriod(timeSubject)}
+                className="btn btn-ghost hover-bg"
                 style={{ color: "#ef4444", border: "1px solid rgba(239, 68, 68, 0.2)", background: "rgba(239, 68, 68, 0.05)" }}
               >
                 Delete
@@ -1219,22 +1220,22 @@ export default function TimeTable() {
             </p>
 
             <div style={{ display: "flex", gap: "1rem", marginBottom: "1rem", alignItems: "center" }}>
-                <label style={{ display: "flex", alignItems: "center", gap: "0.5rem", cursor: "pointer", fontSize: "0.875rem", fontWeight: "500" }}>
-                    <input type="checkbox" checked={timeSubject.isBreak} onChange={(e) => setTimeSubject({...timeSubject, isBreak: e.target.checked})} style={{ width: "16px", height: "16px", accentColor: "var(--accent-primary)" }} />
-                    Mark as Break / Lunch
-                </label>
+              <label style={{ display: "flex", alignItems: "center", gap: "0.5rem", cursor: "pointer", fontSize: "0.875rem", fontWeight: "500" }}>
+                <input type="checkbox" checked={timeSubject.isBreak} onChange={(e) => setTimeSubject({ ...timeSubject, isBreak: e.target.checked })} style={{ width: "16px", height: "16px", accentColor: "var(--accent-primary)" }} />
+                Mark as Break / Lunch
+              </label>
             </div>
 
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem", marginBottom: "1rem" }}>
-              <TimePicker 
-                label="Start Time" 
-                value={timeSubject.initialTime} 
-                onChange={(val) => setTimeSubject({ ...timeSubject, initialTime: val })} 
+              <TimePicker
+                label="Start Time"
+                value={timeSubject.initialTime}
+                onChange={(val) => setTimeSubject({ ...timeSubject, initialTime: val })}
               />
-              <TimePicker 
-                label="End Time" 
-                value={timeSubject.finalTime} 
-                onChange={(val) => setTimeSubject({ ...timeSubject, finalTime: val })} 
+              <TimePicker
+                label="End Time"
+                value={timeSubject.finalTime}
+                onChange={(val) => setTimeSubject({ ...timeSubject, finalTime: val })}
               />
             </div>
 
@@ -1244,7 +1245,7 @@ export default function TimeTable() {
                   <div style={{ marginBottom: "1rem", display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
                     <div>
                       <label style={{ display: "block", marginBottom: "0.5rem", fontSize: "0.75rem" }}>Teacher</label>
-                      <Select 
+                      <Select
                         styles={selectStyles}
                         options={allTeachers.map(t => ({ value: t.id, label: t.name }))}
                         value={allTeachers.map(t => ({ value: t.id, label: t.name })).find(opt => opt.value === timeSubject.teacher) || null}
@@ -1256,7 +1257,7 @@ export default function TimeTable() {
                     </div>
                     <div>
                       <label style={{ display: "block", marginBottom: "0.5rem", fontSize: "0.75rem" }}>Subject</label>
-                      <Select 
+                      <Select
                         styles={selectStyles}
                         options={subjectOptions}
                         value={timeSubject.subject ? { value: timeSubject.subject, label: timeSubject.subject } : null}
@@ -1269,7 +1270,7 @@ export default function TimeTable() {
                     </div>
                   </div>
                 )}
-                
+
                 <div style={{ marginBottom: "1rem" }}>
                   <label style={{ display: "block", marginBottom: "0.5rem", fontSize: "0.75rem" }}>Room Number (Optional)</label>
                   <select className="input-glass" value={timeSubject.roomNumber} onChange={(e) => setTimeSubject({ ...timeSubject, roomNumber: e.target.value })}>
@@ -1314,6 +1315,26 @@ export default function TimeTable() {
                   <option value="exact">Exact Copy (Keep Subjects & Teachers)</option>
                   <option value="structure">Structure Only (Set all to Unassigned)</option>
                 </select>
+              </div>
+              <div>
+                <label style={{ display: "block", marginBottom: "0.5rem", fontSize: "0.875rem", fontWeight: "500" }}>Days to Duplicate</label>
+                <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap", marginTop: "0.25rem" }}>
+                  {[{label: "Mon", val: 1}, {label: "Tue", val: 2}, {label: "Wed", val: 3}, {label: "Thu", val: 4}, {label: "Fri", val: 5}, {label: "Sat", val: 6}, {label: "Sun", val: 0}].map(d => (
+                    <label key={d.val} style={{ display: "flex", alignItems: "center", gap: "4px", fontSize: "0.875rem", cursor: "pointer" }}>
+                      <input 
+                        type="checkbox" 
+                        checked={(duplicateConfig.selectedDays || []).includes(d.val)} 
+                        onChange={(e) => {
+                          const currentDays = duplicateConfig.selectedDays || [];
+                          const newDays = e.target.checked 
+                            ? [...currentDays, d.val] 
+                            : currentDays.filter(day => day !== d.val);
+                          setDuplicateConfig({ ...duplicateConfig, selectedDays: newDays });
+                        }} 
+                      /> {d.label}
+                    </label>
+                  ))}
+                </div>
               </div>
             </div>
             <div style={{ display: "flex", justifyContent: "flex-end", gap: "1rem", marginTop: "1.5rem" }}>

@@ -46,17 +46,47 @@ export const createSubject = async (req, res) => {
 
 export const getSubjects = async (req, res) => {
   try {
-    const [{ data: subjects, error: subError }, { data: mappings, error: mapError }] = await Promise.all([
+    const [
+      { data: subjects, error: subError }, 
+      { data: mappings, error: mapError },
+      { data: subjectTeachers, error: stError }
+    ] = await Promise.all([
       supabase.from("subject").select("*").order("name", { ascending: true }),
-      supabase.from("class_subjects").select("*")
+      supabase.from("class_subjects").select("*"),
+      supabase.from("subject_teachers").select("subject_id, class_id")
     ]);
 
     if (subError) throw subError;
-    // MapError is ignored if the table doesn't exist yet, it'll just fail gracefully in map
+    // MapError is ignored if the table doesn't exist yet, it'll just fail gracefully
+    
+    // Auto-sync missing classes from subject_teachers into class_subjects
+    const existingMappingsSet = new Set((mappings || []).map(m => `${m.subject_id}|${m.class_id}`));
+    const uniqueTeacherMappingsSet = new Set((subjectTeachers || []).filter(st => st.subject_id && st.class_id).map(st => `${st.subject_id}|${st.class_id}`));
+    
+    const missingInserts = [];
+    uniqueTeacherMappingsSet.forEach(mappingKey => {
+      if (!existingMappingsSet.has(mappingKey)) {
+        const [subject_id, class_id] = mappingKey.split('|');
+        missingInserts.push({ subject_id, class_id });
+      }
+    });
+
+    let finalMappings = mappings || [];
+
+    if (missingInserts.length > 0) {
+      const { data: insertedMappings, error: insertError } = await supabase
+        .from("class_subjects")
+        .insert(missingInserts)
+        .select();
+        
+      if (!insertError && insertedMappings) {
+        finalMappings = [...finalMappings, ...insertedMappings];
+      }
+    }
     
     const formattedSubjects = (subjects || []).map(sub => {
-      const classIds = (mappings || []).filter(m => m.subject_id === sub.id).map(m => m.class_id);
-      return { ...sub, classIds };
+      const classIds = finalMappings.filter(m => m.subject_id === sub.id).map(m => m.class_id);
+      return { ...sub, classIds: Array.from(new Set(classIds)) };
     });
 
     return res.status(200).json({

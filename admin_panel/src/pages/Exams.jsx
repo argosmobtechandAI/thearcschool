@@ -4,7 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { fetchExams, fetchCourses, fetchClasses, fetchUsers, fetchSubjects, fetchRooms, fetchResults } from "../features/dataSlice";
 import { toast } from "react-toastify";
 import api, { uploadFile } from "../services/api";
-import { BookOpen, Calendar, Trash2, Edit, Plus, FileSpreadsheet } from "lucide-react";
+import { BookOpen, Calendar, Trash2, Edit, Plus, FileSpreadsheet, Download } from "lucide-react";
 import TableFilterHeader from "../components/TableFilterHeader";
 import DateRangePicker from "../components/DateRangePicker";
 import ClockTimePicker from "../components/ClockTimePicker";
@@ -73,19 +73,19 @@ const Exams = () => {
   const materials = useMemo(() => {
     let list = [];
     if (courseType === "exam") list = exams;
-    else if (courseType === "Material") list = courses?.filter((c) => c.type === "Material");
-    else list = courses?.filter((c) => c.type === "Assignment");
+    else if (courseType === "Material") list = courses?.filter((c) => c.type?.toLowerCase() === "material");
+    else list = courses?.filter((c) => c.type?.toLowerCase() === "assignment");
     
     if (!list) return [];
     
     return list.filter(item => {
       const matchesSearch = item.title?.toLowerCase().includes(searchQuery.toLowerCase()) || 
                             item.subject?.toLowerCase().includes(searchQuery.toLowerCase());
-      const matchesClass = (!classFilter || item.class === classFilter) && (!sectionFilter || item.section === sectionFilter);
+      const matchesClass = (!classFilter || String(item.class) === String(classFilter) || String(item.class?.name) === String(classFilter)) && (!sectionFilter || String(item.section) === String(sectionFilter));
       
       let matchesDate = true;
       if (dateRange.start || dateRange.end) {
-        const itemDateStr = courseType === "exam" ? item.date : item.dueDate;
+        const itemDateStr = courseType === "exam" ? item.date : (item.dueDate || item.duedate);
         if (itemDateStr) {
           const itemDate = new Date(itemDateStr);
           if (dateRange.start && dateRange.end) {
@@ -157,7 +157,7 @@ const Exams = () => {
       let roomNum = "Multiple";
       
       if (sectionFilter) {
-        const classObj = classes?.find(c => c.className === classFilter && c.section === sectionFilter);
+        const classObj = classes?.find(c => String(c.className || c.name) === String(classFilter) && String(c.section) === String(sectionFilter));
         if (classObj && ex.sectionsData[classObj.id]) {
             const tId = ex.sectionsData[classObj.id].invigilator_id;
             invigilatorName = users?.find(u => u.id === tId)?.name || "N/A";
@@ -220,7 +220,7 @@ const Exams = () => {
       let roomNum = "Multiple";
       
       if (sectionFilter) {
-        const classObj = classes?.find(c => c.className === classFilter && c.section === sectionFilter);
+        const classObj = classes?.find(c => String(c.className || c.name) === String(classFilter) && String(c.section) === String(sectionFilter));
         if (classObj && ex.sectionsData[classObj.id]) {
             const tId = ex.sectionsData[classObj.id].invigilator_id;
             invigilatorName = users?.find(u => u.id === tId)?.name || "N/A";
@@ -299,16 +299,22 @@ const Exams = () => {
       } else {
         let contentArray = [];
         if (fileUpload) {
-          const url = await handleFileUpload();
-          if (url) contentArray.push(url);
+          const uploadData = new FormData();
+          uploadData.append("file", fileUpload);
+          const res = await api.post(`/upload/file?category=${courseType.toLowerCase()}`, uploadData, {
+            headers: { "Content-Type": "multipart/form-data" },
+          });
+          if (res.data?.url) {
+            contentArray.push(res.data.url);
+          }
         }
         const payload = { ...formData, type: courseType };
         if (contentArray.length > 0) payload.content = contentArray;
         
         if (editingItem) {
-          await api.put(`/course/updateCourse/${editingItem}`, { data: payload });
+          await api.put(`/course/${editingItem}`, { data: payload });
         } else {
-          await api.post("/course/createCourse", { data: payload });
+          await api.post("/course", { data: payload });
         }
       }
 
@@ -341,7 +347,7 @@ const Exams = () => {
   const handleDeleteCourse = async (id) => {
     if (window.confirm(`Are you sure you want to delete this ${courseType}?`)) {
       try {
-        await api.delete(`/course/deleteCourse/${id}`);
+        await api.delete(`/course/${id}`);
         toast.success("Deleted successfully");
         dispatch(fetchCourses());
       } catch (error) {
@@ -362,7 +368,7 @@ const Exams = () => {
         setEditingItem(item.id);
         setFormData({
           title: item.title || "",
-          dueDate: item.dueDate || "",
+          dueDate: item.dueDate || item.duedate || "",
           class: item.class || "",
           section: item.section || "",
           points: item.points || "",
@@ -429,13 +435,13 @@ const Exams = () => {
                   label: "All Classes",
                   value: classFilter,
                   onChange: (val) => { setClassFilter(val); setSectionFilter(""); },
-                  options: [...new Set(classes?.map(c => c.className))].map(className => ({ value: className, label: className }))
+                  options: [...new Set(classes?.map(c => c.className || c.name))].filter(Boolean).map(className => ({ value: className, label: className }))
                 },
                 ...(classFilter ? [{
                   label: "All Sections",
                   value: sectionFilter,
                   onChange: setSectionFilter,
-                  options: classes?.filter(c => c.className === classFilter).map(c => ({ value: c.section, label: c.section })) || []
+                  options: classes?.filter(c => String(c.className || c.name) === String(classFilter)).map(c => ({ value: c.section, label: c.section })) || []
                 }] : []),
                 {
                   label: "Status",
@@ -451,7 +457,7 @@ const Exams = () => {
               onExportExcel={courseType === "exam" ? handleExportExcel : null}
               hideSearch={courseType === "exam"}
             >
-              {courseType !== "exam" && <DateRangePicker onRangeChange={setDateRange} />}
+              {courseType !== "exam" && <DateRangePicker onRangeChange={setDateRange} initialPreset="this_month" />}
             </TableFilterHeader>
           </div>
         )}
@@ -560,7 +566,7 @@ const Exams = () => {
                     <div>
                       <h4 style={{ fontWeight: "600", fontSize: "1.1rem", marginBottom: "0.25rem" }}>{item.title}</h4>
                       <p style={{ fontSize: "0.875rem", color: "var(--text-secondary)" }}>
-                        Class: {item.class} - {item.section} • Due: {item.dueDate}
+                        Class: {item.class} - {item.section} • Due: {item.dueDate || item.duedate}
                       </p>
                       <p style={{ fontSize: "0.875rem", color: "var(--text-secondary)" }}>
                         Subject: {item.subject} • Chapter: {item.chapter}
@@ -572,6 +578,11 @@ const Exams = () => {
                     <span style={{ padding: "0.25rem 0.75rem", background: "rgba(0,0,0,0.05)", borderRadius: "16px", fontSize: "0.875rem" }}>
                       Points: {item.points}
                     </span>
+                    {item.file_url && (
+                      <a href={item.file_url} target="_blank" rel="noreferrer" className="btn-ghost" style={{ padding: "0.5rem", border: "none", background: "none", cursor: "pointer", color: "#10b981", display: "flex", alignItems: "center" }}>
+                        <Download size={18} />
+                      </a>
+                    )}
                     <button onClick={() => handleOpenModal(item)} className="btn-ghost" style={{ padding: "0.5rem", border: "none", background: "none", cursor: "pointer", color: "#60a5fa" }}>
                       <Edit size={18} />
                     </button>
@@ -622,7 +633,7 @@ const Exams = () => {
                       <select className="input-glass" value={dateSheetSubject.subject} onChange={(e) => setDateSheetSubject({ ...dateSheetSubject, subject: e.target.value })}>
                         <option value="">Select Subject</option>
                         {(() => {
-                          const selectedClassIds = classes?.filter(c => (c.className || c.name) === dateSheetData.class).map(c => c.id) || [];
+                          const selectedClassIds = classes?.filter(c => String(c.className || c.name) === String(dateSheetData.class)).map(c => c.id) || [];
                           const availableSubjects = subjects?.filter(sub => sub.classIds?.some(id => selectedClassIds.includes(id))) || [];
                           return availableSubjects.map((sub, i) => (
                             <option key={i} value={sub.name}>{sub.name}</option>
@@ -735,7 +746,7 @@ const Exams = () => {
                   }}>
                     <option value="">Select Class-Section</option>
                     {classes?.map((c) => (
-                      <option key={c.id} value={`${c.className}-${c.section}`}>{c.className} - {c.section}</option>
+                      <option key={c.id} value={`${c.className || c.name}-${c.section}`}>{c.className || c.name} - {c.section}</option>
                     ))}
                   </select>
                 </div>
@@ -745,9 +756,14 @@ const Exams = () => {
                     <label style={{ display: "block", marginBottom: "0.5rem", fontSize: "0.875rem" }}>Subject</label>
                     <select className="input-glass" required value={formData.subject} onChange={(e) => setFormData({ ...formData, subject: e.target.value })}>
                       <option value="">Select Subject</option>
-                      {classes?.find(c => c.className === formData.class && c.section === formData.section)?.teachersSubject?.map((ts, i) => (
-                        <option key={i} value={ts.subject}>{ts.subject}</option>
-                      ))}
+                      {(() => {
+                        const selectedClassObj = classes?.find(c => String(c.className || c.name) === String(formData.class) && String(c.section) === String(formData.section));
+                        if (!selectedClassObj) return null;
+                        const availableSubjects = subjects?.filter(sub => sub.classIds?.includes(selectedClassObj.id)) || [];
+                        return availableSubjects.map((sub, i) => (
+                          <option key={i} value={sub.name}>{sub.name}</option>
+                        ));
+                      })()}
                     </select>
                   </div>
                 )}

@@ -1,6 +1,7 @@
 import { Router } from "express";
 import multer from "multer";
 import { uploadFile } from "./controller.js";
+import { deleteFile } from "./deleteController.js";
 import { auth } from "../../../middlewares/authMiddleware.js";
 import path from "path";
 import fs from "fs";
@@ -29,12 +30,16 @@ const storage = multer.diskStorage({
       category = "avatar";
     } else if (rawCategory === "gallery") {
       category = "gallery";
+    } else if (rawCategory === "material") {
+      category = "academics/material";
+    } else if (rawCategory === "assignment") {
+      category = "academics/assignment";
     }
 
     // Check if running on Linux VPS
     const isVPS = fs.existsSync("/var/www") && process.platform === "linux";
     const baseDir = isVPS
-      ? "/var/www/thearcschool/public"
+      ? "/var/www/arcschool/uploads"
       : path.join(process.cwd(), "uploads");
 
     const targetDir = path.join(baseDir, category);
@@ -71,5 +76,9 @@ uploadRouter.post("/file", auth, (req, res, next) => {
     next();
   });
 }, uploadFile);
+
+// DELETE /api/upload/file  — body: { url: "<file-url>" }
+uploadRouter.delete("/file", auth, deleteFile);
+
 
 export default uploadRouter;

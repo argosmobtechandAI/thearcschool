@@ -5,7 +5,7 @@ import { fetchUsers, fetchClasses, fetchNewUsers, fetchSubjects, fetchSubjectTea
 import CustomSelect from "../components/CustomSelect";
 import { Search, Plus, Edit, Trash2, Upload, FileSpreadsheet, FileText, ChevronUp, ChevronDown, ChevronsUpDown, Eye, BookOpen } from "lucide-react";
 import { toast } from "react-toastify";
-import api from "../services/api";
+import api, { deleteFile } from "../services/api";
 import { exportToExcel, exportToPDF } from "../utils/exportUtils";
 import TableFilterHeader from "../components/TableFilterHeader";
 import { useSortableData } from "../hooks/useSortableData";
@@ -296,6 +296,8 @@ const UserManagement = () => {
         email: user.email,
         password: "", // Don't populate password on edit
         phone: user.phone || "",
+        alternate_number: user.alternate_number || "",
+        gender: user.gender || "",
         type: user.type,
         avatar_url: user.avatar_url || "",
         connections: user.connections || [],
@@ -1087,13 +1089,20 @@ const UserManagement = () => {
                             type="button" 
                             className="btn btn-ghost" 
                             style={{ color: "#ef4444", fontSize: "0.75rem", padding: "0.25rem 0.5rem" }}
-                            onClick={() => setFormData({ ...formData, avatar_url: "" })}
+                            onClick={async () => {
+                              try {
+                                await deleteFile(formData.avatar_url);
+                              } catch (e) {
+                                console.warn("Could not delete file from server:", e.message);
+                              }
+                              setFormData({ ...formData, avatar_url: "" });
+                            }}
                           >
                             Remove
                           </button>
                         )}
                       </div>
-                      <span style={{ fontSize: "0.75rem", color: "var(--text-secondary)" }}>Upload photo to CDN (cdn.thearcschool.in)</span>
+                      <span style={{ fontSize: "0.75rem", color: "var(--text-secondary)" }}>Upload photo to CDN (cdn.arcschool.cloud)</span>
                     </div>
                   </div>
                 )}
@@ -1348,6 +1357,9 @@ const UserManagement = () => {
                           <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
                             <input type="file" onChange={(e) => handleFileUpload(e, 'tc_document_url')} style={{ fontSize: "0.75rem", width: "160px" }} />
                             {formData.tc_document_url && <a href={formData.tc_document_url} target="_blank" rel="noreferrer" style={{ fontSize: "0.75rem", color: "#c084fc" }}>View</a>}
+                            {formData.tc_document_url && (
+                              <button type="button" onClick={async () => { try { await deleteFile(formData.tc_document_url); } catch(e){} setFormData(p => ({...p, tc_document_url: ""})); }} style={{ fontSize: "0.7rem", color: "#ef4444", background: "none", border: "none", cursor: "pointer" }}>Remove</button>
+                            )}
                           </div>
                         </>
                       )}
@@ -1364,6 +1376,9 @@ const UserManagement = () => {
                           <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
                             <input type="file" onChange={(e) => handleFileUpload(e, 'slc_document_url')} style={{ fontSize: "0.75rem", width: "160px" }} />
                             {formData.slc_document_url && <a href={formData.slc_document_url} target="_blank" rel="noreferrer" style={{ fontSize: "0.75rem", color: "#c084fc" }}>View</a>}
+                            {formData.slc_document_url && (
+                              <button type="button" onClick={async () => { try { await deleteFile(formData.slc_document_url); } catch(e){} setFormData(p => ({...p, slc_document_url: ""})); }} style={{ fontSize: "0.7rem", color: "#ef4444", background: "none", border: "none", cursor: "pointer" }}>Remove</button>
+                            )}
                           </div>
                         </>
                       )}
@@ -1380,6 +1395,9 @@ const UserManagement = () => {
                           <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
                             <input type="file" onChange={(e) => handleFileUpload(e, 'character_certificate_document_url')} style={{ fontSize: "0.75rem", width: "160px" }} />
                             {formData.character_certificate_document_url && <a href={formData.character_certificate_document_url} target="_blank" rel="noreferrer" style={{ fontSize: "0.75rem", color: "#c084fc" }}>View</a>}
+                            {formData.character_certificate_document_url && (
+                              <button type="button" onClick={async () => { try { await deleteFile(formData.character_certificate_document_url); } catch(e){} setFormData(p => ({...p, character_certificate_document_url: ""})); }} style={{ fontSize: "0.7rem", color: "#ef4444", background: "none", border: "none", cursor: "pointer" }}>Remove</button>
+                            )}
                           </div>
                         </>
                       )}

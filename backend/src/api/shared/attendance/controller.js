@@ -34,7 +34,12 @@ export const updateAttendance = async (req, res) => {
     const { data } = req.body;
     const { id } = req.params;
     if (!id || !data?.date || !data?.status) return res.status(400).json({ success: false, message: "User ID, date and status are required" });
-    await AttendanceService.updateAttendance(id, data, req.user.id);
+    
+    // Verify user exists in public user table to avoid FK violations
+    const { data: userRow } = await supabase.from("user").select("id").eq("id", req.user.id).maybeSingle();
+    const markedBy = userRow ? req.user.id : null;
+
+    await AttendanceService.updateAttendance(id, data, markedBy);
     return res.status(200).json({ success: true, message: "Attendance updated successfully" });
   } catch (e) {
     return res.status(500).json({ success: false, message: e.message });
@@ -47,7 +52,12 @@ export const bulkUpdateAttendance = async (req, res) => {
     if (!data || !Array.isArray(data) || data.length === 0) {
       return res.status(400).json({ success: false, message: "Attendance records are required" });
     }
-    await AttendanceService.bulkUpdateAttendance(data, req.user.id);
+    
+    // Verify user exists in public user table to avoid FK violations
+    const { data: userRow } = await supabase.from("user").select("id").eq("id", req.user.id).maybeSingle();
+    const markedBy = userRow ? req.user.id : null;
+
+    await AttendanceService.bulkUpdateAttendance(data, markedBy);
     return res.status(200).json({ success: true, message: "Bulk attendance updated successfully" });
   } catch (e) {
     return res.status(500).json({ success: false, message: e.message });

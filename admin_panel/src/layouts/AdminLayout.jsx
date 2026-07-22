@@ -185,7 +185,7 @@ const AdminLayout = () => {
                 <>
                   <NavLink to="/rooms" style={navLinkStyle}><MapPin size={16} /> Rooms Management</NavLink>
                   <NavLink to="/spotlight" style={navLinkStyle}><Sparkles size={16} /> Spotlight of the Day</NavLink>
-                  <NavLink to="/staff-roles" style={navLinkStyle}><UserCheck size={16} /> Staff Roles</NavLink>
+
                   <NavLink to="/student-of-week" style={navLinkStyle}><Award size={16} /> Student of the Week</NavLink>
                   <NavLink to="/thoughts" style={navLinkStyle}><Quote size={16} /> Thought of the Day</NavLink>
                 </>

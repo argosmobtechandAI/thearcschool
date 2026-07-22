@@ -57,9 +57,16 @@ export const initSocket = (server) => {
 
         const isNewChat = count === 0;
 
+        // Validate sender_id exists in public user table to avoid FK violation
+        let finalSenderId = sender_id;
+        if (finalSenderId) {
+          const { data: sRow } = await supabase.from("user").select("id").eq("id", finalSenderId).maybeSingle();
+          if (!sRow) finalSenderId = null;
+        }
+
         // Save to database
         const payload = {
-          sender_id: sender_id,
+          sender_id: finalSenderId,
           receiver_id: receiver_id,
           message: message,
           type: type || "live_chat"

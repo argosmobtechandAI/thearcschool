@@ -179,7 +179,23 @@ const SchoolInfo = () => {
                                 <FileText size={24} />
                             </div>
                             <div style={{ flex: 1, overflow: "hidden" }}>
-                                <a href={n.document_url} target="_blank" rel="noreferrer" style={{ fontSize: "0.875rem", fontWeight: "700", color: "var(--text-primary)", textDecoration: "none", display: "block", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                                <a href={n.document_url} download target="_blank" rel="noreferrer" style={{ fontSize: "0.875rem", fontWeight: "700", color: "var(--text-primary)", textDecoration: "none", display: "block", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}
+                                   onClick={(e) => {
+                                       e.preventDefault();
+                                       fetch(n.document_url)
+                                         .then(response => response.blob())
+                                         .then(blob => {
+                                           const url = window.URL.createObjectURL(blob);
+                                           const a = document.createElement('a');
+                                           a.href = url;
+                                           a.download = n.document_url.split('/').pop() || 'newsletter';
+                                           document.body.appendChild(a);
+                                           a.click();
+                                           a.remove();
+                                           window.URL.revokeObjectURL(url);
+                                         })
+                                         .catch(() => window.open(n.document_url, '_blank'));
+                                   }}>
                                     Newsletter Document
                                 </a>
                                 <p style={{ fontSize: "0.75rem", color: "var(--text-secondary)", marginTop: "0.25rem", textTransform: "uppercase", letterSpacing: "0.05em" }}>PDF / DOC</p>

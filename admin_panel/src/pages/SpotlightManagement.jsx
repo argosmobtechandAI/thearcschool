@@ -157,7 +157,7 @@ const SpotlightManagement = () => {
                   className="input-glass" 
                   value={formData.image_url || ''} 
                   onChange={e => setFormData({ ...formData, image_url: e.target.value })}
-                  placeholder="e.g. https://cdn.thearcschool.in/spotlight/img.jpg"
+                  placeholder="e.g. https://cdn.arcschool.cloud/spotlight/img.jpg"
                 />
               </div>
 

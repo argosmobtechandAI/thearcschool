@@ -1,88 +1,61 @@
-import { supabase } from "../../../config/supabaseClient.js";
 import fs from "fs";
 import path from "path";
 
 /**
+ * Resolve category string to a canonical folder name.
+ */
+function resolveCategory(rawCategory = "general") {
+  if (rawCategory.startsWith("class_")) return rawCategory;
+  if (rawCategory === "school" || rawCategory === "school_info") return "school_info";
+  if (rawCategory === "exam" || rawCategory === "exams") return "exams";
+  if (
+    rawCategory === "document" ||
+    rawCategory === "admissions" ||
+    rawCategory === "student" ||
+    rawCategory === "aadhar" ||
+    rawCategory === "pan" ||
+    rawCategory === "birthCertificate"
+  )
+    return "admissions";
+  if (rawCategory === "circular") return "circular";
+  if (rawCategory === "avatar" || rawCategory === "avatars" || rawCategory === "profile")
+    return "avatar";
+  if (rawCategory === "gallery") return "gallery";
+  if (rawCategory === "material") return "academics/material";
+  if (rawCategory === "assignment") return "academics/assignment";
+  return "general";
+}
+
+/**
  * Upload a file.
- * If running locally, forwards the request to the VPS backend to be saved directly to the CDN.
+ *
+ * Local dev  → saves to  <project>/backend/uploads/<category>/
+ *              returns   http://localhost:3003/uploads/<category>/<filename>
+ *
+ * VPS (Linux) → saves to  /var/www/arcschool/uploads/<category>/
+ *               returns   https://cdn.arcschool.cloud/<category>/<filename>
  */
 export const uploadFile = async (req, res) => {
   try {
     if (!req.file) {
-      return res.status(400).json({
-        success: false,
-        message: "No file provided",
-      });
+      return res.status(400).json({ success: false, message: "No file provided" });
     }
 
-    const rawCategory = req.query.category || "general";
-    let category = "general";
-    if (rawCategory.startsWith("class_")) {
-      category = rawCategory;
-    } else if (rawCategory === "school" || rawCategory === "school_info") {
-      category = "school_info";
-    } else if (rawCategory === "exam" || rawCategory === "exams") {
-      category = "exams";
-    } else if (rawCategory === "document" || rawCategory === "admissions" || rawCategory === "student" || rawCategory === "aadhar" || rawCategory === "pan" || rawCategory === "birthCertificate") {
-      category = "admissions";
-    } else if (rawCategory === "circular") {
-      category = "circular";
-    } else if (rawCategory === "avatar" || rawCategory === "avatars" || rawCategory === "profile") {
-      category = "avatar";
-    } else if (rawCategory === "gallery") {
-      category = "gallery";
-    }
-
+    const category = resolveCategory(req.query.category);
     const isVPS = fs.existsSync("/var/www") && process.platform === "linux";
 
-    // 1. If running locally, forward the request to the VPS production server
-    if (!isVPS) {
-      try {
-        const formData = new FormData();
-        const fileBuffer = fs.readFileSync(req.file.path);
-        const fileBlob = new Blob([fileBuffer], { type: req.file.mimetype });
-        formData.append("file", fileBlob, req.file.originalname);
+    let fileUrl;
 
-        const vpsResponse = await fetch(`https://api.thearcschool.in/api/upload/file?category=${category}`, {
-          method: "POST",
-          headers: {
-            "Authorization": req.headers.authorization
-          },
-          body: formData
-        });
-
-        // Clean up the local temp file saved by multer
-        try {
-          fs.unlinkSync(req.file.path);
-        } catch (unlinkErr) { }
-
-        const vpsResult = await vpsResponse.json();
-
-        if (vpsResponse.ok && vpsResult.success) {
-          return res.status(200).json(vpsResult);
-        } else {
-          return res.status(vpsResponse.status).json({
-            success: false,
-            message: `VPS upload failed: ${vpsResult.message || vpsResponse.statusText}`
-          });
-        }
-      } catch (forwardErr) {
-        // Local fallback if VPS is offline or not deployed yet
-        const host = req.get("host");
-        const protocol = req.protocol;
-        const localUrl = `${protocol}://${host}/uploads/${category}/${req.file.filename}`;
-
-        return res.status(200).json({
-          success: true,
-          url: localUrl,
-          fileName: req.file.filename,
-          warning: "Failed to forward to VPS, using local dev server fallback"
-        });
-      }
+    if (isVPS) {
+      // On VPS the file is already saved to /var/www/arcschool/uploads/<category>/
+      fileUrl = `https://cdn.arcschool.cloud/${category}/${req.file.filename}`;
+    } else {
+      // On local dev, return a localhost-accessible URL.
+      // The backend serves /uploads as a static directory (make sure this is in app.js).
+      const protocol = req.protocol;
+      const host = req.get("host"); // e.g. localhost:3003
+      fileUrl = `${protocol}://${host}/uploads/${category}/${req.file.filename}`;
     }
-
-    // 2. We are running on the VPS, return the new CDN path
-    const fileUrl = `https://cdn.thearcschool.in/${category}/${req.file.filename}`;
 
     return res.status(200).json({
       success: true,
@@ -90,9 +63,6 @@ export const uploadFile = async (req, res) => {
       fileName: req.file.filename,
     });
   } catch (e) {
-    return res.status(500).json({
-      success: false,
-      message: `Upload failed: ${e.message}`,
-    });
+    return res.status(500).json({ success: false, message: `Upload failed: ${e.message}` });
   }
 };

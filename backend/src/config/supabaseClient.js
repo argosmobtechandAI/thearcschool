@@ -3,7 +3,7 @@ import dotenv from "dotenv";
 
 dotenv.config();
 
-const SUPABASE_URL = process.env.SUPABASE_URL || "https://db.thearcschool.in/";
+const SUPABASE_URL = process.env.SUPABASE_URL || "https://db.arcschool.cloud/";
 const ANON_KEY = process.env.SUPABASE_ANON_KEY || process.env.ANON_KEY;
 const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 

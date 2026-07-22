@@ -73,7 +73,7 @@ export const createTimeTable = async (req, res) => {
 };
 
 export const duplicateDay = async (req, res) => {
-  const { classId, sourceDate, targetStartDate, targetEndDate, copyMode } = req.body;
+  const { classId, sourceDate, targetStartDate, targetEndDate, copyMode, selectedDays } = req.body;
 
   if (!classId || !sourceDate || !targetStartDate || !targetEndDate || !copyMode) {
     return res.status(400).json({ success: false, message: "Missing required fields" });
@@ -97,12 +97,19 @@ export const duplicateDay = async (req, res) => {
     
     let count = 0;
     while (start <= end && count < 90) {
-      const yyyy = start.getFullYear();
-      const mm = String(start.getMonth() + 1).padStart(2, '0');
-      const dd = String(start.getDate()).padStart(2, '0');
-      targetDates.push(`${yyyy}-${mm}-${dd}`);
-      start.setDate(start.getDate() + 1);
+      const dayIndex = start.getUTCDay(); // 0 = Sun, 1 = Mon...
+      if (!selectedDays || selectedDays.length === 0 || selectedDays.includes(dayIndex)) {
+        const yyyy = start.getUTCFullYear();
+        const mm = String(start.getUTCMonth() + 1).padStart(2, '0');
+        const dd = String(start.getUTCDate()).padStart(2, '0');
+        targetDates.push(`${yyyy}-${mm}-${dd}`);
+      }
+      start.setUTCDate(start.getUTCDate() + 1);
       count++;
+    }
+
+    if (targetDates.length === 0) {
+      return res.status(400).json({ success: false, message: "No valid days selected in the date range" });
     }
 
     const { error: deleteError } = await supabase

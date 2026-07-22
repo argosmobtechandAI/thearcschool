@@ -1,6 +1,6 @@
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
-import { autoTable } from 'jspdf-autotable';
+import autoTable from 'jspdf-autotable';
 import { letterheadBase64 } from './letterhead';
 
 /**
@@ -152,7 +152,7 @@ export const generateReceiptPDF = async (paymentsInput, student, receipt) => {
                 // Receipt details
                 pageDoc.setFontSize(10);
                 pageDoc.setTextColor(0);
-                const receiptIdText = receipt?.receipt_number ? `REC-${String(receipt.receipt_number).padStart(6, '0')}` : `RCT-${firstPayment.id?.substring(0, 8).toUpperCase() || Date.now()}`;
+                const receiptIdText = receipt?.receipt_number ? `REC-${String(receipt.receipt_number).padStart(6, '0')}` : `RCT-${String(firstPayment.id || '').substring(0, 8).toUpperCase() || Date.now()}`;
                 pageDoc.text(`Receipt No: ${receiptIdText}`, offsetX + 10, 70);
                 pageDoc.text(`Date: ${new Date(receipt?.created_at || firstPayment.created_at || Date.now()).toLocaleDateString()}`, offsetX + halfWidth - 10, 70, { align: 'right' });
                 

@@ -1,68 +1,30 @@
 import { supabase } from "../../../config/supabaseClient.js";
 import { FCMService } from "../../../services/fcmService.js";
 import fs from "fs";
+import { resolveLocalPath } from "../upload/deleteController.js";
 
-// Upload file to VPS CDN path
+// Upload file — local dev saves to uploads/circular/, VPS saves to /var/www/arcschool/uploads/circular/
 export const uploadCircularFile = async (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ success: false, message: "No file uploaded" });
     }
 
-    // Check if we are running locally (no /var/www directory on Linux VPS)
     const isVPS = fs.existsSync("/var/www") && process.platform === "linux";
-    if (!isVPS) {
-      try {
-        const formData = new FormData();
-        const fileBuffer = fs.readFileSync(req.file.path);
-        const fileBlob = new Blob([fileBuffer], { type: req.file.mimetype });
-        formData.append("file", fileBlob, req.file.originalname);
 
-        const vpsResponse = await fetch("https://api.thearcschool.in/api/circulars/upload", {
-          method: "POST",
-          headers: {
-            "Authorization": req.headers.authorization
-          },
-          body: formData
-        });
-
-        // Clean up the local temp file
-        try {
-          fs.unlinkSync(req.file.path);
-        } catch (unlinkErr) { }
-
-        const vpsResult = await vpsResponse.json();
-
-        if (vpsResponse.ok && vpsResult.success) {
-          return res.status(200).json(vpsResult);
-        } else {
-          return res.status(vpsResponse.status).json({
-            success: false,
-            message: `VPS upload failed: ${vpsResult.message || vpsResponse.statusText}`
-          });
-        }
-      } catch (forwardErr) {
-        // Fallback to local URL if forwarding fails (e.g. VPS backend not deployed yet)
-        const host = req.get("host");
-        const protocol = req.protocol;
-        const localUrl = `${protocol}://${host}/uploads/circular/${req.file.filename}`;
-
-        return res.status(200).json({
-          success: true,
-          url: localUrl,
-          fileName: req.file.filename,
-          warning: "Failed to forward to VPS, using local dev server fallback"
-        });
-      }
+    let fileUrl;
+    if (isVPS) {
+      fileUrl = `https://cdn.arcschool.cloud/circular/${req.file.filename}`;
+    } else {
+      const protocol = req.protocol;
+      const host = req.get("host"); // localhost:3003
+      fileUrl = `${protocol}://${host}/uploads/circular/${req.file.filename}`;
     }
-
-    // We are running on VPS
-    const fileUrl = `https://cdn.thearcschool.in/circular/${req.file.filename}`;
 
     return res.status(200).json({
       success: true,
       url: fileUrl,
-      fileName: req.file.filename
+      fileName: req.file.filename,
     });
   } catch (err) {
     return res.status(500).json({ success: false, message: err.message });
@@ -79,6 +41,16 @@ export const createCircular = async (req, res) => {
       return res.status(400).json({ success: false, message: "Title, content, and target audience are required" });
     }
 
+    // Verify the user exists in the public 'user' table (avoids FK violation for
+    // Supabase dashboard admins who only exist in auth.users, not in 'user' table)
+    const { data: userRow } = await supabase
+      .from("user")
+      .select("id")
+      .eq("id", userId)
+      .maybeSingle();
+
+    const createdBy = userRow ? userId : null;
+
     // Insert circular into Supabase
     const { data: circular, error } = await supabase
       .from("circulars")
@@ -88,7 +60,7 @@ export const createCircular = async (req, res) => {
         attachment_url,
         target_audience,
         class_id: target_audience === "class" ? class_id : null,
-        created_by: userId
+        created_by: createdBy
       })
       .select()
       .single();
@@ -189,9 +161,31 @@ export const getCirculars = async (req, res) => {
 export const deleteCircular = async (req, res) => {
   try {
     const { id } = req.params;
-    const { error } = await supabase.from("circulars").delete().eq("id", id);
 
+    // Fetch the circular first so we can delete its attachment from disk
+    const { data: circular, error: fetchError } = await supabase
+      .from("circulars")
+      .select("attachment_url")
+      .eq("id", id)
+      .maybeSingle();
+
+    if (fetchError) throw fetchError;
+
+    // Delete the DB record
+    const { error } = await supabase.from("circulars").delete().eq("id", id);
     if (error) throw error;
+
+    // Delete the physical file from disk (best-effort, non-blocking)
+    if (circular?.attachment_url) {
+      try {
+        const localPath = resolveLocalPath(circular.attachment_url);
+        if (localPath && fs.existsSync(localPath)) {
+          fs.unlinkSync(localPath);
+        }
+      } catch (fileErr) {
+        console.warn("[deleteCircular] Could not delete attachment file:", fileErr.message);
+      }
+    }
 
     return res.status(200).json({ success: true, message: "Circular deleted successfully" });
   } catch (err) {

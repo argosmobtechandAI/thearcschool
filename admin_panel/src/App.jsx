@@ -90,7 +90,7 @@ function App() {
           <Route path="school-info" element={<ProtectedRoute allowedRoles={["admin", "principal"]}><SchoolInfo /></ProtectedRoute>} />
           <Route path="consents" element={<ProtectedRoute allowedRoles={["admin", "principal"]}><Consents /></ProtectedRoute>} />
           <Route path="circulars" element={<ProtectedRoute allowedRoles={["admin", "principal"]}><Circulars /></ProtectedRoute>} />
-          <Route path="staff-roles" element={<ProtectedRoute allowedRoles={["admin", "principal"]}><StaffRoles /></ProtectedRoute>} />
+
           <Route path="thoughts" element={<ProtectedRoute allowedRoles={["admin", "principal"]}><ThoughtsManagement /></ProtectedRoute>} />
           <Route path="spotlight" element={<ProtectedRoute allowedRoles={["admin", "principal"]}><SpotlightManagement /></ProtectedRoute>} />
           <Route path="student-of-week" element={<ProtectedRoute allowedRoles={["admin", "principal"]}><StudentOfWeekManagement /></ProtectedRoute>} />

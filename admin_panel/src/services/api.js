@@ -85,6 +85,10 @@ export const uploadFile = async (file, bucket = "school", category = "") => {
   }
 };
 
+// Delete a previously uploaded file by its URL
+export const deleteFile = (url) => api.delete("/upload/file", { data: { url } });
+
+
 // Consents API
 export const createConsent = (data) => api.post('/admin_panel/consents', data);
 export const getConsents = (params) => api.get('/admin_panel/consents/admin', { params });

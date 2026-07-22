@@ -1,4 +1,7 @@
 import { supabase } from "../../../config/supabaseClient.js";
+import fs from "fs";
+import { resolveLocalPath } from "../upload/deleteController.js";
+
 
 export const createCourse = async (req, res) => {
   const { data } = req.body;
@@ -64,7 +67,7 @@ export const createCourse = async (req, res) => {
         chapter: data.chapter,
         duedate: data.duedate || data.dueDate || null,
         description: data.description || null,
-        file_url: data.file_url || null,
+        file_url: data.file_url || (data.content && Array.isArray(data.content) && data.content.length > 0 ? data.content[0] : null),
         type: data.type || 'assignment',
         date: data.date || null,
         day: data.day || null,
@@ -72,7 +75,7 @@ export const createCourse = async (req, res) => {
         unit: data.unit || null,
         lesson_no: data.lesson_no || null,
         page_number: data.page_number || null,
-        others: data.others || null,
+        others: data.others || data.points || null,
         homework: data.homework || null
       }])
       .select();
@@ -169,7 +172,8 @@ export const getcourse = async (req, res) => {
     const mappedCourses = courses.map(c => ({
         ...c,
         class: c.class?.name,
-        section: c.class?.section
+        section: c.class?.section,
+        points: c.others
     }));
 
     return res.status(200).json({
@@ -192,22 +196,39 @@ export const updatecourse = async (req, res) => {
   try {
     const updateData = { ...data };
     
-    // Convert empty strings to null for date fields to avoid type errors
-    if (updateData.date === "") updateData.date = null;
-    if (updateData.duedate === "") updateData.duedate = null;
+    const allowedColumns = [
+        'title', 'subject', 'class_id', 'chapter', 'duedate',
+        'description', 'file_url', 'type', 'date', 'day',
+        'topics_taught', 'unit', 'lesson_no', 'page_number',
+        'others', 'homework'
+    ];
+    
+    const sanitizedData = {};
+    for (const key of Object.keys(updateData)) {
+        if (allowedColumns.includes(key)) {
+            sanitizedData[key] = updateData[key];
+        }
+    }
+    
+    if (updateData.dueDate) sanitizedData.duedate = updateData.dueDate;
+    if (updateData.content && Array.isArray(updateData.content) && updateData.content.length > 0) {
+        sanitizedData.file_url = updateData.content[0];
+    }
+    if (updateData.points) sanitizedData.others = updateData.points;
+    
+    if (sanitizedData.date === "") sanitizedData.date = null;
+    if (sanitizedData.duedate === "") sanitizedData.duedate = null;
     
     if (updateData.class && updateData.section) {
         const { data: classData } = await supabase.from("class").select("id").match({ name: updateData.class, section: updateData.section });
         if (classData && classData.length > 0) {
-            updateData.class_id = classData[0].id;
+            sanitizedData.class_id = classData[0].id;
         }
-        delete updateData.class;
-        delete updateData.section;
     }
 
     const { data: updatedcourse, error } = await supabase
       .from("course")
-      .update(updateData)
+      .update(sanitizedData)
       .eq("id", id)
       .select();
 
@@ -235,6 +256,12 @@ export const deletecourse = async (req, res) => {
   const { id } = req.params;
 
   try {
+    // 1️⃣ Fetch file_url before deleting to clean up the uploads folder
+    const { data: courseData } = await supabase
+      .from("course")
+      .select("file_url")
+      .eq("id", id);
+      
     const { error } = await supabase
       .from("course")
       .delete()
@@ -245,6 +272,18 @@ export const deletecourse = async (req, res) => {
         success: false,
         message: error.message,
       });
+    }
+    
+    // 2️⃣ Physically delete the uploaded file if it exists
+    if (courseData && courseData.length > 0 && courseData[0].file_url) {
+        const localPath = resolveLocalPath(courseData[0].file_url);
+        if (localPath && fs.existsSync(localPath)) {
+            try {
+                fs.unlinkSync(localPath);
+            } catch (err) {
+                console.error("Failed to delete orphaned file:", err);
+            }
+        }
     }
 
     return res.status(200).json({

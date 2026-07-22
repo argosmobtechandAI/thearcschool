@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, Trash2, Image as ImageIcon, Video, Film, Eye, Link as LinkIcon, Upload } from 'lucide-react';
-import api from '../services/api';
+import api, { deleteFile } from '../services/api';
 
 const getYoutubeId = (url) => {
   if (!url) return null;
@@ -92,7 +92,13 @@ const GalleryManagement = () => {
   const handleDelete = async (id) => {
     if (!window.confirm("Are you sure you want to delete this gallery item?")) return;
     try {
+      // Fetch the item first to get its media_url for file cleanup
+      const item = galleryItems.find(i => i.id === id);
       await api.delete(`/gallery/${id}`);
+      // Delete the physical file from disk (best-effort)
+      if (item?.media_url && !item.media_url.includes('youtube')) {
+        try { await deleteFile(item.media_url); } catch (e) {}
+      }
       fetchGalleryItems();
     } catch (err) {
       alert(err.response?.data?.message || err.message);

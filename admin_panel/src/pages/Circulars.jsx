@@ -310,7 +310,7 @@ const Circulars = () => {
                   onChange={handleFileChange}
                 />
                 <span style={{ fontSize: "0.75rem", color: "var(--text-secondary)", marginTop: "0.4rem", display: "block" }}>
-                  Files will be uploaded to CDN (cdn.thearcschool.in)
+                  Files will be uploaded to CDN (cdn.arcschool.cloud)
                 </span>
               </div>
 

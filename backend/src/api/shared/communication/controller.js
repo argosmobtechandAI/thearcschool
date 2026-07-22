@@ -5,9 +5,16 @@ export const createCommunication = async (req, res) => {
   const payload = req.body.data || req.body;
 
   try {
+    // 0️⃣ Validate sender exists in public user table to avoid FK violation
+    let finalSenderId = payload.firstPerson || payload.sender_id;
+    if (finalSenderId) {
+      const { data: sRow } = await supabase.from("user").select("id").eq("id", finalSenderId).maybeSingle();
+      if (!sRow) finalSenderId = null;
+    }
+
     // Map legacy payload (firstPerson, title) to current schema (sender_id, message)
     const dbPayload = {
-      sender_id: payload.firstPerson || payload.sender_id,
+      sender_id: finalSenderId,
       message: payload.title || payload.message,
       type: payload.type,
       // For broadcasts/posts, receiver_id might be null or handled differently

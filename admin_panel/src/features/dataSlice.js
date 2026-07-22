@@ -91,7 +91,7 @@ export const fetchCourses = createAsyncThunk(
   "data/fetchCourses",
   async (_, { rejectWithValue }) => {
     try {
-      const response = await api.get("/course/getCourse");
+      const response = await api.get("/course");
       return response.data.courses;
     } catch (error) {
       return rejectWithValue(error.response?.data || "Network Error");

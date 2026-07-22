@@ -233,7 +233,7 @@ const Ledger = () => {
             fee_title: consolidatedPayload[idx]?.title || p.remarks,
             fee: { title: consolidatedPayload[idx]?.title || "Fee" }
         }));
-        generateReceiptPDF(completePayments, selectedStudent);
+        generateReceiptPDF(completePayments, selectedStudent, res.data.receipt);
 
         setPaymentForm({ feeIds: [], amount: "", paymentMode: "Cash", remarks: "" });
         setIsPaymentModalOpen(false); // Close payment modal after success

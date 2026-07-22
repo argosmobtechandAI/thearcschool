@@ -72,6 +72,11 @@ const AdmissionManagement = () => {
     documents: [],
     class_id: "",
     bus_fee: "",
+    monthly_fee: "",
+    fee_exempted: false,
+    admission_date: "",
+    address: "",
+    house: "",
     assigned_to: "",
   });
 
@@ -79,6 +84,7 @@ const AdmissionManagement = () => {
     aadhar: null,
     pan: null,
     birthCertificate: null,
+    avatar: null,
   });
 
   useEffect(() => {
@@ -147,12 +153,17 @@ const AdmissionManagement = () => {
         name: user.name,
         email: user.email,
         type: "student",
-        documents: { pan: "", aadhar: "" },
+        documents: user.documents || [],
         phone: String(user.phone),
         class_id: user.class_id || null,
         bus_fee: user.bus_fee || 0,
-        address: "",
-        links: { fb: "", insta: "", linkdIn: "", twitter: "" },
+        monthly_fee: user.monthly_fee || 0,
+        fee_exempted: user.fee_exempted || false,
+        admission_date: user.admission_date || null,
+        address: user.address || "",
+        house: user.house || "",
+        dob: user.dob || null,
+        gender: user.gender || null,
       };
 
       await api.post("/admission_panel/approveNewUser", { data: { payload, id: user.id, status } });
@@ -179,8 +190,8 @@ const AdmissionManagement = () => {
 
   const closeModal = () => {
     setEditingId(null);
-    setFormData({ name: "", email: "", parent: "", parentEmail: "", phone: "", status: "Pending", dob: "", gender: "", documents: [], class_id: "", bus_fee: "", assigned_to: "" });
-    setSelectedFiles({ aadhar: null, pan: null, birthCertificate: null });
+    setFormData({ name: "", email: "", parent: "", parentEmail: "", phone: "", status: "Pending", dob: "", gender: "", documents: [], class_id: "", bus_fee: "", monthly_fee: "", fee_exempted: false, admission_date: "", address: "", house: "", assigned_to: "" });
+    setSelectedFiles({ aadhar: null, pan: null, birthCertificate: null, avatar: null });
     setOpenModal(false);
   };
 
@@ -205,6 +216,11 @@ const AdmissionManagement = () => {
       documents: user.documents || [],
       class_id: user.class_id || "",
       bus_fee: user.bus_fee || "",
+      monthly_fee: user.monthly_fee || "",
+      fee_exempted: user.fee_exempted || false,
+      admission_date: user.admission_date || "",
+      address: user.address || "",
+      house: user.house || "",
       assigned_to: user.assigned_to || "",
     });
     setOpenModal(true);
@@ -527,6 +543,26 @@ const AdmissionManagement = () => {
                 <div>
                   <label style={{ display: "block", marginBottom: "0.5rem", fontSize: "0.875rem" }}>Bus Fee</label>
                   <input type="number" className="input-glass" value={formData.bus_fee} onChange={(e) => setFormData({ ...formData, bus_fee: e.target.value })} />
+                </div>
+                <div>
+                  <label style={{ display: "block", marginBottom: "0.5rem", fontSize: "0.875rem" }}>Monthly Fee</label>
+                  <input type="number" className="input-glass" value={formData.monthly_fee} onChange={(e) => setFormData({ ...formData, monthly_fee: e.target.value })} />
+                </div>
+                <div>
+                  <label style={{ display: "block", marginBottom: "0.5rem", fontSize: "0.875rem" }}>Date of Admission</label>
+                  <input type="date" className="input-glass" value={formData.admission_date} onChange={(e) => setFormData({ ...formData, admission_date: e.target.value })} />
+                </div>
+                <div>
+                  <label style={{ display: "block", marginBottom: "0.5rem", fontSize: "0.875rem" }}>House</label>
+                  <input className="input-glass" value={formData.house} onChange={(e) => setFormData({ ...formData, house: e.target.value })} />
+                </div>
+                <div style={{ gridColumn: "1 / -1" }}>
+                  <label style={{ display: "block", marginBottom: "0.5rem", fontSize: "0.875rem" }}>Address</label>
+                  <input className="input-glass" value={formData.address} onChange={(e) => setFormData({ ...formData, address: e.target.value })} />
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", gridColumn: "1 / -1" }}>
+                  <input type="checkbox" id="fee_exempted" checked={formData.fee_exempted} onChange={(e) => setFormData({ ...formData, fee_exempted: e.target.checked })} />
+                  <label htmlFor="fee_exempted" style={{ fontSize: "0.875rem" }}>Fee Exempted (Full Waiver)</label>
                 </div>
               </div>
 

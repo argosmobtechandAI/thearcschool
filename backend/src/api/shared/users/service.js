@@ -73,6 +73,7 @@ export class UserService {
         name: userData.name,
         type: userData.type || 'student',
         phone: userData.phone || null,
+        alternate_number: userData.alternate_number || null,
         gender: userData.gender || null,
         dob: userData.dob || null,
         status: userData.status || 'active'
@@ -338,7 +339,7 @@ export class UserService {
 
   static async getUsers() {
     // Fetch users (base data only - no relationship joins to avoid schema cache issues)
-    const { data: users, error } = await supabase.from("user").select("*");
+    const { data: users, error } = await supabase.from("user").select("*, alternate_number");
     if (error) throw error;
 
     // Fetch all related data in separate parallel queries

@@ -456,7 +456,7 @@ const AdmissionManagement = () => {
                         </button>
                       )}
                     </div>
-                    <span style={{ fontSize: "0.75rem", color: "var(--text-secondary)" }}>Upload photo to CDN (cdn.thearcschool.in)</span>
+                    <span style={{ fontSize: "0.75rem", color: "var(--text-secondary)" }}>Upload photo to CDN (cdn.arcschool.cloud)</span>
                   </div>
                 </div>
                 <div>

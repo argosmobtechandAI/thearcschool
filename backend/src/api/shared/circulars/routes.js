@@ -7,7 +7,7 @@ import path from "path";
 import fs from "fs";
 
 // Multer Storage Configuration for VPS CDN directory with local dev fallback
-const VPS_DIR = "/var/www/thearcschool/public/circular";
+const VPS_DIR = "/var/www/arcschool/uploads/circular";
 const LOCAL_DIR = path.join(process.cwd(), "uploads", "circular");
 const isVPS = fs.existsSync("/var/www") && process.platform === "linux";
 const targetDir = isVPS ? VPS_DIR : LOCAL_DIR;

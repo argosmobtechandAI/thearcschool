@@ -9,7 +9,7 @@ const adminId = "e18145b5-c5ad-4be3-8103-5d527a23188f"; // System Admin
 
 // Let's just read the database for Pooja's ID.
 import { createClient } from '@supabase/supabase-js';
-const SUPABASE_URL = process.env.VITE_SUPABASE_URL || 'https://db.thearcschool.in';
+const SUPABASE_URL = process.env.VITE_SUPABASE_URL || 'https://db.arcschool.cloud';
 const SUPABASE_KEY = process.env.VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyAgCiAgICAicm9sZSI6ICJhbm9uIiwKICAgICJpc3MiOiAic3VwYWJhc2UtZGVtbyIsCiAgICAiaWF0IjogMTY0MTc2OTIwMCwKICAgICJleHAiOiAxNzk5NTM1NjAwCn0.dc_X5iR_VP_qT0zsiyj_I_OZ2T9FtRU2BBNWN8Bu4GE';
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
@@ -17,8 +17,8 @@ async function run() {
   const { data: teacher } = await supabase.from('user').select('id').eq('type', 'teacher').limit(1).single();
   const teacherId = teacher.id;
 
-  const adminSocket = io("https://api.thearcschool.in");
-  const teacherSocket = io("https://api.thearcschool.in");
+  const adminSocket = io("https://api.arcschool.cloud");
+  const teacherSocket = io("https://api.arcschool.cloud");
 
   adminSocket.on("connect", () => {
     console.log("Admin connected:", adminSocket.id);
