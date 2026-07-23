@@ -34,7 +34,7 @@ const CourseWorkScreen = () => {
   const [downloadingFile, setDownloadingFile] = useState(null); // Track which file is downloading
 
   const { data: courseData, isLoading, isFetching, refetch } = useGetCourseWorkQuery();
-  const courseworkItems = courseData?.courses || [];
+  const courseworkItems = Array.isArray(courseData?.courses) ? courseData.courses : [];
 
   const onRefresh = async () => {
     await refetch();
@@ -42,7 +42,7 @@ const CourseWorkScreen = () => {
 
   // Filter items by type first
   const currentType = TAB_TYPES[activeTab];
-  const itemsFilteredByType = courseworkItems.filter(item => item.type === currentType);
+  const itemsFilteredByType = courseworkItems.filter(item => item?.type === currentType);
 
   // Group coursework items of the current type by subject name
   const subjectGroups = (() => {

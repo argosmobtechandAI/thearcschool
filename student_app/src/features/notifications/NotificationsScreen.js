@@ -21,13 +21,13 @@ const NotificationsScreen = ({ navigation }) => {
     return () => sub.remove();
   }, [refetch]);
 
-  const notifications = data?.data || [];
-  const unreadCount = notifications.filter(n => !n.is_read).length;
+  const notifications = Array.isArray(data?.data) ? data.data : [];
+  const unreadCount = notifications.filter(n => !n?.is_read).length;
 
   const handleMarkAllRead = async () => {
     if (unreadCount === 0) return;
     try {
-      const unreadIds = notifications.filter(n => !n.is_read).map(n => n.id);
+      const unreadIds = notifications.filter(n => !n?.is_read).map(n => n.id);
       await Promise.all(unreadIds.map(id => markAsRead(id).unwrap()));
     } catch (err) {
       console.error("Failed to mark all as read", err);

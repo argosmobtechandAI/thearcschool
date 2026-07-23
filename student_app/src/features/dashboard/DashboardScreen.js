@@ -217,32 +217,34 @@ const DashboardScreen = ({ navigation }) => {
     todaySchedule, upcomingEvents, latestGrade, pendingCount 
   } = data?.data || {};
 
-  const notices = notificationsData?.data || [];
-  const unreadCount = notices.filter(n => !n.is_read).length;
+  const notices = Array.isArray(notificationsData?.data) ? notificationsData.data : [];
+  const unreadCount = notices.filter(n => !n?.is_read).length;
   
-  const consents = consentsData?.data || [];
-  const pendingConsents = consents.filter(c => c.status === 'pending');
+  const consents = Array.isArray(consentsData?.data) ? consentsData.data : [];
+  const pendingConsents = consents.filter(c => c?.status === 'pending');
   const pendingConsentsCount = pendingConsents.length;
 
-  const totalDues = feesData?.fees?.reduce((sum, f) => sum + ((f.fee?.amount || 0) - (f.total_paid_amount || 0)), 0) || 0;
+  const totalDues = Array.isArray(feesData?.fees) 
+    ? feesData.fees.reduce((sum, f) => sum + ((f?.fee?.amount || 0) - (f?.total_paid_amount || 0)), 0) 
+    : 0;
   
   const d = new Date();
   const todayStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   
   let realTodaySchedule = [];
-  if (timetableData?.timeTables) {
+  if (Array.isArray(timetableData?.timeTables)) {
     timetableData.timeTables.forEach(classObj => {
-      const dates = classObj.dates || {};
-      if (dates[todayStr]) {
+      const dates = classObj?.dates || {};
+      if (dates[todayStr] && Array.isArray(dates[todayStr])) {
         dates[todayStr].forEach(p => realTodaySchedule.push({ ...p, _date: todayStr }));
       }
     });
-    realTodaySchedule.sort((a, b) => (a.time || '').localeCompare(b.time || ''));
+    realTodaySchedule.sort((a, b) => (a?.time || '').localeCompare(b?.time || ''));
     // Map it to match the expected format (time_slot instead of time)
     realTodaySchedule = realTodaySchedule.map(p => ({
       ...p,
-      time_slot: p.time,
-      is_break: p.type === 'break'
+      time_slot: p?.time,
+      is_break: p?.type === 'break'
     }));
   }
 

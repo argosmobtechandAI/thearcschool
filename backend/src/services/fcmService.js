@@ -46,85 +46,93 @@ export const FCMService = {
     }
 
     try {
-      // 1. Fetch tokens for these users
-      const { data: tokensData, error } = await supabase
-        .from('user_device_tokens')
-        .select('fcm_token, user_id')
-        .in('user_id', userIds);
+      if (!userIds || userIds.length === 0) return;
 
-      if (error) throw error;
+      // 1. Fetch tokens for these users in chunks of 50 to avoid 414 Request-URI Too Large from Supabase/Nginx
+      let tokensData = [];
+      const chunkSize = 50;
+      for (let i = 0; i < userIds.length; i += chunkSize) {
+        const chunk = userIds.slice(i, i + chunkSize);
+        const { data: chunkTokens, error } = await supabase
+          .from('user_device_tokens')
+          .select('fcm_token, user_id')
+          .in('user_id', chunk);
+
+        if (!error && chunkTokens) {
+          tokensData.push(...chunkTokens);
+        }
+      }
+
       if (!tokensData || tokensData.length === 0) return;
+      const allTokens = [...new Set(tokensData.map(t => t.fcm_token))];
 
-      const tokens = tokensData.map(t => t.fcm_token);
-
-      // Removed duplicate DB insert (handled by controller)
-
-      // 3. Construct message payload
-      const message = {
-        notification: {
-          title,
-          body,
-        },
-        android: {
-          priority: 'high',
-          notification: {
-            channelId: 'high_importance_channel_v4',
-            priority: 'max',
-            visibility: 'public',
-            defaultSound: true
-          }
-        },
-        apns: {
-          payload: {
-            aps: {
-              sound: 'default'
-            }
-          }
-        },
-        data: (() => {
-          const sanitized = {};
-          if (data && typeof data === 'object') {
-            Object.keys(data).forEach(key => {
-              const val = data[key];
-              if (val !== undefined && val !== null) {
-                sanitized[key] = typeof val === 'string' ? val : (typeof val === 'object' ? JSON.stringify(val) : String(val));
-              }
-            });
-          }
-          sanitized.click_action = sanitized.click_action || 'FLUTTER_NOTIFICATION_CLICK';
-          return sanitized;
-        })(),
-        tokens,
-      };
-
-      // 4. Send multicast message
-      const response = await getMessaging().sendEachForMulticast(message);
-      
-      console.log(`Successfully sent messages: ${response.successCount}`);
-      if (response.failureCount > 0) {
-        console.warn(`Failed to send ${response.failureCount} messages`);
-        // Optional: Remove invalid tokens here based on response.responses
-        const failedTokens = [];
-        response.responses.forEach((resp, idx) => {
-          if (!resp.success) {
-            const errCode = resp.error?.code;
-            console.error(`FCM send failed for token ${tokens[idx]}:`, resp.error);
-            if (errCode === 'messaging/invalid-registration-token' || 
-                errCode === 'messaging/registration-token-not-registered') {
-              failedTokens.push(tokens[idx]);
-            }
+      // 2. Sanitize data payload
+      const sanitizedData = {};
+      if (data && typeof data === 'object') {
+        Object.keys(data).forEach(key => {
+          const val = data[key];
+          if (val !== undefined && val !== null) {
+            sanitizedData[key] = typeof val === 'string' ? val : (typeof val === 'object' ? JSON.stringify(val) : String(val));
           }
         });
+      }
+      sanitizedData.click_action = sanitizedData.click_action || 'FLUTTER_NOTIFICATION_CLICK';
 
-        if (failedTokens.length > 0) {
-          await supabase
-            .from('user_device_tokens')
-            .delete()
-            .in('fcm_token', failedTokens);
+      // 3. Send multicast messages in batches of 500 (FCM limit)
+      for (let i = 0; i < allTokens.length; i += 500) {
+        const batchTokens = allTokens.slice(i, i + 500);
+
+        const message = {
+          notification: {
+            title,
+            body,
+          },
+          android: {
+            priority: 'high',
+            notification: {
+              channelId: 'high_importance_channel_v4',
+              priority: 'max',
+              visibility: 'public',
+              defaultSound: true
+            }
+          },
+          apns: {
+            payload: {
+              aps: {
+                sound: 'default'
+              }
+            }
+          },
+          data: sanitizedData,
+          tokens: batchTokens,
+        };
+
+        const response = await getMessaging().sendEachForMulticast(message);
+        console.log(`Successfully sent push notification batch: ${response.successCount} succeeded, ${response.failureCount} failed`);
+
+        if (response.failureCount > 0) {
+          const failedTokens = [];
+          response.responses.forEach((resp, idx) => {
+            if (!resp.success) {
+              const errCode = resp.error?.code;
+              console.error(`FCM send failed for token ${batchTokens[idx]}:`, resp.error);
+              if (errCode === 'messaging/invalid-registration-token' || 
+                  errCode === 'messaging/registration-token-not-registered') {
+                failedTokens.push(batchTokens[idx]);
+              }
+            }
+          });
+
+          if (failedTokens.length > 0) {
+            await supabase
+              .from('user_device_tokens')
+              .delete()
+              .in('fcm_token', failedTokens);
+          }
         }
       }
     } catch (err) {
-      console.error('Error sending push notifications:', err);
+      console.error("Error sending push notifications:", err);
     }
   }
 };

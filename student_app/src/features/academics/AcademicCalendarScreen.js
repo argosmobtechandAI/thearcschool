@@ -53,9 +53,9 @@ const AcademicCalendarScreen = ({ navigation }) => {
   }, [refetchEvents]);
 
   const combinedData = useMemo(() => {
-    const evs = eventsData?.data || [];
+    const evs = Array.isArray(eventsData?.data) ? eventsData.data : [];
     // Only include non-exam events for the Academic Calendar
-    return [...evs].sort((a, b) => (a.start_date || '').localeCompare(b.start_date || ''));
+    return [...evs].sort((a, b) => (a?.start_date || '').localeCompare(b?.start_date || ''));
   }, [eventsData]);
 
   const categories = useMemo(() => {

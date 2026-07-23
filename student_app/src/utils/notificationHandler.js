@@ -72,6 +72,15 @@ export const registerBackgroundHandler = () => {
   // Request notification permission once at startup
   notifee.requestPermission();
 
+  // Pre-create high importance channel so Android OS can deliver killed state notifications
+  notifee.createChannel({
+    id: 'high_importance_channel_v4',
+    name: 'High Importance Notifications',
+    importance: AndroidImportance.HIGH,
+    sound: 'default',
+    vibration: true,
+  });
+
   notifee.onBackgroundEvent(handleNotificationEvent);
 
   // Handle background FCM messages

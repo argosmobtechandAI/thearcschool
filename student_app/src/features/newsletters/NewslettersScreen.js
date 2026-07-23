@@ -18,22 +18,29 @@ const NewslettersScreen = () => {
     });
   };
 
-  const renderItem = ({ item }) => (
-    <TouchableOpacity 
-      style={styles.card} 
-      onPress={() => handleOpenLink(item.document_url)}
-      activeOpacity={0.8}
-    >
-      <View style={styles.iconContainer}>
-        <Icon name="file-text" size={18} color={theme.colors.primary} />
-      </View>
-      <View style={styles.textContainer}>
-        <Text style={styles.filename} numberOfLines={1}>{item.document_url.split('/').pop()}</Text>
-        <Text style={styles.date}>{new Date(item.created_at).toLocaleDateString()}</Text>
-      </View>
-      <Icon name="download" size={20} color={theme.colors.textMuted} />
-    </TouchableOpacity>
-  );
+  const renderItem = ({ item }) => {
+    const docUrl = item?.document_url || '';
+    const fileName = docUrl ? docUrl.split('/').pop() : (item?.title || 'Document');
+    const createdDate = item?.created_at ? new Date(item.created_at) : null;
+    const isValidDate = createdDate && !isNaN(createdDate.getTime());
+
+    return (
+      <TouchableOpacity 
+        style={styles.card} 
+        onPress={() => docUrl && handleOpenLink(docUrl)}
+        activeOpacity={0.8}
+      >
+        <View style={styles.iconContainer}>
+          <Icon name="file-text" size={18} color={theme.colors.primary} />
+        </View>
+        <View style={styles.textContainer}>
+          <Text style={styles.filename} numberOfLines={1}>{fileName}</Text>
+          <Text style={styles.date}>{isValidDate ? createdDate.toLocaleDateString() : ''}</Text>
+        </View>
+        <Icon name="download" size={20} color={theme.colors.textMuted} />
+      </TouchableOpacity>
+    );
+  };
 
   return (
     <View style={styles.container}>

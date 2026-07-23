@@ -43,20 +43,27 @@ const AcademicsHomeScreen = ({ navigation }) => {
         {/* Upcoming Exams */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Upcoming Exams</Text>
-          {upcomingExams.length > 0 ? (
-            upcomingExams.map((exam, index) => (
-              <Card variant="elevated" key={index} style={styles.examCard}>
-                <View style={styles.dateBox}>
-                  <Text style={styles.dateDay}>{format(new Date(exam.date), 'dd')}</Text>
-                  <Text style={styles.dateMonth}>{format(new Date(exam.date), 'MMM')}</Text>
-                </View>
-                <View style={styles.examDetails}>
-                  <Text style={styles.subjectText}>{exam.subject?.name}</Text>
-                  <Text style={styles.timeText}>{exam.start_time.slice(0,5)} - {exam.end_time.slice(0,5)}</Text>
-                </View>
-                <Icon name="calendar" size={20} color={theme.colors.primary} />
-              </Card>
-            ))
+          {Array.isArray(upcomingExams) && upcomingExams.length > 0 ? (
+            upcomingExams.map((exam, index) => {
+              const examDate = exam?.date ? new Date(exam.date) : null;
+              const isValidDate = examDate && !isNaN(examDate.getTime());
+              const startTime = (exam?.start_time || '').slice(0, 5);
+              const endTime = (exam?.end_time || '').slice(0, 5);
+
+              return (
+                <Card variant="elevated" key={index} style={styles.examCard}>
+                  <View style={styles.dateBox}>
+                    <Text style={styles.dateDay}>{isValidDate ? format(examDate, 'dd') : '--'}</Text>
+                    <Text style={styles.dateMonth}>{isValidDate ? format(examDate, 'MMM') : '--'}</Text>
+                  </View>
+                  <View style={styles.examDetails}>
+                    <Text style={styles.subjectText}>{exam?.subject?.name || 'Subject'}</Text>
+                    <Text style={styles.timeText}>{startTime && endTime ? `${startTime} - ${endTime}` : 'TBD'}</Text>
+                  </View>
+                  <Icon name="calendar" size={20} color={theme.colors.primary} />
+                </Card>
+              );
+            })
           ) : (
             <Card variant="flat" style={styles.emptyCard}>
               <Icon name="check-circle" size={32} color={theme.colors.success} style={{ marginBottom: 8 }} />
@@ -68,30 +75,35 @@ const AcademicsHomeScreen = ({ navigation }) => {
         {/* Academic Results */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Exam Results</Text>
-          {grades.length > 0 ? (
+          {Array.isArray(grades) && grades.length > 0 ? (
             grades.map((grade, index) => {
-              const percentage = grade.exams?.marks > 0 ? (grade.marks / grade.exams.marks) * 100 : 0;
+              const totalMarks = Number(grade?.exams?.marks || 0);
+              const obtainedMarks = Number(grade?.marks || 0);
+              const percentage = totalMarks > 0 ? (obtainedMarks / totalMarks) * 100 : 0;
               let scoreColor = theme.colors.success;
               if (percentage < 40) scoreColor = theme.colors.danger;
               else if (percentage < 70) scoreColor = theme.colors.warning;
 
+              const examDate = grade?.exams?.date ? new Date(grade.exams.date) : null;
+              const isValidDate = examDate && !isNaN(examDate.getTime());
+
               return (
                 <Card variant="elevated" key={index} style={styles.resultCard}>
                   <View style={styles.resultHeader}>
-                    <Text style={styles.examNameText}>{grade.exams?.name}</Text>
-                    <Text style={styles.examDateText}>{format(new Date(grade.exams?.date), 'MMM dd, yyyy')}</Text>
+                    <Text style={styles.examNameText}>{grade?.exams?.name || 'Exam'}</Text>
+                    <Text style={styles.examDateText}>{isValidDate ? format(examDate, 'MMM dd, yyyy') : ''}</Text>
                   </View>
                   <View style={styles.resultBody}>
                     <View style={styles.scoreBox}>
                       <Text style={[styles.scorePercentage, { color: scoreColor }]}>{percentage.toFixed(0)}%</Text>
-                      <Text style={styles.scoreRaw}>{grade.marks} / {grade.exams?.marks}</Text>
+                      <Text style={styles.scoreRaw}>{obtainedMarks} / {totalMarks}</Text>
                     </View>
-                    {grade.feedback && (
+                    {grade?.feedback ? (
                       <View style={styles.feedbackBox}>
                         <Icon name="message-circle" size={14} color={theme.colors.textMuted} style={{ marginRight: 6 }} />
                         <Text style={styles.feedbackText} numberOfLines={2}>{grade.feedback}</Text>
                       </View>
-                    )}
+                    ) : null}
                   </View>
                 </Card>
               );

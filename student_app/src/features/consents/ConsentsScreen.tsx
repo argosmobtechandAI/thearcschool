@@ -19,7 +19,7 @@ const ConsentsScreen = () => {
   const [endDate, setEndDate] = useState(null);
   const [modalConfig, setModalConfig] = useState({ visible: false, title: '', message: '', type: 'success' });
 
-  const rawConsents = response?.data || [];
+  const rawConsents = Array.isArray(response?.data) ? response.data : [];
 
   const handleUpdateStatus = async (id: string, status: 'accepted' | 'declined') => {
     try {

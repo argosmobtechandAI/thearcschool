@@ -46,7 +46,7 @@ const AdminLayout = () => {
             }
           }
         } catch (error) {
-          console.error("FCM Token Error:", error);
+          console.warn("FCM Web Push not enabled or blocked by browser:", error.message);
         }
       };
 
