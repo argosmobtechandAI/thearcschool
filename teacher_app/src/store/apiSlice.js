@@ -115,7 +115,7 @@ export const apiSlice = createApi({
         method: 'POST',
         body: { grades },
       }),
-      invalidatesTags: ['Exams'],
+      invalidatesTags: ['Exams', 'Grades'],
     }),
     getChats: builder.query({
       query: () => '/live_chat/list',

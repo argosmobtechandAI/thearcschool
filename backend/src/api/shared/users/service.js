@@ -266,6 +266,15 @@ export class UserService {
       if (authError) throw authError;
     }
     
+    if (data.email && data.email !== existingUser[0].email) {
+      if (!supabaseAdmin) throw new Error("Supabase Admin client missing for email updates.");
+      const { error: emailAuthError } = await supabaseAdmin.auth.admin.updateUserById(userId, {
+        email: data.email,
+        email_confirm: true
+      });
+      if (emailAuthError) throw emailAuthError;
+    }
+    
     delete data.password;
     delete data.id;
     delete data.createdAt;

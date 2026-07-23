@@ -1,6 +1,6 @@
 import { isFirebaseInitialized } from '../config/firebaseAdmin.js';
 import { getMessaging } from 'firebase-admin/messaging';
-import { supabase } from '../config/supabaseClient.js';
+import { supabase, supabaseAdmin } from '../config/supabaseClient.js';
 
 export const FCMService = {
   /**
@@ -53,7 +53,7 @@ export const FCMService = {
       const chunkSize = 50;
       for (let i = 0; i < userIds.length; i += chunkSize) {
         const chunk = userIds.slice(i, i + chunkSize);
-        const { data: chunkTokens, error } = await supabase
+        const { data: chunkTokens, error } = await supabaseAdmin
           .from('user_device_tokens')
           .select('fcm_token, user_id')
           .in('user_id', chunk);

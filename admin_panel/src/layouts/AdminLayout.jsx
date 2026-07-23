@@ -251,10 +251,10 @@ const AdminLayout = () => {
           {((user?.type === "admin" || user?.type === "super_admin") || user?.type === "principal") && (
             <>
               <NavGroup title="Portals" />
-              <a href="https://admission.thearcschool.in" target="_blank" rel="noopener noreferrer" style={{ ...navLinkStyle({ isActive: false }), color: "var(--text-secondary)" }}>
+              <a href="https://admissions.arcschool.cloud" target="_blank" rel="noopener noreferrer" style={{ ...navLinkStyle({ isActive: false }), color: "var(--text-secondary)" }}>
                 <ExternalLink size={16} /> Admission Portal
               </a>
-              <a href="https://finance.thearcschool.in" target="_blank" rel="noopener noreferrer" style={{ ...navLinkStyle({ isActive: false }), color: "var(--text-secondary)" }}>
+              <a href="https://finance.arcschool.cloud" target="_blank" rel="noopener noreferrer" style={{ ...navLinkStyle({ isActive: false }), color: "var(--text-secondary)" }}>
                 <ExternalLink size={16} /> Finance Portal
               </a>
             </>
