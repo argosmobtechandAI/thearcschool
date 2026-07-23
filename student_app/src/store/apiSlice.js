@@ -18,7 +18,7 @@ export const apiSlice = createApi({
       return headers;
     },
   }),
-  tagTypes: ['Dashboard', 'Academics', 'Attendance', 'Notifications', 'Chats', 'LiveChat', 'Quote', 'Rewards', 'Timetable', 'CourseWork', 'Events', 'Fees', 'Consents', 'Circulars', 'Gallery', 'Settings'],
+  tagTypes: ['Dashboard', 'Academics', 'Attendance', 'Notifications', 'Chats', 'LiveChat', 'Quote', 'Rewards', 'Timetable', 'CourseWork', 'Events', 'Fees', 'Consents', 'Circulars', 'Gallery', 'Settings', 'Newsletters'],
   endpoints: (builder) => ({
     // Auth endpoints
     login: builder.mutation({

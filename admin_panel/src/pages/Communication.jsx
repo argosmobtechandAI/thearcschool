@@ -5,11 +5,10 @@ import api, { getSystemMonitorHistory, createCommunication } from "../services/a
 import { toast } from "react-toastify";
 import { Search, Send, Megaphone, PenSquare, MessageSquare, Activity, Filter } from "lucide-react";
 import DateRangePicker from "../components/DateRangePicker";
-import { io } from "socket.io-client";
+import { socket } from "../lib/socket";
 
 const Communication = () => {
     const dispatch = useDispatch();
-    const socketRef = useRef(null);
     const [activeTab, setActiveTab] = useState("my_chats");
     const [socketStatus, setSocketStatus] = useState('Disconnected');
     const [socketUrl, setSocketUrl] = useState('');
@@ -20,6 +19,19 @@ const Communication = () => {
     const [content, setContent] = useState("");
     const [selectedRole, setSelectedRole] = useState("all");
     const [selectedChatUser, setSelectedChatUser] = useState(null);
+    const selectedChatUserRef = useRef(null);
+    const [readUserIds, setReadUserIds] = useState(new Set());
+
+    const handleSelectChatUser = (user) => {
+        setSelectedChatUser(user);
+        if (user?.id) {
+            setReadUserIds(prev => new Set(prev).add(user.id));
+        }
+    };
+    const [isTyping, setIsTyping] = useState(false);
+    const typingTimeoutRef = useRef(null);
+    const messagesEndRef = useRef(null);
+    const monitorEndRef = useRef(null);
     const [selectedMonitorChat, setSelectedMonitorChat] = useState(null);
     const [monitorHistory, setMonitorHistory] = useState([]);
     const [showNewChat, setShowNewChat] = useState(false);
@@ -40,7 +52,8 @@ const Communication = () => {
         }
     }, [dispatch, activeTab]);
 
-    const myself = (() => {
+    const authUser = useSelector((state) => state.auth.user);
+    const myself = authUser || (() => {
         try {
             return JSON.parse(localStorage.getItem('adminUser')) || users?.find(u => u.type === 'admin') || null;
         } catch (e) {
@@ -52,36 +65,67 @@ const Communication = () => {
         if (!myself?.id) return;
 
         const SOCKET_URL = (import.meta.env.VITE_API_URL || "http://localhost:3002/api").replace(/\/api\/?$/, '');
-        socketRef.current = io(SOCKET_URL);
         setSocketUrl(SOCKET_URL);
 
-        socketRef.current.on('connect', () => {
+        if (socket.connected) {
             setSocketStatus('Connected');
-            socketRef.current.emit('identify', myself.id);
-        });
-
-        socketRef.current.on('disconnect', () => {
-            setSocketStatus('Disconnected');
-        });
-
-        socketRef.current.on('receive_message', (newChat) => {
-            console.log("Socket received message:", newChat);
-            // Optionally show a toast if the message is from someone else
-            if (newChat.sender_id !== myself.id) {
-                toast.info(`New message from ${users?.find(u => u.id === newChat.sender_id)?.name || 'User'}`);
+            socket.emit('identify', myself.id);
+            if (selectedChatUserRef.current?.id) {
+                socket.emit('join_chat', { senderId: myself.id, receiverId: selectedChatUserRef.current.id });
             }
+        }
+
+        const onConnect = () => {
+            setSocketStatus('Connected');
+            socket.emit('identify', myself.id);
+            if (selectedChatUserRef.current?.id) {
+                socket.emit('join_chat', { senderId: myself.id, receiverId: selectedChatUserRef.current.id });
+            }
+        };
+
+        const onDisconnect = () => {
+            setSocketStatus('Disconnected');
+        };
+
+        const onTypingStart = ({ senderId }) => {
+            if (!selectedChatUserRef.current?.id || senderId === selectedChatUserRef.current?.id) {
+                setIsTyping(true);
+            }
+        };
+
+        const onTypingStop = ({ senderId }) => {
+            if (!selectedChatUserRef.current?.id || senderId === selectedChatUserRef.current?.id) {
+                setIsTyping(false);
+            }
+        };
+
+        const onReceiveMessage = (newChat) => {
+            console.log("Communication.jsx socket receive_message:", newChat);
             dispatch(addLiveChatMessage(newChat));
-            dispatch(fetchSystemMonitorList());
-        });
+            dispatch(fetchCommunication('live_chat'));
+            setIsTyping(false);
+        };
+
+        socket.on('connect', onConnect);
+        socket.on('disconnect', onDisconnect);
+        socket.on('typing_start', onTypingStart);
+        socket.on('typing_stop', onTypingStop);
+        socket.on('receive_message', onReceiveMessage);
 
         return () => {
-            if (socketRef.current) socketRef.current.disconnect();
+            socket.off('connect', onConnect);
+            socket.off('disconnect', onDisconnect);
+            socket.off('typing_start', onTypingStart);
+            socket.off('typing_stop', onTypingStop);
+            socket.off('receive_message', onReceiveMessage);
         };
-    }, [myself?.id, dispatch]);
+    }, [myself?.id]);
 
     useEffect(() => {
-        if (socketRef.current && myself?.id && selectedChatUser?.id) {
-            socketRef.current.emit('join_chat', { senderId: myself.id, receiverId: selectedChatUser.id });
+        selectedChatUserRef.current = selectedChatUser;
+        setIsTyping(false);
+        if (socket.connected && myself?.id && selectedChatUser?.id) {
+            socket.emit('join_chat', { senderId: myself.id, receiverId: selectedChatUser.id });
         }
     }, [selectedChatUser?.id, myself?.id]);
 
@@ -129,7 +173,13 @@ const Communication = () => {
         }
 
         try {
-            await createCommunication(payload);
+            const res = await createCommunication(payload);
+            if (res.data?.data) {
+                dispatch(addLiveChatMessage({ ...res.data.data, sender_id: myself?.id }));
+            }
+            if (activeTab === "my_chats" && socket.connected && selectedChatUser) {
+                socket.emit('typing_stop', { senderId: myself.id, receiverId: selectedChatUser.id });
+            }
             setContent("");
             if (activeTab === "my_chats") dispatch(fetchCommunication('live_chat'));
             else dispatch(fetchCommunication(activeTab));
@@ -137,6 +187,17 @@ const Communication = () => {
             setShowNewChat(false);
         } catch (error) {
             showToast(error.response?.data?.message || "Failed to send message", "error");
+        }
+    };
+
+    const handleTextChange = (e) => {
+        setContent(e.target.value);
+        if (activeTab === "my_chats" && socket.connected && selectedChatUser) {
+            socket.emit('typing_start', { senderId: myself.id, receiverId: selectedChatUser.id });
+            if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+            typingTimeoutRef.current = setTimeout(() => {
+                socket.emit('typing_stop', { senderId: myself.id, receiverId: selectedChatUser.id });
+            }, 2000);
         }
     };
 
@@ -182,12 +243,24 @@ const Communication = () => {
 
         const sortedChats = [...chats].sort((a, b) => new Date(b.created_at || b.createdAt) - new Date(a.created_at || a.createdAt));
 
-        sortedChats.filter(c => c.type === "live_chat" && (c.sender_id == myself.id || c.receiver_id == myself.id))
+        const adminUserIds = new Set(users.filter(u => u.type === 'admin' || u.type === 'principal').map(u => u.id));
+        if (myself?.id) adminUserIds.add(myself.id);
+
+        sortedChats.filter(c => c.type === "live_chat" && (adminUserIds.has(c.sender_id) || adminUserIds.has(c.receiver_id)))
             .forEach(c => {
-                const otherId = c.sender_id == myself.id ? c.receiver_id : c.sender_id;
+                const otherId = adminUserIds.has(c.sender_id) && !adminUserIds.has(c.receiver_id) 
+                    ? c.receiver_id 
+                    : (!adminUserIds.has(c.sender_id) && adminUserIds.has(c.receiver_id) ? c.sender_id : (c.sender_id === myself.id ? c.receiver_id : c.sender_id));
+
                 const user = users.find(u => u.id == otherId);
                 if (user && !uniqueUsers.has(otherId)) {
-                    uniqueUsers.set(otherId, { ...user, lastMessageTime: c.created_at || c.createdAt, lastMessage: c.message || c.title });
+                    const hasUnread = !adminUserIds.has(c.sender_id);
+                    uniqueUsers.set(otherId, { 
+                        ...user, 
+                        lastMessageTime: c.created_at || c.createdAt, 
+                        lastMessage: c.message || c.title,
+                        hasUnread
+                    });
                 }
             });
         return Array.from(uniqueUsers.values());
@@ -206,12 +279,27 @@ const Communication = () => {
     }, [monitorChats, searchMonitor, myself]);
 
     const myChatMessages = useMemo(() => {
-        if (!selectedChatUser || !chats || !myself) return [];
+        if (!selectedChatUser || !chats || !myself || !users) return [];
+        const adminUserIds = new Set(users.filter(u => u.type === 'admin' || u.type === 'principal').map(u => u.id));
+        if (myself?.id) adminUserIds.add(myself.id);
+
         return chats.filter(c => c.type === "live_chat" &&
-            ((c.sender_id == myself.id && c.receiver_id == selectedChatUser.id) ||
-                (c.sender_id == selectedChatUser.id && c.receiver_id == myself.id))
+            ((adminUserIds.has(c.sender_id) && c.receiver_id == selectedChatUser.id) ||
+             (c.sender_id == selectedChatUser.id && adminUserIds.has(c.receiver_id)))
         ).sort((a, b) => new Date(a.created_at || a.createdAt) - new Date(b.created_at || b.createdAt));
-    }, [chats, selectedChatUser, myself]);
+    }, [chats, selectedChatUser, myself, users]);
+
+    useEffect(() => {
+        if (messagesEndRef.current) {
+            messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
+        }
+    }, [myChatMessages]);
+
+    useEffect(() => {
+        if (monitorEndRef.current) {
+            monitorEndRef.current.scrollIntoView({ behavior: "smooth" });
+        }
+    }, [monitorHistory]);
 
     const getUserName = (id) => users?.find(usr => usr.id == id)?.name || "Unknown";
 
@@ -432,20 +520,33 @@ const Communication = () => {
                             </div>
                         </div>
                         <div style={{ overflowY: "auto", flex: 1 }}>
-                            {filteredMyChatUsers?.map((user) => (
-                                <div key={user?.id} onClick={() => setSelectedChatUser(user)} className={`sidebar-item ${selectedChatUser?.id === user.id ? 'active' : ''}`}>
-                                    <div style={{ width: "40px", height: "40px", borderRadius: "50%", background: "var(--accent-light)", color: "var(--accent-primary)", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: "bold", flexShrink: 0 }}>
-                                        {user?.name?.charAt(0).toUpperCase()}
+                            {filteredMyChatUsers?.map((user) => {
+                                const isUnread = user?.hasUnread && selectedChatUser?.id !== user.id && !readUserIds.has(user.id);
+                                return (
+                                    <div key={user?.id} onClick={() => handleSelectChatUser(user)} className={`sidebar-item ${selectedChatUser?.id === user.id ? 'active' : ''}`}>
+                                        <div style={{ width: "40px", height: "40px", borderRadius: "50%", background: "var(--accent-light)", color: "var(--accent-primary)", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: "bold", flexShrink: 0, position: "relative" }}>
+                                            {user?.name?.charAt(0).toUpperCase()}
+                                            {isUnread && (
+                                                <span style={{ position: "absolute", top: 0, right: 0, width: "10px", height: "10px", backgroundColor: "#22c55e", borderRadius: "50%", border: "2px solid #fff" }} />
+                                            )}
+                                        </div>
+                                        <div style={{ overflow: "hidden", flex: 1 }}>
+                                            <div style={{ fontWeight: isUnread ? "700" : "600", fontSize: "0.9rem", color: "var(--text-primary)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                                                <span>{user?.name}</span>
+                                                {isUnread && (
+                                                    <span style={{ width: "8px", height: "8px", backgroundColor: "#22c55e", borderRadius: "50%", display: "inline-block", marginLeft: "4px" }} />
+                                                )}
+                                            </div>
+                                            <div style={{ fontSize: "0.75rem", color: isUnread ? "var(--text-primary)" : "var(--text-secondary)", fontWeight: isUnread ? "600" : "normal", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                                                {user?.lastMessage}
+                                            </div>
+                                        </div>
+                                        <div style={{ fontSize: "0.7rem", color: "var(--text-secondary)", alignSelf: "flex-start", marginTop: "0.2rem", whiteSpace: "nowrap" }}>
+                                            {user?.lastMessageTime ? new Date(user.lastMessageTime).toLocaleDateString([], { month: 'short', day: 'numeric' }) : ''}
+                                        </div>
                                     </div>
-                                    <div style={{ overflow: "hidden", flex: 1 }}>
-                                        <div style={{ fontWeight: "600", fontSize: "0.9rem", color: "var(--text-primary)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{user?.name}</div>
-                                        <div style={{ fontSize: "0.75rem", color: "var(--text-secondary)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{user?.lastMessage}</div>
-                                    </div>
-                                    <div style={{ fontSize: "0.7rem", color: "var(--text-secondary)", alignSelf: "flex-start", marginTop: "0.2rem", whiteSpace: "nowrap" }}>
-                                        {user?.lastMessageTime ? new Date(user.lastMessageTime).toLocaleDateString([], { month: 'short', day: 'numeric' }) : ''}
-                                    </div>
-                                </div>
-                            ))}
+                                );
+                            })}
                             {filteredMyChatUsers?.length === 0 && <div style={{ padding: "2rem", textAlign: "center", color: "var(--text-secondary)" }}>No active conversations.</div>}
                         </div>
                     </div>
@@ -459,7 +560,7 @@ const Communication = () => {
                                     </div>
                                     <div>
                                         <h3 style={{ fontWeight: "700", fontSize: "1rem" }}>{selectedChatUser.name}</h3>
-                                        <p style={{ fontSize: "0.75rem", color: "var(--text-secondary)", textTransform: "capitalize" }}>{selectedChatUser.type}</p>
+                                        <p style={{ fontSize: "0.75rem", color: "var(--text-secondary)", textTransform: "capitalize" }}>{selectedChatUser.type} {isTyping && <span style={{color: "var(--accent-primary)", fontStyle: "italic", marginLeft: "8px"}}>Typing...</span>}</p>
                                     </div>
                                 </div>
 
@@ -477,6 +578,7 @@ const Communication = () => {
                                             </div>
                                         );
                                     })}
+                                    <div ref={messagesEndRef} />
                                     {myChatMessages?.length === 0 && <div style={{ textAlign: "center", color: "var(--text-secondary)", marginTop: "2rem" }}>Say hello to {selectedChatUser.name}!</div>}
                                 </div>
 
@@ -484,7 +586,7 @@ const Communication = () => {
                                     <div style={{ display: "flex", gap: "0.5rem", background: "#f1f5f9", padding: "0.3rem", borderRadius: "var(--radius-md)" }}>
                                         <input
                                             value={content}
-                                            onChange={(e) => setContent(e.target.value)}
+                                            onChange={handleTextChange}
                                             onKeyDown={(e) => e.key === 'Enter' && handleSend()}
                                             className="input-glass"
                                             style={{ background: "transparent", border: "none", boxShadow: "none" }}
@@ -583,7 +685,8 @@ const Communication = () => {
                                             </div>
                                         );
                                     })}
-                                    {monitorHistory?.length === 0 && <div style={{ textAlign: "center", color: "var(--text-secondary)", marginTop: "2rem" }}>Loading history...</div>}
+                                    <div ref={monitorEndRef} />
+                                    {monitorHistory?.length === 0 && <div style={{ textAlign: "center", color: "var(--text-secondary)", marginTop: "2rem" }}>No messages recorded.</div>}
                                 </div>
                             </>
                         ) : (

@@ -15,15 +15,19 @@ const ChatRoomScreen = ({ route, navigation }) => {
   
   const [messages, setMessages] = useState([]);
   const [inputText, setInputText] = useState('');
+  const [isTyping, setIsTyping] = useState(false);
   const flatListRef = useRef();
   const socketRef = useRef(null);
+  const typingTimeoutRef = useRef(null);
 
   // Fetch initial history
   const { data: historyData, isLoading } = useGetLiveChatHistoryQuery(chatId, { refetchOnMountOrArgChange: true });
   const historyChats = historyData?.chats || [];
 
   useEffect(() => {
-    socketRef.current = io(SOCKET_URL);
+    socketRef.current = io(SOCKET_URL, {
+      transports: ['websocket'],
+    });
 
     socketRef.current.on('connect', () => {
       socketRef.current.emit('identify', user.id);
@@ -32,7 +36,16 @@ const ChatRoomScreen = ({ route, navigation }) => {
 
     socketRef.current.on('receive_message', (newChat) => {
       setMessages((prev) => [...prev, newChat]);
+      setIsTyping(false);
       setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
+    });
+
+    socketRef.current.on('typing_start', ({ senderId }) => {
+      if (senderId === chatId) setIsTyping(true);
+    });
+
+    socketRef.current.on('typing_stop', ({ senderId }) => {
+      if (senderId === chatId) setIsTyping(false);
     });
 
     return () => {
@@ -62,8 +75,21 @@ const ChatRoomScreen = ({ route, navigation }) => {
     };
 
     socketRef.current.emit('send_message', payload);
+    socketRef.current.emit('typing_stop', { senderId: user.id, receiverId: chatId });
     setInputText('');
     setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
+  };
+
+  const handleTextChange = (text) => {
+    setInputText(text);
+    if (socketRef.current) {
+      socketRef.current.emit('typing_start', { senderId: user.id, receiverId: chatId });
+      
+      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+      typingTimeoutRef.current = setTimeout(() => {
+        socketRef.current.emit('typing_stop', { senderId: user.id, receiverId: chatId });
+      }, 2000);
+    }
   };
 
   const renderMessage = ({ item }) => {
@@ -93,7 +119,7 @@ const ChatRoomScreen = ({ route, navigation }) => {
         </TouchableOpacity>
         <View style={styles.headerInfo}>
           <Text style={styles.headerTitle} numberOfLines={1}>{chatName}</Text>
-          <Text style={styles.statusText}>Online</Text>
+          <Text style={styles.statusText}>{isTyping ? 'Typing...' : 'Online'}</Text>
         </View>
         <View style={{ width: 34 }} />
       </View>
@@ -132,7 +158,7 @@ const ChatRoomScreen = ({ route, navigation }) => {
             placeholder="Type a message..."
             placeholderTextColor={colors.textMuted}
             value={inputText}
-            onChangeText={setInputText}
+            onChangeText={handleTextChange}
             multiline
           />
           <TouchableOpacity 

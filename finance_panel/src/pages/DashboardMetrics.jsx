@@ -372,18 +372,33 @@ const DashboardMetrics = () => {
             return toast.error("Invalid payment configuration");
         }
 
-        const consolidatedPayload = [{
-            feeId: paymentForm.feeIds[0],
-            amount: totalPaymentAmount,
-            title: feeTitles.join(", ")
-        }];
+        const paymentsPayload = [];
+        let tempRemaining = Number(paymentForm.amount);
+        
+        for (const feeId of paymentForm.feeIds) {
+            const feeObj = studentLedger.fees.find(f => f.id === feeId);
+            if (!feeObj) continue;
+            
+            const dueAmount = Number(feeObj.fee?.amount || 0) - Number(feeObj.total_paid_amount || 0);
+            if (tempRemaining <= 0) break;
+            
+            const paymentAmount = Math.min(tempRemaining, dueAmount);
+            
+            paymentsPayload.push({
+                feeId: feeId,
+                amount: paymentAmount,
+                title: feeObj.fee?.title || "Fee"
+            });
+            
+            tempRemaining -= paymentAmount;
+        }
 
       const res = await api.post("/finance_panel/logPayment", {
         data: {
           studentId: selectedStudent.id,
           paymentMode: paymentForm.paymentMode,
           remarks: paymentForm.remarks,
-          payments: consolidatedPayload
+          payments: paymentsPayload
         }
       });
       if (res.data.success) {
@@ -392,8 +407,8 @@ const DashboardMetrics = () => {
         
         const completePayments = res.data.payments.map((p, idx) => ({
             ...p,
-            fee_title: consolidatedPayload[idx]?.title || p.remarks,
-            fee: { title: consolidatedPayload[idx]?.title || "Fee" }
+            fee_title: paymentsPayload[idx]?.title || p.remarks,
+            fee: { title: paymentsPayload[idx]?.title || "Fee" }
         }));
         generateReceiptPDF(completePayments, selectedStudent, res.data.receipt);
 

@@ -9,7 +9,21 @@ export const createCommunication = async (req, res) => {
     let finalSenderId = payload.firstPerson || payload.sender_id;
     if (finalSenderId) {
       const { data: sRow } = await supabase.from("user").select("id").eq("id", finalSenderId).maybeSingle();
-      if (!sRow) finalSenderId = null;
+      if (!sRow) {
+        try {
+          const userEmail = req.user?.email || "admin@thearcschool.in";
+          const userType = req.user?.type || "admin";
+          const { data: newRow } = await supabase.from("user").insert([{
+            id: finalSenderId,
+            email: userEmail,
+            name: "System Admin",
+            type: userType
+          }]).select("id").maybeSingle();
+          if (!newRow) finalSenderId = null;
+        } catch (e) {
+          finalSenderId = null;
+        }
+      }
     }
 
     // Map legacy payload (firstPerson, title) to current schema (sender_id, message)
@@ -36,11 +50,16 @@ export const createCommunication = async (req, res) => {
     }
 
     // Emit live chat socket event if this is a one-on-one message
-    if (dbPayload.receiver_id && dbPayload.sender_id) {
+    const actualSenderId = payload.firstPerson || payload.sender_id;
+    if (dbPayload.receiver_id && actualSenderId) {
       try {
         const io = getIO();
-        const room = [dbPayload.sender_id, dbPayload.receiver_id].sort().join('_');
-        io.to(room).to(dbPayload.sender_id).to(dbPayload.receiver_id).to("admin_monitor").emit("receive_message", chat[0]);
+        const room = [actualSenderId, dbPayload.receiver_id].sort().join('_');
+        const socketPayload = {
+          ...chat[0],
+          sender_id: actualSenderId
+        };
+        io.to(room).to(actualSenderId).to(dbPayload.receiver_id).to("admin_monitor").emit("receive_message", socketPayload);
       } catch (socketErr) {
         console.error("Socket error during API createCommunication:", socketErr);
       }

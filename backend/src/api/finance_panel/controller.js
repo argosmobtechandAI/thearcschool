@@ -57,13 +57,21 @@ export const getDashboardStats = async (req, res) => {
       .select("*")
       .eq("academic_year", academicYear);
 
-    // 4. Calculate months passed
+    // 4. Calculate months passed dynamically up to current/end date
     const sessionStartYear = parseInt(academicYear.split("-")[0]);
     const today = new Date();
-    const currentMonth = today.getMonth();
-    const currentYear = today.getFullYear();
+    let calcDate = today;
+    if (endDate) {
+      const parsedEnd = new Date(endDate);
+      if (!isNaN(parsedEnd.getTime())) calcDate = parsedEnd;
+    }
+
+    const calcYear = calcDate.getFullYear();
+    const calcMonth = calcDate.getMonth(); // 0-indexed, 0 = Jan, 3 = April
     
-    let monthsPassed = 12; // Full academic year
+    let monthsPassed = (calcYear - sessionStartYear) * 12 + (calcMonth - 3) + 1;
+    if (monthsPassed < 0) monthsPassed = 0;
+    if (monthsPassed > 12) monthsPassed = 12;
 
     let balance = 0;
     

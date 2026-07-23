@@ -202,7 +202,7 @@ export class UserService {
     };
   }
 
-  static async updateUser(data) {
+  static async updateUser(data) { console.log('UPDATE USER DATA ID:', data.id, typeof data.id, JSON.stringify(data));
     if (data.type === 'parent') {
       const parentId = data.id;
       let father_name = data.name || '';
@@ -233,7 +233,8 @@ export class UserService {
       return { success: true };
     }
 
-    const { data: existingUser, error: existingError } = await supabase
+    const client = supabaseAdmin || supabase;
+    const { data: existingUser, error: existingError } = await client
       .from("user")
       .select("*")
       .eq("id", data.id);
@@ -284,53 +285,55 @@ export class UserService {
       }
     });
 
-    const { error: updateError } = await supabase
-      .from("user")
-      .update(data)
-      .eq("id", userId);
+    if (Object.keys(data).length > 0) {
+      const { error: updateError } = await client
+        .from("user")
+        .update(data)
+        .eq("id", userId);
 
-    if (updateError) throw updateError;
+      if (updateError) throw updateError;
+    }
 
     const userType = existingUser[0].type;
 
     if (connections !== undefined && userType === 'parent') {
-      await supabase.from("user_connections").delete().eq("parent_id", userId);
+      await client.from("user_connections").delete().eq("parent_id", userId);
       if (connections.length > 0) {
         const connectionInserts = connections.map(studentId => ({ parent_id: userId, student_id: studentId }));
-        await supabase.from("user_connections").insert(connectionInserts);
+        await client.from("user_connections").insert(connectionInserts);
       }
     }
 
     if (classId !== undefined && userType === 'student') {
-      await supabase.from("class_students").delete().eq("student_id", userId);
+      await client.from("class_students").delete().eq("student_id", userId);
       if (classId) {
-        await supabase.from("class_students").insert([{ class_id: classId, student_id: userId }]);
+        await client.from("class_students").insert([{ class_id: classId, student_id: userId }]);
       }
     }
 
     if (classes !== undefined && userType === 'teacher') {
-      await supabase.from("class_teachers").delete().eq("teacher_id", userId);
+      await client.from("class_teachers").delete().eq("teacher_id", userId);
       if (classes.length > 0) {
         const teacherInserts = classes.map(cId => ({ class_id: cId, teacher_id: userId }));
-        await supabase.from("class_teachers").insert(teacherInserts);
+        await client.from("class_teachers").insert(teacherInserts);
       }
     }
 
     if (userType === 'teacher' && teacherDetailsData && Object.keys(teacherDetailsData).length > 0) {
-      const { data: td } = await supabase.from("teacher_details").select("*").eq("user_id", userId).single();
+      const { data: td } = await client.from("teacher_details").select("*").eq("user_id", userId).single();
       if (td) {
-        await supabase.from("teacher_details").update(teacherDetailsData).eq("user_id", userId);
+        await client.from("teacher_details").update(teacherDetailsData).eq("user_id", userId);
       } else {
-        await supabase.from("teacher_details").insert([{ user_id: userId, ...teacherDetailsData }]);
+        await client.from("teacher_details").insert([{ user_id: userId, ...teacherDetailsData }]);
       }
     }
 
     if (data.type && ['admission', 'finance', 'admin', 'principal'].includes(data.type)) {
-      const { data: sd } = await supabase.from("staff_details").select("*").eq("user_id", userId).single();
+      const { data: sd } = await client.from("staff_details").select("*").eq("user_id", userId).single();
       if (sd) {
-        await supabase.from("staff_details").update({ access_level: data.type }).eq("user_id", userId);
+        await client.from("staff_details").update({ access_level: data.type }).eq("user_id", userId);
       } else {
-        await supabase.from("staff_details").insert([{ user_id: userId, access_level: data.type }]);
+        await client.from("staff_details").insert([{ user_id: userId, access_level: data.type }]);
       }
     }
 

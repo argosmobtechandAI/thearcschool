@@ -1,17 +1,27 @@
-import { Outlet, useNavigate, NavLink } from "react-router-dom";
+import { Outlet, useNavigate, NavLink, useLocation } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import { useEffect, useState } from "react";
 import { LogOut, LayoutDashboard, Users, BookOpen, UserCircle, Settings, UserCheck, IndianRupee, FileEdit, Clock, Calendar, ClipboardCheck, Bell, DollarSign, MessageSquare, Info, ShieldAlert, MapPin, ExternalLink, TrendingUp, FileSignature, Quote, Award, FileText, Sparkles, Image as ImageIcon } from "lucide-react";
 import { toast } from "react-toastify";
 import { logout } from "../features/authSlice";
+import { addLiveChatMessage, fetchSystemMonitorList } from "../features/dataSlice";
 import { messaging } from "../config/firebase";
 import { getToken, onMessage } from "firebase/messaging";
 import api from "../services/api";
+import { socket } from "../lib/socket";
 
 const AdminLayout = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
-  const { user } = useSelector((state) => state.auth);
+  const location = useLocation();
+  const authUser = useSelector((state) => state.auth.user);
+  const user = authUser || (() => {
+    try {
+      return JSON.parse(localStorage.getItem('adminUser')) || null;
+    } catch(e) {
+      return null;
+    }
+  })();
 
   const handleLogout = () => {
     dispatch(logout());
@@ -83,7 +93,49 @@ const AdminLayout = () => {
         window.removeEventListener('notificationsRead', handleNotificationsRead);
       };
     }
-  }, [user]);
+  }, [user, dispatch]);
+
+  useEffect(() => {
+    const targetUserId = user?.id;
+    if (!targetUserId) return;
+
+    if (!socket.connected) {
+      socket.connect();
+    }
+
+    const onSocketConnect = () => {
+      socket.emit('identify', targetUserId);
+    };
+
+    const onReceiveMessage = (newChat) => {
+      if (newChat.sender_id !== targetUserId) {
+        toast.info(`New message received`);
+        if (!window.location.pathname.includes('/communication')) {
+          setUnreadChats(prev => prev + 1);
+        }
+      }
+      dispatch(addLiveChatMessage(newChat));
+      dispatch(fetchSystemMonitorList());
+    };
+
+    socket.on('connect', onSocketConnect);
+    socket.on('receive_message', onReceiveMessage);
+
+    if (socket.connected) {
+      socket.emit('identify', targetUserId);
+    }
+
+    return () => {
+      socket.off('connect', onSocketConnect);
+      socket.off('receive_message', onReceiveMessage);
+    };
+  }, [user?.id, dispatch]);
+
+  useEffect(() => {
+    if (location.pathname.includes('/communication')) {
+      setUnreadChats(0);
+    }
+  }, [location.pathname]);
 
   const navLinkStyle = ({ isActive }) => ({
     display: "flex", alignItems: "center", gap: "0.5rem", padding: "0.35rem 0.75rem", 
@@ -157,6 +209,9 @@ const AdminLayout = () => {
               <NavLink to="/coursework" style={navLinkStyle}><FileText size={16} /> Coursework</NavLink>
               <NavLink to="/communication/inbox" style={navLinkStyle}>
                 <MessageSquare size={16} /> Communication
+                {unreadChats > 0 && (
+                  <span style={{ width: "8px", height: "8px", backgroundColor: "#22c55e", borderRadius: "50%", marginLeft: "auto" }} />
+                )}
               </NavLink>
               <NavLink to="/consents" style={navLinkStyle}><FileSignature size={16} /> Consents</NavLink>
               <NavLink to="/exams" style={navLinkStyle}><ClipboardCheck size={16} /> Exams & Grading</NavLink>

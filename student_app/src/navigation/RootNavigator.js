@@ -1,8 +1,11 @@
 import React from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { useSelector } from 'react-redux';
+import { useSelector, useDispatch } from 'react-redux';
+import { useEffect } from 'react';
 import { colors } from '../theme/colors';
+import { socket } from '../services/socket';
+import { apiSlice } from '../store/apiSlice';
 
 import LoginScreen from '../features/auth/LoginScreen';
 import TabNavigator from './TabNavigator';
@@ -29,7 +32,39 @@ const MainScreen = () => {
 // ─── Root Navigator ──────────────────────────────────────────────────────────
 
 const RootNavigator = () => {
-  const { isAuthenticated } = useSelector((state) => state.auth);
+  const { isAuthenticated, user } = useSelector((state) => state.auth);
+  const dispatch = useDispatch();
+
+  useEffect(() => {
+    if (isAuthenticated && user?.id) {
+      if (!socket.connected) {
+        socket.connect();
+      }
+
+      const onSocketConnect = () => {
+        socket.emit('identify', user.id);
+      };
+
+      const onReceiveMessage = (newChat) => {
+        if (newChat.sender_id !== user.id) {
+          dispatch(apiSlice.util.invalidateTags(['LiveChat', 'Chats']));
+        }
+      };
+
+      socket.on('connect', onSocketConnect);
+      socket.on('receive_message', onReceiveMessage);
+
+      if (socket.connected) {
+        socket.emit('identify', user.id);
+      }
+
+      return () => {
+        socket.off('connect', onSocketConnect);
+        socket.off('receive_message', onReceiveMessage);
+        socket.disconnect();
+      };
+    }
+  }, [isAuthenticated, user?.id, dispatch]);
 
   return (
     <NavigationContainer ref={navigationRef}>

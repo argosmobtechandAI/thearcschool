@@ -13,22 +13,40 @@ export const getLiveChatHistory = async (req, res) => {
     // We want messages where (firstPerson = currentUser AND secondPerson contains userId) 
     // OR (firstPerson = userId AND secondPerson contains currentUser)
     
-    // We'll fetch all live_chat messages and filter, or use an OR query.
-    // Supabase OR with arrays is a bit tricky, so we can just use a broad OR query.
+    // Fetch all admin/principal user IDs to group admin desk communications
+    const { data: adminUsers } = await supabase
+      .from("user")
+      .select("id, type, name")
+      .or("type.eq.admin,type.eq.principal,type.eq.super_admin,name.eq.System Admin");
+    const adminIds = new Set(adminUsers ? adminUsers.map(u => u.id) : []);
+
+    const isOtherAdmin = adminIds.has(userId);
+    const isCurrentAdmin = adminIds.has(currentUserId);
+
     const { data: chats, error } = await supabase
       .from("communication")
       .select("*")
       .eq("type", "live_chat")
-      .or(`sender_id.eq.${currentUserId},receiver_id.eq.${currentUserId}`)
+      .or(`sender_id.eq.${currentUserId},receiver_id.eq.${currentUserId},sender_id.is.null`)
       .order("created_at", { ascending: true });
 
     if (error) throw error;
 
-    // Filter down to only messages between these two specific users
+    // Filter down to messages between these two entities, correctly accounting for admin desk users
     const filteredChats = chats.filter(chat => {
-      const isSenderCurrent = chat.sender_id === currentUserId && chat.receiver_id === userId;
-      const isSenderOther = chat.sender_id === userId && chat.receiver_id === currentUserId;
-      return isSenderCurrent || isSenderOther;
+      if (isOtherAdmin) {
+        const isFromCurrentToAdmin = chat.sender_id === currentUserId && (!chat.receiver_id || adminIds.has(chat.receiver_id));
+        const isFromAdminToCurrent = (!chat.sender_id || adminIds.has(chat.sender_id)) && chat.receiver_id === currentUserId;
+        return isFromCurrentToAdmin || isFromAdminToCurrent;
+      } else if (isCurrentAdmin) {
+        const isFromAdminToUser = (!chat.sender_id || adminIds.has(chat.sender_id)) && chat.receiver_id === userId;
+        const isFromUserToAdmin = chat.sender_id === userId && (!chat.receiver_id || adminIds.has(chat.receiver_id));
+        return isFromAdminToUser || isFromUserToAdmin;
+      } else {
+        const isSenderCurrent = (chat.sender_id === currentUserId || !chat.sender_id) && chat.receiver_id === userId;
+        const isSenderOther = (chat.sender_id === userId || !chat.sender_id) && (chat.receiver_id === currentUserId || !chat.receiver_id);
+        return isSenderCurrent || isSenderOther;
+      }
     });
 
     return res.status(200).json({
@@ -164,18 +182,17 @@ export const getStudents = async (req, res) => {
 
 export const getPrincipal = async (req, res) => {
   try {
-    const { data: principal, error } = await supabase
+    const { data: adminUsers } = await supabase
       .from("user")
       .select("id, name, email, type")
-      .eq("type", "principal")
-      .limit(1)
-      .single();
+      .or("type.eq.admin,type.eq.principal,type.eq.super_admin,name.eq.System Admin")
+      .limit(1);
 
-    if (error && error.code !== 'PGRST116') throw error; // PGRST116 is no rows found
+    const principal = adminUsers && adminUsers.length > 0 ? adminUsers[0] : null;
 
     return res.status(200).json({
       success: true,
-      principal: principal || null
+      principal: principal ? { ...principal, name: "System Admin" } : { id: "admin", name: "System Admin", type: "admin" }
     });
   } catch (e) {
     return res.status(500).json({
@@ -189,31 +206,55 @@ export const getLiveChatsList = async (req, res) => {
   if (!currentUserId) return res.status(401).json({ success: false, message: "Unauthorized" });
 
   try {
+    // Fetch all admin/principal user IDs to group admin desk entries
+    const { data: adminUsers } = await supabase
+      .from("user")
+      .select("id, type, name")
+      .or("type.eq.admin,type.eq.principal,type.eq.super_admin,name.eq.System Admin");
+    const adminIds = new Set(adminUsers ? adminUsers.map(u => u.id) : []);
+
     const { data: chats, error } = await supabase
       .from("communication")
       .select("sender_id, receiver_id, message, created_at")
       .eq("type", "live_chat")
-      .or(`sender_id.eq.${currentUserId},receiver_id.eq.${currentUserId}`)
+      .or(`sender_id.eq.${currentUserId},receiver_id.eq.${currentUserId},sender_id.is.null`)
       .order("created_at", { ascending: false });
 
     if (error) throw error;
 
-    // We need to find unique users that the current user has chatted with.
     const userMap = new Map();
     const userIdsToFetch = new Set();
+    let hasAdminThread = false;
 
     for (const chat of chats) {
       const otherId = chat.sender_id === currentUserId ? chat.receiver_id : chat.sender_id;
-      if (!otherId) continue;
-      
-      if (!userMap.has(otherId)) {
-        userMap.set(otherId, {
-          id: otherId,
-          lastMessage: chat.message,
-          time: chat.created_at,
-          unread: 0 // Placeholder
-        });
-        userIdsToFetch.add(otherId);
+      const isOtherAdmin = !otherId || adminIds.has(otherId);
+
+      if (isOtherAdmin) {
+        if (!hasAdminThread) {
+          hasAdminThread = true;
+          const primaryAdminId = Array.from(adminIds)[0] || otherId || "admin";
+          const isUnread = chat.sender_id !== currentUserId;
+          userMap.set("ADMIN_DESK", {
+            id: primaryAdminId,
+            name: "System Admin",
+            role: "admin",
+            lastMessage: chat.message,
+            time: chat.created_at,
+            unread: isUnread ? 1 : 0
+          });
+        }
+      } else {
+        if (!userMap.has(otherId)) {
+          const isUnread = chat.sender_id !== currentUserId;
+          userMap.set(otherId, {
+            id: otherId,
+            lastMessage: chat.message,
+            time: chat.created_at,
+            unread: isUnread ? 1 : 0
+          });
+          userIdsToFetch.add(otherId);
+        }
       }
     }
 
@@ -225,7 +266,29 @@ export const getLiveChatsList = async (req, res) => {
 
       if (!usersError && usersData) {
         for (const u of usersData) {
-          if (userMap.has(u.id)) {
+          const isAdminUser = u.type === 'admin' || u.type === 'principal' || u.type === 'super_admin' || u.name === 'System Admin';
+
+          if (isAdminUser) {
+            const orphanThread = userMap.get(u.id);
+            userMap.delete(u.id);
+
+            if (!userMap.has("ADMIN_DESK")) {
+              userMap.set("ADMIN_DESK", {
+                id: u.id,
+                name: "System Admin",
+                role: "admin",
+                lastMessage: orphanThread?.lastMessage || "",
+                time: orphanThread?.time || new Date().toISOString(),
+                unread: 0
+              });
+            } else {
+              const adminThread = userMap.get("ADMIN_DESK");
+              if (orphanThread && new Date(orphanThread.time) > new Date(adminThread.time)) {
+                adminThread.lastMessage = orphanThread.lastMessage;
+                adminThread.time = orphanThread.time;
+              }
+            }
+          } else if (userMap.has(u.id)) {
             const mapped = userMap.get(u.id);
             mapped.name = u.name;
             mapped.role = u.type;

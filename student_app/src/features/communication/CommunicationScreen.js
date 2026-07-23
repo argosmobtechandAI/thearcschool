@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity,
   ActivityIndicator, RefreshControl, TextInput, ScrollView
@@ -25,19 +26,32 @@ const CommunicationScreen = ({ navigation }) => {
   const [activeTab, setActiveTab] = useState('history');
   const [searchQuery, setSearchQuery] = useState('');
 
-  const { data: teachersData, isLoading: teachersLoading, refetch: refetchTeachers, isFetching: teachersFetching } = useGetTeachersQuery(undefined, { pollingInterval: 60000 });
+  const { data: teachersData, isLoading: teachersLoading, refetch: refetchTeachers, isFetching: teachersFetching } = useGetTeachersQuery();
   const { data: principalData, isLoading: principalLoading, refetch: refetchPrincipal, isFetching: principalFetching } = useGetPrincipalQuery();
-  const { data: historyData, isLoading: historyLoading, refetch: refetchHistory, isFetching: historyFetching } = useGetLiveChatsListQuery(undefined, { pollingInterval: 10000 });
+  const { data: historyData, isLoading: historyLoading, refetch: refetchHistory, isFetching: historyFetching } = useGetLiveChatsListQuery();
 
   const teachers = teachersData?.teachers || [];
   const principal = principalData?.principal;
   const historyList = historyData?.chats || [];
 
+  useFocusEffect(
+    useCallback(() => {
+      refetchHistory();
+      refetchTeachers();
+      refetchPrincipal();
+    }, [refetchHistory, refetchTeachers, refetchPrincipal])
+  );
+
   const filteredTeachers = teachers.filter(t => 
     t.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+  const [readThreadIds, setReadThreadIds] = useState(new Set());
+
   const handleOpenChat = (user) => {
+    if (user?.id) {
+      setReadThreadIds(prev => new Set(prev).add(user.id));
+    }
     navigation.navigate('LiveChatScreen', { 
       teacherId: user.id, 
       teacherName: user.name, 
@@ -58,20 +72,38 @@ const CommunicationScreen = ({ navigation }) => {
     </TouchableOpacity>
   );
 
-  const renderHistoryCard = ({ item }) => (
-    <TouchableOpacity style={styles.userCard} onPress={() => handleOpenChat(item)}>
-      <View style={styles.avatar}>
-        <Text style={styles.avatarText}>{item.name ? item.name.substring(0, 1).toUpperCase() : 'U'}</Text>
-      </View>
-      <View style={styles.userInfo}>
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-          <Text style={styles.userName}>{item.name || 'Unknown'}</Text>
-          <Text style={{ fontSize: 12, color: colors.textMuted }}>{formatTime(item.time)}</Text>
+  const renderHistoryCard = ({ item }) => {
+    const isUnread = item.unread > 0 && !readThreadIds.has(item.id);
+    return (
+      <TouchableOpacity style={styles.userCard} onPress={() => handleOpenChat(item)}>
+        <View style={[styles.avatar, { position: 'relative' }]}>
+          <Text style={styles.avatarText}>{item.name ? item.name.substring(0, 1).toUpperCase() : 'U'}</Text>
+          {isUnread && (
+            <View style={{
+              position: 'absolute', top: -2, right: -2,
+              width: 12, height: 12, borderRadius: 6,
+              backgroundColor: '#10B981', borderWidth: 2, borderColor: '#fff'
+            }} />
+          )}
         </View>
-        <Text style={{ fontSize: 14, color: colors.textMuted }} numberOfLines={1}>{item.lastMessage}</Text>
-      </View>
-    </TouchableOpacity>
-  );
+        <View style={styles.userInfo}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+            <Text style={[styles.userName, isUnread && { fontWeight: '700' }]}>{item.name || 'Unknown'}</Text>
+            <Text style={{ fontSize: 12, color: colors.textMuted }}>{formatTime(item.time)}</Text>
+          </View>
+          <Text style={[{ fontSize: 14, color: colors.textMuted }, isUnread && { color: colors.textPrimary, fontWeight: '600' }]} numberOfLines={1}>
+            {item.lastMessage}
+          </Text>
+        </View>
+        {isUnread && (
+          <View style={{
+            width: 10, height: 10, borderRadius: 5,
+            backgroundColor: '#10B981', marginLeft: 8
+          }} />
+        )}
+      </TouchableOpacity>
+    );
+  };
 
   return (
     <View style={styles.container}>
@@ -117,7 +149,7 @@ const CommunicationScreen = ({ navigation }) => {
             }
           }}
         >
-          <Text style={[styles.tabText, activeTab === 'principal' && styles.tabTextActive]}>Principal</Text>
+          <Text style={[styles.tabText, activeTab === 'principal' && styles.tabTextActive]}>Admin</Text>
         </TouchableOpacity>
       </View>
 
@@ -138,7 +170,7 @@ const CommunicationScreen = ({ navigation }) => {
                 <View style={styles.emptyState}>
                   <Icon name="message-square" size={48} color={colors.textMuted} />
                   <Text style={styles.emptyTitle}>No Chats Yet</Text>
-                  <Text style={styles.emptyText}>Find a teacher or the principal in the directories to start a chat.</Text>
+                  <Text style={styles.emptyText}>Find a teacher or the admin in the directories to start a chat.</Text>
                 </View>
               }
             />
@@ -200,8 +232,8 @@ const CommunicationScreen = ({ navigation }) => {
             ) : (
               <View style={styles.emptyState}>
                 <Icon name="user" size={48} color={colors.textMuted} />
-                <Text style={styles.emptyTitle}>No Principal Found</Text>
-                <Text style={styles.emptyText}>The principal's profile is not available at this moment.</Text>
+                <Text style={styles.emptyTitle}>No Admin Found</Text>
+                <Text style={styles.emptyText}>The admin's profile is not available at this moment.</Text>
               </View>
             )}
           </View>

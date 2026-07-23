@@ -113,7 +113,7 @@ const ChatListScreen = ({ navigation }) => {
             }
           }}
         >
-          <Text style={[styles.tabText, activeTab === 'principal' && styles.tabTextActive]}>Principal</Text>
+          <Text style={[styles.tabText, activeTab === 'principal' && styles.tabTextActive]}>Admin</Text>
         </TouchableOpacity>
       </View>
 
@@ -134,7 +134,7 @@ const ChatListScreen = ({ navigation }) => {
                 <View style={styles.emptyState}>
                   <Icon name="message-square" size={48} color={colors.textMuted} />
                   <Text style={styles.emptyTitle}>No Chats Yet</Text>
-                  <Text style={styles.emptyText}>Find a student or the principal in the directories to start a chat.</Text>
+                  <Text style={styles.emptyText}>Find a student or the admin in the directories to start a chat.</Text>
                 </View>
               }
             />
@@ -196,8 +196,8 @@ const ChatListScreen = ({ navigation }) => {
             ) : (
               <View style={styles.emptyState}>
                 <Icon name="user" size={48} color={colors.textMuted} />
-                <Text style={styles.emptyTitle}>No Principal Found</Text>
-                <Text style={styles.emptyText}>The principal's profile is not available at this moment.</Text>
+                <Text style={styles.emptyTitle}>No Admin Found</Text>
+                <Text style={styles.emptyText}>The admin's profile is not available at this moment.</Text>
               </View>
             )}
           </View>

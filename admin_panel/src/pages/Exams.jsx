@@ -73,8 +73,8 @@ const Exams = () => {
   const materials = useMemo(() => {
     let list = [];
     if (courseType === "exam") list = exams;
-    else if (courseType === "Material") list = courses?.filter((c) => c.type?.toLowerCase() === "material");
-    else list = courses?.filter((c) => c.type?.toLowerCase() === "assignment");
+    else if (courseType === "Material") list = courses?.filter((c) => c.type === "study_material" || c.type?.toLowerCase() === "material");
+    else list = courses?.filter((c) => c.type === "assignment" || c.type?.toLowerCase() === "assignment");
     
     if (!list) return [];
     
@@ -308,7 +308,10 @@ const Exams = () => {
             contentArray.push(res.data.url);
           }
         }
-        const payload = { ...formData, type: courseType };
+        let typeToSave = courseType;
+        if (courseType === "Material") typeToSave = "study_material";
+        if (courseType === "Assignment") typeToSave = "assignment";
+        const payload = { ...formData, type: typeToSave };
         if (contentArray.length > 0) payload.content = contentArray;
         
         if (editingItem) {

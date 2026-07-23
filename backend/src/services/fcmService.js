@@ -66,23 +66,34 @@ export const FCMService = {
           body,
         },
         android: {
+          priority: 'high',
           notification: {
             channelId: 'high_importance_channel_v4',
-            sound: 'melody'
+            priority: 'max',
+            visibility: 'public',
+            defaultSound: true
           }
         },
         apns: {
           payload: {
             aps: {
-              sound: 'melody.wav'
+              sound: 'default'
             }
           }
         },
-        data: {
-          ...data,
-          // Ensure all data values are strings as required by FCM
-          click_action: data.click_action || 'FLUTTER_NOTIFICATION_CLICK', 
-        },
+        data: (() => {
+          const sanitized = {};
+          if (data && typeof data === 'object') {
+            Object.keys(data).forEach(key => {
+              const val = data[key];
+              if (val !== undefined && val !== null) {
+                sanitized[key] = typeof val === 'string' ? val : (typeof val === 'object' ? JSON.stringify(val) : String(val));
+              }
+            });
+          }
+          sanitized.click_action = sanitized.click_action || 'FLUTTER_NOTIFICATION_CLICK';
+          return sanitized;
+        })(),
         tokens,
       };
 

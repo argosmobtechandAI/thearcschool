@@ -11,10 +11,19 @@ export const createConsent = async (req, res) => {
       return res.status(400).json({ success: false, message: "Title and Class ID are required." });
     }
 
+    // Verify admin exists in user table to prevent FK constraint error
+    const { data: validUser } = await supabase
+      .from("user")
+      .select("id")
+      .eq("id", created_by)
+      .maybeSingle();
+
+    const final_created_by = validUser ? created_by : null;
+
     // Insert consent
     const { data: consent, error: consentError } = await supabase
       .from("consents")
-      .insert([{ title, description, class_id, event_date, created_by }])
+      .insert([{ title, description, class_id, event_date, created_by: final_created_by }])
       .select()
       .single();
 

@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
 import {
   View, Text, StyleSheet, TextInput, TouchableOpacity, FlatList,
   KeyboardAvoidingView, Platform, ActivityIndicator
@@ -6,8 +7,7 @@ import {
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/Feather';
 import { useSelector } from 'react-redux';
-import io from 'socket.io-client';
-import { SOCKET_URL } from '@env';
+import { socket } from '../../services/socket';
 import { useGetLiveChatHistoryQuery } from '../../store/apiSlice';
 import { colors } from '../../theme/colors';
 
@@ -18,39 +18,62 @@ const LiveChatScreen = ({ route, navigation }) => {
   
   const [messages, setMessages] = useState([]);
   const [inputText, setInputText] = useState('');
+  const [isTyping, setIsTyping] = useState(false);
   const flatListRef = useRef();
   const socketRef = useRef(null);
+  const typingTimeoutRef = useRef(null);
 
   // Fetch initial history
-  const { data: historyData, isLoading } = useGetLiveChatHistoryQuery(teacherId, { refetchOnMountOrArgChange: true });
+  const { data: historyData, isLoading, refetch } = useGetLiveChatHistoryQuery(teacherId, { refetchOnMountOrArgChange: true });
   const historyChats = historyData?.chats || [];
 
-  // Initialize socket connection
+  useFocusEffect(
+    useCallback(() => {
+      refetch();
+    }, [refetch])
+  );
+
+  // Initialize socket listeners
   useEffect(() => {
-    socketRef.current = io(SOCKET_URL, {
-      transports: ['websocket']
-    });
+    if (!socket.connected) {
+       socket.connect();
+    }
+    
+    socket.emit('identify', user.id);
+    socket.emit('join_chat', { senderId: user.id, receiverId: teacherId });
 
-    socketRef.current.on('connect', () => {
-      socketRef.current.emit('identify', user.id);
-      socketRef.current.emit('join_chat', { senderId: user.id, receiverId: teacherId });
-    });
+    const onConnect = () => {
+      socket.emit('identify', user.id);
+      socket.emit('join_chat', { senderId: user.id, receiverId: teacherId });
+    };
 
-    socketRef.current.on('receive_message', (newChat) => {
+    const onReceiveMessage = (newChat) => {
       console.log('Received message via socket:', newChat);
-      setMessages((prev) => {
-        console.log('Previous messages length:', prev.length);
-        return [...prev, newChat];
-      });
+      setMessages((prev) => [...prev, newChat]);
+      setIsTyping(false);
       setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
-    });
+    };
+
+    const onTypingStart = ({ senderId }) => {
+      if (senderId === teacherId || senderId !== user.id) setIsTyping(true);
+    };
+
+    const onTypingStop = ({ senderId }) => {
+      if (senderId === teacherId || senderId !== user.id) setIsTyping(false);
+    };
+
+    socket.on('connect', onConnect);
+    socket.on('receive_message', onReceiveMessage);
+    socket.on('typing_start', onTypingStart);
+    socket.on('typing_stop', onTypingStop);
 
     return () => {
-      if (socketRef.current) {
-        socketRef.current.disconnect();
-      }
+      socket.off('connect', onConnect);
+      socket.off('receive_message', onReceiveMessage);
+      socket.off('typing_start', onTypingStart);
+      socket.off('typing_stop', onTypingStop);
     };
-  }, [user.id, teacherId]);
+  }, [teacherId, user?.id]);
 
   // Combine history with live messages
   const allMessages = [...historyChats];
@@ -71,9 +94,22 @@ const LiveChatScreen = ({ route, navigation }) => {
       type: 'live_chat'
     };
 
-    socketRef.current.emit('send_message', payload);
+    socket.emit('send_message', payload);
+    socket.emit('typing_stop', { senderId: user.id, receiverId: teacherId });
     setInputText('');
     setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
+  };
+
+  const handleTextChange = (text) => {
+    setInputText(text);
+    if (socket.connected) {
+      socket.emit('typing_start', { senderId: user.id, receiverId: teacherId });
+      
+      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+      typingTimeoutRef.current = setTimeout(() => {
+        socket.emit('typing_stop', { senderId: user.id, receiverId: teacherId });
+      }, 2000);
+    }
   };
 
   const renderMessage = ({ item }) => {
@@ -102,7 +138,7 @@ const LiveChatScreen = ({ route, navigation }) => {
         </TouchableOpacity>
         <View style={styles.headerInfo}>
           <Text style={styles.headerTitle} numberOfLines={1}>{teacherName}</Text>
-          <Text style={styles.statusText}>Online</Text>
+          <Text style={styles.statusText}>{isTyping ? 'Typing...' : 'Online'}</Text>
         </View>
         <View style={{ width: 34 }} />
       </View>
@@ -141,7 +177,7 @@ const LiveChatScreen = ({ route, navigation }) => {
             placeholder="Type a message..."
             placeholderTextColor={colors.textMuted}
             value={inputText}
-            onChangeText={setInputText}
+            onChangeText={handleTextChange}
             multiline
           />
           <TouchableOpacity 

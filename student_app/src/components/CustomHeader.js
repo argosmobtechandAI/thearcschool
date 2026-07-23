@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, StatusBar } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, StatusBar, Image } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/Feather';
@@ -29,7 +29,10 @@ const CustomHeader = ({ title, showBack, onMenuPress, rightComponent }) => {
         <View style={{ width: 34 }} />
       )}
 
-      <Text style={styles.headerTitle}>{title || 'The Arc School'}</Text>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+        <Image source={require('../assets/images/logo.jpeg')} style={{ width: 24, height: 24, borderRadius: 12 }} />
+        <Text style={styles.headerTitle}>{title || 'The Arc School'}</Text>
+      </View>
 
       {rightComponent ? (
         rightComponent

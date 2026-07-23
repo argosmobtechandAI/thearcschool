@@ -219,7 +219,7 @@ const FeesScreen = ({ navigation }) => {
       <View key={payment.id} style={styles.feeCard}>
         <View style={styles.feeTopRow}>
           <View style={{ flex: 1 }}>
-            <Text style={styles.feeTitle}>Receipt: #{payment.id.split('-')[0].toUpperCase()}</Text>
+            <Text style={styles.feeTitle}>Receipt: #{payment.id?.toString().split('-')[0].toUpperCase()}</Text>
             <Text style={styles.feeType}>{payment.payment_mode || 'Cash/Bank'}</Text>
           </View>
           <Text style={styles.feeAmount}>₹{Number(payment.amount_paid || 0).toLocaleString()}</Text>

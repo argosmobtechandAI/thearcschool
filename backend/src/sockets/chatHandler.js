@@ -21,17 +21,31 @@ export const initSocket = (server) => {
       socket.join(userId); // Join personal room for inbox updates
       
       let userName = "Unknown";
+      let userType = "admin";
       try {
-        const { data } = await supabase.from("user").select("name, type").eq("id", userId).single();
+        let { data } = await supabase.from("user").select("name, type").eq("id", userId).maybeSingle();
+        if (!data) {
+          const { data: newRow } = await supabase.from("user").insert([{
+            id: userId,
+            email: "admin@thearcschool.in",
+            name: "System Admin",
+            type: "admin"
+          }]).select("name, type").maybeSingle();
+          data = newRow;
+        }
+
         if (data) {
           if (data.name) userName = data.name;
-          if (data.type === 'admin' || data.type === 'principal') {
-             socket.join("admin_monitor");
-          }
+          if (data.type) userType = data.type;
         }
       } catch (err) {}
+
+      if (['admin', 'principal', 'unknown'].includes(userType) || !userType) {
+         socket.join("admin_monitor");
+      }
+
       socket.userName = userName;
-      console.log(`Socket ${socket.id} identified as user ${userId} (${userName})`);
+      console.log(`Socket ${socket.id} identified as user ${userId} (${userName}, type: ${userType})`);
     });
 
     // Join a private room between two users
@@ -61,7 +75,19 @@ export const initSocket = (server) => {
         let finalSenderId = sender_id;
         if (finalSenderId) {
           const { data: sRow } = await supabase.from("user").select("id").eq("id", finalSenderId).maybeSingle();
-          if (!sRow) finalSenderId = null;
+          if (!sRow) {
+            try {
+              const { data: newRow } = await supabase.from("user").insert([{
+                id: finalSenderId,
+                email: "admin@thearcschool.in",
+                name: socket.userName || "System Admin",
+                type: "admin"
+              }]).select("id").maybeSingle();
+              if (!newRow) finalSenderId = null;
+            } catch (e) {
+              finalSenderId = null;
+            }
+          }
         }
 
         // Save to database
@@ -79,9 +105,10 @@ export const initSocket = (server) => {
 
         if (error) throw error;
 
-        console.log(`About to emit receive_message to room: ${room}, chat:`, chat[0]);
+        const emitPayload = { ...chat[0], sender_id: sender_id };
+        console.log(`About to emit receive_message to room: ${room}, chat:`, emitPayload);
         // Emit to the room, both users' personal rooms (for inbox updates), and admin monitor
-        io.to(room).to(sender_id).to(receiver_id).to("admin_monitor").emit("receive_message", chat[0]);
+        io.to(room).to(sender_id).to(receiver_id).to("admin_monitor").emit("receive_message", emitPayload);
 
         // Get sender details to encode for deep-linking
         let senderName = "User";
@@ -164,6 +191,17 @@ export const initSocket = (server) => {
       } catch (err) {
         console.error("Error handling send_message event:", err);
       }
+    });
+
+    // Handle typing events
+    socket.on("typing_start", ({ senderId, receiverId }) => {
+      const room = [senderId, receiverId].sort().join('_');
+      io.to(room).to("admin_monitor").emit("typing_start", { senderId });
+    });
+
+    socket.on("typing_stop", ({ senderId, receiverId }) => {
+      const room = [senderId, receiverId].sort().join('_');
+      io.to(room).to("admin_monitor").emit("typing_stop", { senderId });
     });
 
     socket.on("disconnect", () => {

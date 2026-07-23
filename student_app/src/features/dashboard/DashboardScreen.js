@@ -11,7 +11,8 @@ import {
   useGetConsentsQuery,
   useGetFeesQuery,
   useGetTimetableQuery,
-  useGetSpotlightOfTodayQuery
+  useGetSpotlightOfTodayQuery,
+  useGetCircularsQuery
 } from '../../store/apiSlice';
 import Icon from 'react-native-vector-icons/Feather';
 import { theme } from '../../theme/theme';
@@ -131,7 +132,9 @@ const DashboardScreen = ({ navigation }) => {
   const { data: feesData, refetch: refetchFees } = useGetFeesQuery();
   const { data: timetableData, refetch: refetchTimetable } = useGetTimetableQuery();
   const { data: spotlightResponse, refetch: refetchSpotlight } = useGetSpotlightOfTodayQuery();
+  const { data: circularsData, refetch: refetchCirculars } = useGetCircularsQuery();
   const spotlightOfToday = spotlightResponse?.data;
+  const circulars = circularsData?.data || [];
   
   const classId = data?.data?.classInfo?.id;
   const { data: sotwResponse, refetch: refetchSotw } = require('../../store/apiSlice').useGetStudentOfWeekQuery(classId, { skip: !classId });
@@ -183,10 +186,10 @@ const DashboardScreen = ({ navigation }) => {
   });
 
   const onRefresh = useCallback(async () => {
-        const promises = [refetchDash(), refetchNotifs(), refetchConsents(), refetchFees(), refetchTimetable(), refetchSpotlight()];
+        const promises = [refetchDash(), refetchNotifs(), refetchConsents(), refetchFees(), refetchTimetable(), refetchSpotlight(), refetchCirculars()];
         if (classId) promises.push(refetchSotw());
         await Promise.all(promises);
-      }, [refetchDash, refetchNotifs, refetchConsents, refetchFees, refetchTimetable, refetchSotw, refetchSpotlight, classId]);
+      }, [refetchDash, refetchNotifs, refetchConsents, refetchFees, refetchTimetable, refetchSotw, refetchSpotlight, refetchCirculars, classId]);
 
   if (isLoading) {
     return (
@@ -218,7 +221,8 @@ const DashboardScreen = ({ navigation }) => {
   const unreadCount = notices.filter(n => !n.is_read).length;
   
   const consents = consentsData?.data || [];
-  const pendingConsentsCount = consents.filter(c => c.status === 'pending').length;
+  const pendingConsents = consents.filter(c => c.status === 'pending');
+  const pendingConsentsCount = pendingConsents.length;
 
   const totalDues = feesData?.fees?.reduce((sum, f) => sum + ((f.fee?.amount || 0) - (f.total_paid_amount || 0)), 0) || 0;
   
@@ -252,7 +256,11 @@ const DashboardScreen = ({ navigation }) => {
           <Icon name="menu" size={24} color="#fff" />
         </TouchableOpacity>
         
-        <View style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, justifyContent: 'center', alignItems: 'center', pointerEvents: 'none' }}>
+        <View style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, justifyContent: 'center', alignItems: 'center', pointerEvents: 'none', flexDirection: 'row' }}>
+          <Image 
+            source={require('../../assets/images/logo.jpeg')} 
+            style={{ width: 26, height: 26, borderRadius: 13, marginRight: 8 }} 
+          />
           <Text style={styles.navTitle}>The Arc School</Text>
         </View>
 
@@ -572,6 +580,57 @@ const DashboardScreen = ({ navigation }) => {
                 />
               </View>
             </View>
+
+            {/* Action Required & Updates */}
+            {(pendingConsentsCount > 0 || circulars.length > 0) && (
+              <View style={styles.sectionBlock}>
+                <View style={styles.sectionHeader}>
+                  <Text style={styles.sectionTitle}>Recent Circulars & Consents</Text>
+                  <TouchableOpacity onPress={() => navigation.navigate('Consents')}>
+                    <Text style={styles.sectionLink}>View All</Text>
+                  </TouchableOpacity>
+                </View>
+                <View style={styles.eventsWrapper}>
+                  {pendingConsents.slice(0, 2).map((consentItem, idx) => (
+                    <TouchableOpacity 
+                      key={`consent-${consentItem.id}`} 
+                      style={styles.eventRow}
+                      onPress={() => navigation.navigate('Consents')}
+                    >
+                      <View style={[styles.eventIconBox, { backgroundColor: '#FEF3C7' }]}>
+                        <Icon name="clipboard" size={22} color="#D97706" />
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.eventTitle}>{consentItem.consent?.title || 'Action Required: Consent Form'}</Text>
+                        <Text style={[styles.eventDate, { color: '#D97706' }]}>Pending Approval</Text>
+                      </View>
+                      <Icon name="chevron-right" size={20} color={theme.colors.textMuted} />
+                    </TouchableOpacity>
+                  ))}
+                  {circulars.slice(0, 2).map((circ, idx) => (
+                    <TouchableOpacity 
+                      key={`circ-${circ.id}`} 
+                      style={styles.eventRow}
+                      onPress={() => navigation.navigate('Circulars')}
+                    >
+                      <View style={[styles.eventIconBox, { backgroundColor: '#E0E7FF' }]}>
+                        <Icon name="file-text" size={22} color="#4F46E5" />
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.eventTitle} numberOfLines={1}>{circ.title}</Text>
+                        <View style={styles.eventMetaRow}>
+                          <Icon name="clock" size={12} color={theme.colors.textMuted} />
+                          <Text style={styles.eventDate}>
+                            {new Date(circ.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                          </Text>
+                        </View>
+                      </View>
+                      <Icon name="chevron-right" size={20} color={theme.colors.textMuted} />
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+            )}
 
             {/* Today's Timetable Horizontal List */}
             <View style={styles.sectionBlock}>

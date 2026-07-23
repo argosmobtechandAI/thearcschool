@@ -80,36 +80,32 @@ export const generateReceiptPDF = async (paymentsInput, student, receipt) => {
 
         const sanitize = (str) => str ? str.replace(/₹/g, 'Rs. ') : str;
 
-        const feeTitlesArray = payments.flatMap(p => {
-            let title = 'General Fee';
-            if (p.fee?.title) {
-                title = p.fee.title;
-            } else if (p.fee_title) {
-                title = p.fee_title;
-            } else if (p.remarks && p.remarks.startsWith("Fee Payment: ")) {
-                title = p.remarks.replace("Fee Payment: ", "").trim();
-            }
-            
-            // Clean up any zero late fees from older generated data
+        const tableData = payments.flatMap(p => {
+            let title = p.fee?.title || p.fee_title || (p.remarks && p.remarks.startsWith("Fee Payment: ") ? p.remarks.replace("Fee Payment: ", "").trim() : "General Fee");
             title = title.replace(/\(\+₹0 Late Fee\)/g, "").replace(/\(\+Rs\. 0 Late Fee\)/g, "").trim();
             
-            // Handle legacy records that combined multiple fees with commas
-            if (title.includes(",")) {
-                return title.split(",").map(s => s.trim());
-            }
-            return [`${title} (Rs. ${p.amount_paid || 0})`];
+            let amount = p.amount_paid || 0;
+            return [[sanitize(title), amount, "", sanitize(title), amount]];
         });
 
-        const feeTitles = feeTitlesArray.map(s => `• ${sanitize(s)}`).join("\n");
-        
         const totalAmountPaid = payments.reduce((sum, p) => sum + Number(p.amount_paid || 0), 0);
         const paymentMode = sanitize(firstPayment.payment_mode || 'Cash');
 
-        const tableData = [
-            ["Fee Type(s):", feeTitles, "", "Fee Type(s):", feeTitles],
-            ["Payment Mode:", paymentMode, "", "Payment Mode:", paymentMode],
-            ["Amount Paid:", `Rs. ${totalAmountPaid}/-`, "", "Amount Paid:", `Rs. ${totalAmountPaid}/-`],
-        ];
+        // Add Total, Mode, Remarks at the bottom
+        tableData.push([
+            { content: 'Total Amount Paid:', styles: { fontStyle: 'bold', halign: 'right' } },
+            { content: `Rs. ${totalAmountPaid}/-`, styles: { fontStyle: 'bold', halign: 'right' } },
+            "",
+            { content: 'Total Amount Paid:', styles: { fontStyle: 'bold', halign: 'right' } },
+            { content: `Rs. ${totalAmountPaid}/-`, styles: { fontStyle: 'bold', halign: 'right' } }
+        ]);
+        tableData.push([
+            { content: 'Payment Mode:', styles: { fontStyle: 'bold', halign: 'right' } },
+            { content: paymentMode, styles: { halign: 'right' } },
+            "",
+            { content: 'Payment Mode:', styles: { fontStyle: 'bold', halign: 'right' } },
+            { content: paymentMode, styles: { halign: 'right' } }
+        ]);
         
         let remarksText = receipt?.remarks ? sanitize(receipt.remarks) : "";
         if (!remarksText) {
@@ -120,7 +116,13 @@ export const generateReceiptPDF = async (paymentsInput, student, receipt) => {
         }
 
         if (remarksText) {
-            tableData.push(["Remarks:", remarksText, "", "Remarks:", remarksText]);
+            tableData.push([
+                { content: 'Remarks:', styles: { fontStyle: 'bold', halign: 'right' } },
+                { content: remarksText, styles: { halign: 'right' } },
+                "",
+                { content: 'Remarks:', styles: { fontStyle: 'bold', halign: 'right' } },
+                { content: remarksText, styles: { halign: 'right' } }
+            ]);
         }
 
         const drawHeadersAndFooter = (data) => {
@@ -170,23 +172,35 @@ export const generateReceiptPDF = async (paymentsInput, student, receipt) => {
             
             drawSideHeader(0, true);
             drawSideHeader(halfWidth, false);
+            
+            // Draw Signature on every page
+            pageDoc.setFontSize(10);
+            pageDoc.setFont("helvetica", "normal");
+            pageDoc.setTextColor(0);
+            
+            pageDoc.text("Authorized Signatory", halfWidth - 10, 190, { align: 'right' });
+            pageDoc.line(halfWidth - 50, 185, halfWidth - 10, 185);
+            
+            pageDoc.text("Authorized Signatory", 297 - 10, 190, { align: 'right' });
+            pageDoc.line(297 - 50, 185, 297 - 10, 185);
         };
 
         autoTable(doc, {
-            startY: 90,
-            head: [["Payment Details", "", "", "Payment Details", ""]],
+            startY: 85,
+            head: [["Fee Name", "Amount", "", "Fee Name", "Amount"]],
             body: tableData,
             theme: 'grid',
-            headStyles: { fillColor: [240, 240, 240], textColor: [0, 0, 0], fontStyle: 'bold', fontSize: 11 },
-            bodyStyles: { fontSize: 10, textColor: [0, 0, 0] },
+            styles: { cellPadding: 2, fontSize: 9, textColor: [0, 0, 0] },
+            headStyles: { fillColor: [200, 200, 200], textColor: [0, 0, 0], fontStyle: 'bold', fontSize: 10, halign: 'center' },
+            bodyStyles: { textColor: [0, 0, 0] },
             columnStyles: {
-                0: { fontStyle: 'bold', cellWidth: 35 },
-                1: { cellWidth: halfWidth - 20 - 35 }, // 93.5
+                0: { cellWidth: 100 },
+                1: { cellWidth: 28.5, halign: 'right' },
                 2: { cellWidth: 20 },
-                3: { fontStyle: 'bold', cellWidth: 35 },
-                4: { cellWidth: halfWidth - 20 - 35 } // 93.5
+                3: { cellWidth: 100 },
+                4: { cellWidth: 28.5, halign: 'right' }
             },
-            margin: { top: 90, left: 10, right: 10, bottom: 40 }, // explicitly set top margin so subsequent pages don't overlap header
+            margin: { top: 85, left: 10, right: 10, bottom: 30 }, // explicitly set top margin so subsequent pages don't overlap header
             didDrawPage: drawHeadersAndFooter,
             willDrawCell: (data) => {
                 // Hide borders and background for the gap column
@@ -199,22 +213,7 @@ export const generateReceiptPDF = async (paymentsInput, student, receipt) => {
             }
         });
 
-        const finalY = (doc.lastAutoTable?.finalY || 140) + 20;
-        
-        // Ensure finalY doesn't overlap the footer message at Y=200
-        const sigY = finalY > 190 ? 190 : finalY;
-        
-        // Footer signature on the very last page generated
-        doc.setFontSize(10);
-        doc.setFont("helvetica", "normal");
-        doc.setTextColor(0);
-        doc.text("Authorized Signatory", halfWidth - 10, sigY, { align: 'right' });
-        doc.line(halfWidth - 50, sigY - 5, halfWidth - 10, sigY - 5);
-        
-        doc.text("Authorized Signatory", 297 - 10, sigY, { align: 'right' });
-        doc.line(297 - 50, sigY - 5, 297 - 10, sigY - 5);
-
-        doc.save(`Receipt_${student.name || 'Student'}_${firstPayment.id?.substring(0,6) || ''}.pdf`);
+        doc.save(`Receipt_${student.name || 'Student'}_${String(firstPayment.id || '').substring(0,6) || ''}.pdf`);
     } catch (error) {
         console.error("Error generating Receipt PDF", error);
         alert("Failed to generate PDF: " + error.message);
