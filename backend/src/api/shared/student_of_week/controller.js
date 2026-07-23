@@ -50,13 +50,16 @@ export const getCurrentStudentOfWeek = async (req, res) => {
     }
 
     if (existingRecords && existingRecords.length > 0) {
+      // Ensure records are properly sorted by total score before sending to frontend
+      existingRecords.sort((a, b) => (b.metrics?.total || 0) - (a.metrics?.total || 0));
       return res.status(200).json({ success: true, data: existingRecords });
     }
 
     // --- AUTOMATED SELECTION LOGIC (PER CLASS) ---
-    const lastWeekDate = new Date();
-    lastWeekDate.setDate(lastWeekDate.getDate() - 7);
-    const { start: prevStart, end: prevEnd } = getWeekRange(lastWeekDate);
+    // For testing/immediate feedback, we evaluate the CURRENT week instead of the previous week
+    const evalDate = new Date();
+    // evalDate.setDate(evalDate.getDate() - 7); // Uncomment to evaluate previous week
+    const { start: prevStart, end: prevEnd } = getWeekRange(evalDate);
 
     // 1. Get all students in this class
     const { data: classStudents, error: csError } = await supabaseAdmin
@@ -75,8 +78,8 @@ export const getCurrentStudentOfWeek = async (req, res) => {
       .from("attendance")
       .select("user_id, status")
       .in("user_id", studentIds)
-      .gte("date", prevStart.toISOString())
-      .lte("date", prevEnd.toISOString());
+      .gte("date", prevStart.toISOString().split('T')[0])
+      .lte("date", prevEnd.toISOString().split('T')[0]);
 
     if (attError) {
       console.error("Error fetching attendance for SOTW:", attError);
@@ -86,7 +89,7 @@ export const getCurrentStudentOfWeek = async (req, res) => {
     // 3. Fetch grades for the previous week
     const { data: gradesData, error: gradesError } = await supabaseAdmin
       .from("grades")
-      .select("student_id, marks, max_marks")
+      .select("student_id, marks, max_marks, exams(marks)")
       .in("student_id", studentIds)
       .gte("created_at", prevStart.toISOString())
       .lte("created_at", prevEnd.toISOString());
@@ -106,7 +109,7 @@ export const getCurrentStudentOfWeek = async (req, res) => {
 
     if (attendanceData) {
       attendanceData.forEach(att => {
-        if (att.status === 'Present' && studentMetrics[att.user_id]) {
+        if (att.status?.toLowerCase() === 'present' && studentMetrics[att.user_id]) {
           studentMetrics[att.user_id].attendance += 10;
         }
       });
@@ -114,8 +117,9 @@ export const getCurrentStudentOfWeek = async (req, res) => {
 
     if (gradesData) {
       gradesData.forEach(g => {
-        if (g.max_marks > 0 && studentMetrics[g.student_id]) {
-          const percentage = (g.marks / g.max_marks) * 100;
+        const maxMarks = g.max_marks || (g.exams && g.exams.marks) || 0;
+        if (maxMarks > 0 && studentMetrics[g.student_id]) {
+          const percentage = (g.marks / maxMarks) * 100;
           studentMetrics[g.student_id].grades += (percentage / 10);
         }
       });
@@ -161,7 +165,7 @@ export const getCurrentStudentOfWeek = async (req, res) => {
     await Promise.all(insertPromises);
 
     // Fetch the newly created records with full student details
-    const { data: newRecords, error: fetchNewError } = await supabaseAdmin
+    const { data: newRecords, error: fetchError } = await supabaseAdmin
       .from("student_of_the_week")
       .select(`
         id,
@@ -172,13 +176,18 @@ export const getCurrentStudentOfWeek = async (req, res) => {
         student:student_id (id, name, avatar_url)
       `)
       .eq("class_id", classId)
-      .gte("week_end_date", currentStart.toISOString())
-      .lte("week_start_date", currentEnd.toISOString())
+      .gte("week_end_date", currentStart.toISOString().split('T')[0])
+      .lte("week_start_date", currentEnd.toISOString().split('T')[0])
       .order("created_at", { ascending: false });
 
-    if (fetchNewError) {
-      console.error("Error fetching newly created SOTW records:", fetchNewError);
-      return res.status(500).json({ success: false, message: "Failed to load winners" });
+    if (fetchError) {
+      console.error("Error fetching newly inserted student of the week:", fetchError);
+      return res.status(500).json({ success: false, message: "Failed to fetch updated student of the week" });
+    }
+
+    // Ensure records are properly sorted by total score
+    if (newRecords && newRecords.length > 0) {
+      newRecords.sort((a, b) => (b.metrics?.total || 0) - (a.metrics?.total || 0));
     }
 
     return res.status(200).json({ success: true, data: newRecords });

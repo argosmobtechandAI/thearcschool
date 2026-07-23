@@ -560,41 +560,57 @@ const Exams = () => {
                 No {courseType}s found.
               </div>
             ) : (
-              materials?.map((item) => (
-                <div key={item.id} className="glass-card" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "1.25rem" }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
-                    <div style={{ padding: "0.75rem", background: "rgba(0,0,0,0.08)", borderRadius: "12px", color: "#60a5fa" }}>
-                      <BookOpen size={24} />
-                    </div>
-                    <div>
-                      <h4 style={{ fontWeight: "600", fontSize: "1.1rem", marginBottom: "0.25rem" }}>{item.title}</h4>
-                      <p style={{ fontSize: "0.875rem", color: "var(--text-secondary)" }}>
-                        Class: {item.class} - {item.section} • Due: {item.dueDate || item.duedate}
-                      </p>
-                      <p style={{ fontSize: "0.875rem", color: "var(--text-secondary)" }}>
-                        Subject: {item.subject} • Chapter: {item.chapter}
-                      </p>
-                    </div>
-                  </div>
-
-                  <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
-                    <span style={{ padding: "0.25rem 0.75rem", background: "rgba(0,0,0,0.05)", borderRadius: "16px", fontSize: "0.875rem" }}>
-                      Points: {item.points}
-                    </span>
-                    {item.file_url && (
-                      <a href={item.file_url} target="_blank" rel="noreferrer" className="btn-ghost" style={{ padding: "0.5rem", border: "none", background: "none", cursor: "pointer", color: "#10b981", display: "flex", alignItems: "center" }}>
-                        <Download size={18} />
-                      </a>
-                    )}
-                    <button onClick={() => handleOpenModal(item)} className="btn-ghost" style={{ padding: "0.5rem", border: "none", background: "none", cursor: "pointer", color: "#60a5fa" }}>
-                      <Edit size={18} />
-                    </button>
-                    <button onClick={() => handleDeleteCourse(item.id)} className="btn-ghost" style={{ padding: "0.5rem", border: "none", background: "none", cursor: "pointer", color: "#ef4444" }}>
-                      <Trash2 size={18} />
-                    </button>
-                  </div>
-                </div>
-              ))
+              <div style={{ overflowX: "auto", background: "var(--bg-secondary)", borderRadius: "12px", border: "1px solid var(--glass-border)" }}>
+                <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left" }}>
+                  <thead>
+                    <tr style={{ borderBottom: "1px solid var(--glass-border)", color: "var(--text-secondary)" }}>
+                      <th style={{ padding: "1rem" }}>SN</th>
+                      <th style={{ padding: "1rem" }}>Title</th>
+                      <th style={{ padding: "1rem" }}>Class</th>
+                      <th style={{ padding: "1rem" }}>Subject</th>
+                      <th style={{ padding: "1rem" }}>Chapter</th>
+                      <th style={{ padding: "1rem" }}>Points</th>
+                      <th style={{ padding: "1rem", textAlign: "right" }}>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {materials.map((item, index) => (
+                      <tr key={item.id} style={{ borderBottom: "1px solid var(--glass-border)", transition: "background-color 0.2s" }} onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "rgba(0,0,0,0.02)"} onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "transparent"}>
+                        <td style={{ padding: "1rem", color: "var(--text-secondary)" }}>{index + 1}</td>
+                        <td style={{ padding: "1rem", fontWeight: "600", color: "var(--text-primary)" }}>
+                          {item.title}
+                          <div style={{ fontSize: "0.75rem", color: "var(--text-secondary)", fontWeight: "400", marginTop: "0.25rem" }}>
+                            Due: {item.dueDate || item.duedate}
+                          </div>
+                        </td>
+                        <td style={{ padding: "1rem" }}>{item.class} - {item.section}</td>
+                        <td style={{ padding: "1rem" }}>{item.subject}</td>
+                        <td style={{ padding: "1rem" }}>{item.chapter}</td>
+                        <td style={{ padding: "1rem" }}>
+                          <span style={{ padding: "0.25rem 0.75rem", background: "rgba(0,0,0,0.05)", borderRadius: "16px", fontSize: "0.875rem" }}>
+                            {item.points}
+                          </span>
+                        </td>
+                        <td style={{ padding: "1rem" }}>
+                          <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: "0.5rem" }}>
+                            {item.file_url && (
+                              <a href={item.file_url} target="_blank" rel="noreferrer" className="btn-ghost" style={{ padding: "0.5rem", border: "none", background: "none", cursor: "pointer", color: "#10b981", display: "flex", alignItems: "center" }}>
+                                <Download size={18} />
+                              </a>
+                            )}
+                            <button onClick={() => handleOpenModal(item)} className="btn-ghost" style={{ padding: "0.5rem", border: "none", background: "none", cursor: "pointer", color: "#60a5fa" }}>
+                              <Edit size={18} />
+                            </button>
+                            <button onClick={() => handleDeleteCourse(item.id)} className="btn-ghost" style={{ padding: "0.5rem", border: "none", background: "none", cursor: "pointer", color: "#ef4444" }}>
+                              <Trash2 size={18} />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             )}
           </div>
         ) : null}

@@ -26,13 +26,21 @@ const ChatRoomScreen = ({ route, navigation }) => {
 
   useEffect(() => {
     socketRef.current = io(SOCKET_URL, {
-      transports: ['websocket'],
+      transports: ['polling', 'websocket'],
     });
 
-    socketRef.current.on('connect', () => {
-      socketRef.current.emit('identify', user.id);
-      socketRef.current.emit('join_chat', { senderId: user.id, receiverId: chatId });
-    });
+    const onConnect = () => {
+      if (user?.id) {
+        socketRef.current.emit('identify', user.id);
+        socketRef.current.emit('join_chat', { senderId: user.id, receiverId: chatId });
+      }
+    };
+
+    socketRef.current.on('connect', onConnect);
+
+    if (socketRef.current.connected && user?.id) {
+      onConnect();
+    }
 
     socketRef.current.on('receive_message', (newChat) => {
       setMessages((prev) => [...prev, newChat]);
@@ -50,10 +58,11 @@ const ChatRoomScreen = ({ route, navigation }) => {
 
     return () => {
       if (socketRef.current) {
+        socketRef.current.off('connect', onConnect);
         socketRef.current.disconnect();
       }
     };
-  }, [user.id, chatId]);
+  }, [user?.id, chatId]);
 
   // Combine history with live messages
   const allMessages = [...historyChats];

@@ -66,6 +66,34 @@ const FeesScreen = ({ navigation }) => {
   const totalDue = Math.max(0, globalTotalDue - totalPaid);
   
   const payments = data?.payments || [];
+  
+  const uniqueReceipts = [];
+  const receiptIds = new Set();
+  
+  payments.forEach(p => {
+    const rId = p.receipt_id;
+    if (rId) {
+       if (!receiptIds.has(rId)) {
+          receiptIds.add(rId);
+          uniqueReceipts.push({
+             ...p,
+             id: rId,
+             display_id: p.receipts ? p.receipts.receipt_number : p.id?.toString().split('-')[0].toUpperCase(),
+             amount_paid: p.receipts ? p.receipts.total_amount : p.amount_paid,
+             payment_mode: p.receipts ? p.receipts.payment_mode : p.payment_mode,
+             created_at: p.receipts ? p.receipts.created_at : p.created_at,
+             remarks: p.receipts ? p.receipts.remarks : p.remarks,
+             fee: { title: "Combined Fee Payment" }
+          });
+       }
+    } else {
+       uniqueReceipts.push({
+          ...p,
+          display_id: p.id?.toString().split('-')[0].toUpperCase(),
+          fee: p.fee || { title: "Fee Payment" }
+       });
+    }
+  });
 
   const formatCompactNumber = (number) => {
     if (number < 1000) return number.toString();
@@ -219,7 +247,7 @@ const FeesScreen = ({ navigation }) => {
       <View key={payment.id} style={styles.feeCard}>
         <View style={styles.feeTopRow}>
           <View style={{ flex: 1 }}>
-            <Text style={styles.feeTitle}>Receipt: #{payment.id?.toString().split('-')[0].toUpperCase()}</Text>
+            <Text style={styles.feeTitle}>Receipt: #{payment.display_id || payment.id?.toString().split('-')[0].toUpperCase()}</Text>
             <Text style={styles.feeType}>{payment.payment_mode || 'Cash/Bank'}</Text>
           </View>
           <Text style={styles.feeAmount}>₹{Number(payment.amount_paid || 0).toLocaleString()}</Text>
@@ -244,7 +272,7 @@ const FeesScreen = ({ navigation }) => {
     );
   };
 
-  const displayedFees = activeTab === 'current' ? currentDues : activeTab === 'history' ? payments : feeStructure;
+  const displayedFees = activeTab === 'current' ? currentDues : activeTab === 'history' ? uniqueReceipts : feeStructure;
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top']}>

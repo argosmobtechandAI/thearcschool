@@ -120,6 +120,32 @@ export const addNewsletter = async (req, res) => {
   try {
     const { data, error } = await supabase.from("school_newsletters").insert([{ document_url }]).select();
     if (error) throw error;
+
+    // Send notifications to all active users
+    const { data: users, error: usersErr } = await supabase.from("user").select("id").eq("status", "active");
+    if (!usersErr && users && users.length > 0) {
+      const chunkSize = 500;
+      for (let i = 0; i < users.length; i += chunkSize) {
+        const chunk = users.slice(i, i + chunkSize);
+        const notificationInserts = chunk.map(user => ({
+            user_id: user.id,
+            title: "New Newsletter",
+            message: "A new school newsletter has been published.",
+            type: "newsletter",
+            is_read: false
+        }));
+        await supabase.from("notifications").insert(notificationInserts);
+      }
+      
+      try {
+        const { FCMService } = await import("../../../services/fcmService.js");
+        const userIds = users.map(u => u.id);
+        await FCMService.sendToUsers(userIds, "New Newsletter", "A new school newsletter has been published.", { type: "newsletter" });
+      } catch (fcmErr) {
+        console.error("FCM Error for newsletter:", fcmErr);
+      }
+    }
+
     return res.status(201).json({ success: true, data: data[0], message: "Newsletter uploaded successfully" });
   } catch (error) {
     return res.status(500).json({ success: false, message: error.message });

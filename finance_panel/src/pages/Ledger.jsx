@@ -34,6 +34,7 @@ const Ledger = () => {
     remarks: ""
   });
   const [isPaying, setIsPaying] = useState(false);
+  const [feeSearchTerm, setFeeSearchTerm] = useState("");
 
   const [balancesMap, setBalancesMap] = useState({});
   const [refreshTrigger, setRefreshTrigger] = useState(0);
@@ -461,31 +462,39 @@ const Ledger = () => {
             ) : (
               <form onSubmit={handlePaymentSubmit} style={{ display: "flex", flexDirection: "column", gap: "1rem", flex: 1, overflow: "hidden" }}>
                 <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.5rem", flexShrink: 0 }}>
-                    <label style={{ fontSize: "0.875rem" }}>Select Fee(s)</label>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.5rem", flexShrink: 0, flexWrap: "wrap", gap: "0.5rem" }}>
+                    <label style={{ fontSize: "0.875rem", fontWeight: "600" }}>Select Fee(s)</label>
+                    <input 
+                      type="text" 
+                      placeholder="Search fee (e.g. Tuition)" 
+                      value={feeSearchTerm}
+                      onChange={(e) => setFeeSearchTerm(e.target.value)}
+                      className="input-glass"
+                      style={{ padding: "0.25rem 0.5rem", fontSize: "0.875rem", width: "200px" }}
+                    />
                     <label style={{ fontSize: "0.75rem", display: "flex", alignItems: "center", gap: "0.25rem", cursor: "pointer" }}>
                       <input 
                         type="checkbox" 
-                        checked={studentLedger.fees.filter(f => f.status !== "paid").length > 0 && paymentForm.feeIds.length === studentLedger.fees.filter(f => f.status !== "paid").length}
+                        checked={studentLedger.fees.filter(f => f.status !== "paid" && (f.fee?.title || "").toLowerCase().includes(feeSearchTerm.toLowerCase())).length > 0 && paymentForm.feeIds.length === studentLedger.fees.filter(f => f.status !== "paid" && (f.fee?.title || "").toLowerCase().includes(feeSearchTerm.toLowerCase())).length}
                         onChange={(e) => {
                           if (e.target.checked) {
-                            const allFeeIds = studentLedger.fees.filter(f => f.status !== "paid").map(f => f.id);
+                            const filteredFeeIds = studentLedger.fees.filter(f => f.status !== "paid" && (f.fee?.title || "").toLowerCase().includes(feeSearchTerm.toLowerCase())).map(f => f.id);
                             let totalAmt = 0;
-                            allFeeIds.forEach(id => {
+                            filteredFeeIds.forEach(id => {
                               const fObj = studentLedger.fees.find(fee => fee.id === id);
                               if (fObj) totalAmt += (Number(fObj.fee?.amount || 0) - Number(fObj.total_paid_amount || 0));
                             });
-                            setPaymentForm({ ...paymentForm, feeIds: allFeeIds, amount: totalAmt });
+                            setPaymentForm({ ...paymentForm, feeIds: filteredFeeIds, amount: totalAmt });
                           } else {
                             setPaymentForm({ ...paymentForm, feeIds: [], amount: "" });
                           }
                         }}
                       />
-                      Select All
+                      Select All Filtered
                     </label>
                   </div>
                   <div style={{ flex: 1, overflowY: "auto", border: "1px solid var(--glass-border)", borderRadius: "8px", padding: "0.5rem", background: "rgba(255,255,255,0.05)" }}>
-                    {studentLedger.fees.filter(f => f.status !== "paid").map(f => {
+                    {studentLedger.fees.filter(f => f.status !== "paid" && (f.fee?.title || "").toLowerCase().includes(feeSearchTerm.toLowerCase())).map(f => {
                       const due = Number(f.fee?.amount || 0) - Number(f.total_paid_amount || 0);
                       const isChecked = paymentForm.feeIds.includes(f.id);
                       return (
@@ -520,8 +529,8 @@ const Ledger = () => {
                         </label>
                       );
                     })}
-                    {studentLedger.fees.filter(f => f.status !== "paid").length === 0 && (
-                      <div style={{ padding: "1rem", textAlign: "center", color: "var(--text-secondary)", fontSize: "0.875rem" }}>No pending fees</div>
+                    {studentLedger.fees.filter(f => f.status !== "paid" && (f.fee?.title || "").toLowerCase().includes(feeSearchTerm.toLowerCase())).length === 0 && (
+                      <div style={{ padding: "1rem", textAlign: "center", color: "var(--text-secondary)", fontSize: "0.875rem" }}>No matching pending fees found</div>
                     )}
                   </div>
                 </div>

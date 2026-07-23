@@ -12,7 +12,7 @@ export const getLiveChatHistory = async (req, res) => {
     // Communication table has firstPerson (sender) and secondPerson (array of receivers)
     // We want messages where (firstPerson = currentUser AND secondPerson contains userId) 
     // OR (firstPerson = userId AND secondPerson contains currentUser)
-    
+
     // Fetch all admin/principal user IDs to group admin desk communications
     const { data: adminUsers } = await supabase
       .from("user")

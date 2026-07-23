@@ -15,7 +15,7 @@ export const apiSlice = createApi({
       return headers;
     },
   }),
-  tagTypes: ['Exams', 'Courses', 'Attendance', 'Timetable', 'Events', 'Students', 'Classes', 'Complaints', 'Grades', 'Notifications', 'Performance', 'Chats', 'Circulars', 'Gallery'],
+  tagTypes: ['Exams', 'Courses', 'Attendance', 'Timetable', 'Events', 'Students', 'Classes', 'Complaints', 'Grades', 'Notifications', 'Performance', 'Chats', 'Circulars', 'Gallery', 'Newsletters'],
   endpoints: (builder) => ({
     getTeacherClasses: builder.query({
       query: () => '/teacher_app/classes',

@@ -652,7 +652,6 @@ export const bulkUpdateGrades = async (req, res) => {
       const data = {
         student_id: g.student_id,
         exam_id: g.exam_id,
-        subject: examSubjectMap[g.exam_id] || "Unknown",
         marks: g.marks !== "" && g.marks !== null ? Number(g.marks) : 0
       };
 

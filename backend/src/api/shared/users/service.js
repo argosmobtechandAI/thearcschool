@@ -184,14 +184,26 @@ export class UserService {
       throw new Error(authError.message);
     }
 
-    // After successful auth, fetch the public profile
-    const { data: user, error: userError } = await supabase
+    // After successful auth, fetch the public profile by ID or by Email fallback
+    let { data: user } = await supabase
       .from("user")
       .select("*")
       .eq("id", authData.user.id)
-      .single();
+      .maybeSingle();
 
-    if (userError || !user) {
+    if (!user && email) {
+      const { data: userByEmail } = await supabase
+        .from("user")
+        .select("*")
+        .eq("email", email)
+        .maybeSingle();
+
+      if (userByEmail) {
+        user = userByEmail;
+      }
+    }
+
+    if (!user) {
       throw new Error("User profile not found in public schema");
     }
 

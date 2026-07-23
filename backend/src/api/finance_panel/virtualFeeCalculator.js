@@ -77,6 +77,17 @@ export const calculateVirtualDues = async (studentId, academicYear = getCurrentA
 
     const categoryTitle = baseCategory.split(/[_ ]/).map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
     let joinMonthStart = new Date(sessionStartYear, 3, 1); // default April 1st of session
+    
+    // Override if student joined later
+    let admissionDateStr = student.admission_date || student.created_at;
+    if (admissionDateStr) {
+      const admissionDate = new Date(admissionDateStr);
+      // Only adjust if they joined after the session started
+      if (admissionDate > joinMonthStart) {
+        // Set joinMonthStart to the 1st of the month they joined
+        joinMonthStart = new Date(admissionDate.getFullYear(), admissionDate.getMonth(), 1);
+      }
+    }
 
     if (frequency === 'annual') {
       if (monthsPassed > 0) {
@@ -348,6 +359,17 @@ export const calculateTotalVirtualDueForStudent = (student, sClassName, structur
     const categoryTitle = baseCategory.split(/[_ ]/).map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
 
     let joinMonthStart = new Date(sessionStartYear, 3, 1); // default April 1st of session
+
+    // Override if student joined later
+    let admissionDateStr = student.admission_date || student.created_at;
+    if (admissionDateStr) {
+      const admissionDate = new Date(admissionDateStr);
+      // Only adjust if they joined after the session started
+      if (admissionDate > joinMonthStart) {
+        // Set joinMonthStart to the 1st of the month they joined
+        joinMonthStart = new Date(admissionDate.getFullYear(), admissionDate.getMonth(), 1);
+      }
+    }
 
     if (frequency === 'annual') {
       if (monthsPassed > 0 && startMonthsPassed === 0) {

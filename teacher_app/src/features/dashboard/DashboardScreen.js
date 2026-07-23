@@ -112,10 +112,10 @@ const DashboardScreen = ({ navigation }) => {
   let attendanceMetric = "Pending";
   if (!activeClassId) {
     attendanceMetric = "N/A";
-  } else if (attendanceData?.records) {
+  } else if (Array.isArray(attendanceData?.records)) {
     const records = attendanceData.records;
     if (records.length > 0 && totalStudents > 0) {
-      const present = records.filter(r => r.status === 'present').length;
+      const present = records.filter(r => r?.status === 'present').length;
       attendanceMetric = `${Math.round((present / totalStudents) * 100)}%`;
     } else if (records.length > 0) {
       attendanceMetric = "Done";
@@ -126,11 +126,11 @@ const DashboardScreen = ({ navigation }) => {
 
   let upcomingEventsCount = 0;
   let upcomingEventsList = [];
-  if (eventsData?.data) {
+  if (Array.isArray(eventsData?.data)) {
     const upcoming = eventsData.data.filter(event => {
-      const eventDate = event.end_date || event.start_date;
-      return eventDate >= todayDate;
-    }).sort((a, b) => new Date(a.start_date) - new Date(b.start_date));
+      const eventDate = event?.end_date || event?.start_date;
+      return eventDate && eventDate >= todayDate;
+    }).sort((a, b) => new Date(a?.start_date || 0) - new Date(b?.start_date || 0));
     
     upcomingEventsCount = upcoming.length;
     upcomingEventsList = upcoming.slice(0, 3);
