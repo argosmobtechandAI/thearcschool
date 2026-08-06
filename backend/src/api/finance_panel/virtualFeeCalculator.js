@@ -79,7 +79,7 @@ export const calculateVirtualDues = async (studentId, academicYear = getCurrentA
     let joinMonthStart = new Date(sessionStartYear, 3, 1); // default April 1st of session
     
     // Override if student joined later
-    let admissionDateStr = student.admission_date || student.created_at;
+    let admissionDateStr = student.admission_date;
     if (admissionDateStr) {
       const admissionDate = new Date(admissionDateStr);
       // Only adjust if they joined after the session started
@@ -361,7 +361,7 @@ export const calculateTotalVirtualDueForStudent = (student, sClassName, structur
     let joinMonthStart = new Date(sessionStartYear, 3, 1); // default April 1st of session
 
     // Override if student joined later
-    let admissionDateStr = student.admission_date || student.created_at;
+    let admissionDateStr = student.admission_date;
     if (admissionDateStr) {
       const admissionDate = new Date(admissionDateStr);
       // Only adjust if they joined after the session started

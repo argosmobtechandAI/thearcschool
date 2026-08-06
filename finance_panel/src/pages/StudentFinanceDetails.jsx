@@ -285,7 +285,7 @@ const StudentFinanceDetails = () => {
                       {new Date(p.created_at).toLocaleDateString()}
                     </td>
                     <td style={{ padding: "0.75rem 1rem", color: "var(--text-secondary)", fontSize: "0.875rem", fontFamily: "monospace" }}>
-                      RCT-{p.id.substring(0,8).toUpperCase()}
+                      RCT-{String(p.id).substring(0,8).toUpperCase()}
                     </td>
                     <td style={{ padding: "0.75rem 1rem", fontSize: "0.875rem", fontWeight: "500" }}>
                       {p.fee?.title || "-"}
