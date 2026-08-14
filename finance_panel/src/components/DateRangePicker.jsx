@@ -1,8 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import { Calendar } from 'lucide-react';
 
-const DateRangePicker = ({ startDate, endDate, setStartDate, setEndDate, onChange, defaultRange = 'mtd' }) => {
+const DateRangePicker = ({ startDate, endDate, setStartDate, setEndDate, onChange, defaultRange = 'mtd', academicYear }) => {
   const [selectedRange, setSelectedRange] = useState(defaultRange);
+
+  let minDate = "";
+  let maxDate = "";
+  if (academicYear && academicYear !== "ALL") {
+    const startYear = parseInt(academicYear.split("-")[0]);
+    minDate = `${startYear}-04-01`;
+    maxDate = `${startYear + 1}-03-31`;
+  }
+
 
   const ranges = {
     custom: "Custom",
@@ -159,6 +168,8 @@ const DateRangePicker = ({ startDate, endDate, setStartDate, setEndDate, onChang
               else if (typeof setStartDate === 'function') setStartDate(e.target.value);
               setSelectedRange('custom');
             }} 
+            min={minDate || undefined}
+            max={maxDate || undefined}
             className="input-glass"
             style={{ padding: "0.4rem 0.4rem 0.4rem 2.2rem", width: "160px", fontSize: "0.8rem" }}
           />
@@ -174,6 +185,8 @@ const DateRangePicker = ({ startDate, endDate, setStartDate, setEndDate, onChang
               else if (typeof setEndDate === 'function') setEndDate(e.target.value);
               setSelectedRange('custom');
             }} 
+            min={minDate || undefined}
+            max={maxDate || undefined}
             className="input-glass"
             style={{ padding: "0.4rem 0.4rem 0.4rem 2.2rem", width: "160px", fontSize: "0.8rem" }}
           />

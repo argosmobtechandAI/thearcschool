@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Clock, CheckCircle, Printer, Bus, Edit2, Save, X } from "lucide-react";
+import { Clock, CheckCircle, Printer, Bus, Edit2, Save, X, Trash2 } from "lucide-react";
 import { generateReceiptPDF } from "../utils/exportUtils";
 import api from "../services/api";
 import { toast } from "react-toastify";
@@ -11,6 +11,7 @@ const StudentLedgerModal = ({ isOpen, onClose, student }) => {
   const [isEditingTransport, setIsEditingTransport] = useState(false);
   const [transportForm, setTransportForm] = useState({ bus_fee: "", bus_start_date: "" });
   const [updatingTransport, setUpdatingTransport] = useState(false);
+  const [feeDeleting, setFeeDeleting] = useState(null);
 
   useEffect(() => {
     if (isOpen && student?.id) {
@@ -141,8 +142,37 @@ const StudentLedgerModal = ({ isOpen, onClose, student }) => {
                 (studentLedger?.fees || []).filter(f => f.status !== "paid").length > 0 ? (
                   <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
                     {(studentLedger?.fees || []).filter(f => f.status !== "paid").map(f => (
-                      <div key={f.id} style={{ padding: "1rem", background: "rgba(0,0,0,0.02)", borderRadius: "8px", border: "1px solid var(--glass-border)", borderLeft: "4px solid #ef4444" }}>
-                        <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.5rem", alignItems: "flex-start" }}>
+                      <div key={f.id} style={{ padding: "1rem", background: "rgba(0,0,0,0.02)", borderRadius: "8px", border: "1px solid var(--glass-border)", borderLeft: "4px solid #ef4444", position: "relative" }}>
+                        
+                        {f.id?.startsWith("physical-") && (
+                          <button 
+                            onClick={async () => {
+                              if (window.confirm(`Are you sure you want to permanently delete the fee: ${f.fee?.title}?`)) {
+                                setFeeDeleting(f.id);
+                                try {
+                                  const dbId = f.id.replace("physical-", "");
+                                  const res = await api.delete(`/finance_panel/studentFee/${dbId}`);
+                                  if (res.data.success) {
+                                    alert("Fee deleted successfully!");
+                                    fetchLedger(student.id); // Reload the modal's ledger
+                                  }
+                                } catch (error) {
+                                  alert(error.response?.data?.message || "Failed to delete fee");
+                                } finally {
+                                  setFeeDeleting(null);
+                                }
+                              }
+                            }}
+                            disabled={feeDeleting === f.id}
+                            style={{ position: "absolute", top: "0.75rem", right: "0.75rem", background: "none", border: "none", color: "var(--text-secondary)", cursor: "pointer", padding: "0.25rem", display: "flex", alignItems: "center", justifyContent: "center", opacity: feeDeleting === f.id ? 0.5 : 0.6 }}
+                            title="Delete Fee"
+                            className="hover-opacity-1"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        )}
+
+                        <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.5rem", alignItems: "flex-start", paddingRight: f.id?.startsWith("physical-") ? "1.5rem" : "0" }}>
                           <div>
                             <div style={{ fontWeight: "600", marginBottom: "0.25rem" }}>{f.fee?.title || "Unknown Fee"}</div>
                             {f.fee?.due_date && <div style={{ fontSize: "0.75rem", color: "var(--text-secondary)" }}>Due Date: <span style={{ fontWeight: "500", color: "var(--text-primary)" }}>{new Date(f.fee.due_date).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}</span></div>}

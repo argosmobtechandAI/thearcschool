@@ -12,6 +12,7 @@ const StudentFinanceDetails = () => {
   const dispatch = useDispatch();
 
   const { users, classes } = useSelector((state) => state.data);
+  const { academicYear } = useSelector((state) => state.settings);
 
   const [studentLedger, setStudentLedger] = useState({ fees: [], payments: [] });
   const [ledgerLoading, setLedgerLoading] = useState(false);
@@ -39,8 +40,8 @@ const StudentFinanceDetails = () => {
     if (activeStudent) {
       setLedgerLoading(true);
       Promise.all([
-        api.post("/finance_panel/studentBalances", { students: [{ id: activeStudent.id, type: activeStudent.type, fee_exempted: activeStudent.fee_exempted, classes: activeStudent.classes, bus_fee: activeStudent.bus_fee }] }),
-        api.get(`/finance_panel/getStudentLedger/${activeStudent.id}`)
+        api.post("/finance_panel/studentBalances", { students: [{ id: activeStudent.id, type: activeStudent.type, fee_exempted: activeStudent.fee_exempted, classes: activeStudent.classes, bus_fee: activeStudent.bus_fee, admission_date: activeStudent.admission_date, created_at: activeStudent.created_at }], academic_year: academicYear }),
+        api.get(`/finance_panel/getStudentLedger/${activeStudent.id}?academic_year=${academicYear}`)
       ]).then(([balanceRes, ledgerRes]) => {
         if (balanceRes.data.success && balanceRes.data.data.length > 0) {
           setBalanceData(balanceRes.data.data[0]);
@@ -61,7 +62,7 @@ const StudentFinanceDetails = () => {
         setLedgerLoading(false);
       });
     }
-  }, [activeStudent]);
+  }, [activeStudent, academicYear]);
 
   const handleUpdateTransport = async () => {
     if (!activeStudent) return;
@@ -75,8 +76,8 @@ const StudentFinanceDetails = () => {
             // Reload just ledger and balance
             setLedgerLoading(true);
             const [balanceRes, ledgerRes] = await Promise.all([
-              api.post("/finance_panel/studentBalances", { students: [{ id: activeStudent.id, type: activeStudent.type, fee_exempted: activeStudent.fee_exempted, classes: activeStudent.classes, bus_fee: transportForm.bus_fee }] }),
-              api.get(`/finance_panel/getStudentLedger/${activeStudent.id}`)
+              api.post("/finance_panel/studentBalances", { students: [{ id: activeStudent.id, type: activeStudent.type, fee_exempted: activeStudent.fee_exempted, classes: activeStudent.classes, bus_fee: transportForm.bus_fee, admission_date: activeStudent.admission_date, created_at: activeStudent.created_at }], academic_year: academicYear }),
+              api.get(`/finance_panel/getStudentLedger/${activeStudent.id}?academic_year=${academicYear}`)
             ]);
             
             if (balanceRes.data.success && balanceRes.data.data.length > 0) {

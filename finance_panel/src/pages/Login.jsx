@@ -24,7 +24,7 @@ const Login = () => {
       });
 
       if (response.data.success) {
-        const allowedRoles = ["admin", "principal", "finance", "accountant"];
+        const allowedRoles = ["super_admin", "admin", "principal", "finance", "accountant"];
         if (!allowedRoles.includes(response.data.user.type)) {
           toast.error("Unauthorized access. Finance portal only.");
           setLoading(false);

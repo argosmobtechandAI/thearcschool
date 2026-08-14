@@ -8,8 +8,9 @@ export const getStudentFees = async (req, res) => {
   try {
     const userId = req.user.id;
     const academic_year = req.query.academic_year || getCurrentAcademicYear();
+    const includeFuture = req.query.include_future === 'true';
 
-    const { virtualDues, payments, structures } = await calculateVirtualDues(userId, academic_year);
+    const { virtualDues, payments, structures } = await calculateVirtualDues(userId, academic_year, includeFuture);
 
     return res.status(200).json({
       success: true,

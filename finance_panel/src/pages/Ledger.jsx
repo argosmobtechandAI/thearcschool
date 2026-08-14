@@ -5,13 +5,14 @@ import api from "../services/api";
 import { toast } from "react-toastify";
 import TableFilterHeader from "../components/TableFilterHeader";
 import { useSortableData } from "../hooks/useSortableData";
-import { Eye, Receipt, PlusCircle, CheckCircle, Clock, Printer } from "lucide-react";
+import { Eye, Receipt, PlusCircle, CheckCircle, Clock, Printer, CalendarClock } from "lucide-react";
 import { exportToExcel, exportToPDF, generateReceiptPDF } from "../utils/exportUtils";
 import StudentLedgerModal from "../components/StudentLedgerModal";
 
 const Ledger = () => {
   const dispatch = useDispatch();
   const { users, classes: globalClasses, loading } = useSelector((state) => state.data);
+  const { academicYear } = useSelector((state) => state.settings);
 
   const [studentSearch, setStudentSearch] = useState("");
   const [classFilter, setClassFilter] = useState("");
@@ -35,6 +36,7 @@ const Ledger = () => {
   });
   const [isPaying, setIsPaying] = useState(false);
   const [feeSearchTerm, setFeeSearchTerm] = useState("");
+  const [showFutureLedger, setShowFutureLedger] = useState(false);
 
   const [balancesMap, setBalancesMap] = useState({});
   const [refreshTrigger, setRefreshTrigger] = useState(0);
@@ -49,7 +51,10 @@ const Ledger = () => {
   useEffect(() => {
     if (students.length > 0) {
       // Fetch student balances in batch
-      api.post("/finance_panel/studentBalances", { students: students.map(s => ({ id: s.id, type: s.type, fee_exempted: s.fee_exempted, classes: s.classes, bus_fee: s.bus_fee })) })
+      api.post("/finance_panel/studentBalances", { 
+        students: students.map(s => ({ id: s.id, type: s.type, fee_exempted: s.fee_exempted, classes: s.classes, bus_fee: s.bus_fee, admission_date: s.admission_date, created_at: s.created_at })),
+        academic_year: academicYear
+      })
         .then(res => {
           if (res.data.success) {
             const bMap = {};
@@ -59,7 +64,7 @@ const Ledger = () => {
         })
         .catch(console.error);
     }
-  }, [students, refreshTrigger]);
+  }, [students, refreshTrigger, academicYear]);
 
   // Derive class options
   const classes = useMemo(() => {
@@ -155,7 +160,7 @@ const Ledger = () => {
     setIsModalOpen(true);
     setLedgerLoading(true);
     try {
-      const res = await api.get(`/finance_panel/getStudentLedger/${student.id}`);
+      const res = await api.get(`/finance_panel/getStudentLedger/${student.id}?academic_year=${academicYear}`);
       if (res.data.success) {
         setStudentLedger(res.data.data);
       }
@@ -171,7 +176,7 @@ const Ledger = () => {
     setIsPaymentModalOpen(true);
     setLedgerLoading(true);
     try {
-      const res = await api.get(`/finance_panel/getStudentLedger/${student.id}`);
+      const res = await api.get(`/finance_panel/getStudentLedger/${student.id}?includeFuture=${showFutureLedger}&academic_year=${academicYear}`);
       if (res.data.success) {
         setStudentLedger(res.data.data);
       }
@@ -464,34 +469,65 @@ const Ledger = () => {
                 <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.5rem", flexShrink: 0, flexWrap: "wrap", gap: "0.5rem" }}>
                     <label style={{ fontSize: "0.875rem", fontWeight: "600" }}>Select Fee(s)</label>
-                    <input 
-                      type="text" 
-                      placeholder="Search fee (e.g. Tuition)" 
-                      value={feeSearchTerm}
-                      onChange={(e) => setFeeSearchTerm(e.target.value)}
-                      className="input-glass"
-                      style={{ padding: "0.25rem 0.5rem", fontSize: "0.875rem", width: "200px" }}
-                    />
-                    <label style={{ fontSize: "0.75rem", display: "flex", alignItems: "center", gap: "0.25rem", cursor: "pointer" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", flexWrap: "wrap" }}>
                       <input 
-                        type="checkbox" 
-                        checked={studentLedger.fees.filter(f => f.status !== "paid" && (f.fee?.title || "").toLowerCase().includes(feeSearchTerm.toLowerCase())).length > 0 && paymentForm.feeIds.length === studentLedger.fees.filter(f => f.status !== "paid" && (f.fee?.title || "").toLowerCase().includes(feeSearchTerm.toLowerCase())).length}
-                        onChange={(e) => {
-                          if (e.target.checked) {
-                            const filteredFeeIds = studentLedger.fees.filter(f => f.status !== "paid" && (f.fee?.title || "").toLowerCase().includes(feeSearchTerm.toLowerCase())).map(f => f.id);
-                            let totalAmt = 0;
-                            filteredFeeIds.forEach(id => {
-                              const fObj = studentLedger.fees.find(fee => fee.id === id);
-                              if (fObj) totalAmt += (Number(fObj.fee?.amount || 0) - Number(fObj.total_paid_amount || 0));
-                            });
-                            setPaymentForm({ ...paymentForm, feeIds: filteredFeeIds, amount: totalAmt });
-                          } else {
-                            setPaymentForm({ ...paymentForm, feeIds: [], amount: "" });
-                          }
-                        }}
+                        type="text" 
+                        placeholder="Search fee (e.g. Tuition)" 
+                        value={feeSearchTerm}
+                        onChange={(e) => setFeeSearchTerm(e.target.value)}
+                        className="input-glass"
+                        style={{ padding: "0.25rem 0.5rem", fontSize: "0.875rem", width: "200px" }}
                       />
-                      Select All Filtered
-                    </label>
+                      <label style={{ display: "flex", alignItems: "center", gap: "0.4rem", cursor: "pointer", fontSize: "0.75rem", color: showFutureLedger ? "var(--accent-primary)" : "var(--text-secondary)", fontWeight: "500", userSelect: "none" }}>
+                        <CalendarClock size={14} />
+                        Future Dues
+                        <div
+                          onClick={() => {
+                            const newVal = !showFutureLedger;
+                            setShowFutureLedger(newVal);
+                            // Re-fetch with new param
+                            setLedgerLoading(true);
+                            api.get(`/finance_panel/getStudentLedger/${selectedStudent.id}?includeFuture=${newVal}&academic_year=${academicYear}`)
+                              .then(res => { if (res.data.success) { setStudentLedger(res.data.data); setPaymentForm({ ...paymentForm, feeIds: [], amount: "" }); } })
+                              .catch(() => toast.error("Failed to reload ledger"))
+                              .finally(() => setLedgerLoading(false));
+                          }}
+                          style={{
+                            width: "32px", height: "18px", borderRadius: "9px",
+                            background: showFutureLedger ? "var(--accent-primary)" : "rgba(0,0,0,0.15)",
+                            position: "relative", cursor: "pointer", transition: "background 0.2s",
+                            flexShrink: 0
+                          }}
+                        >
+                          <div style={{
+                            width: "14px", height: "14px", borderRadius: "50%",
+                            background: "white", position: "absolute", top: "2px",
+                            left: showFutureLedger ? "16px" : "2px", transition: "left 0.2s",
+                            boxShadow: "0 1px 3px rgba(0,0,0,0.2)"
+                          }} />
+                        </div>
+                      </label>
+                      <label style={{ fontSize: "0.75rem", display: "flex", alignItems: "center", gap: "0.25rem", cursor: "pointer" }}>
+                        <input 
+                          type="checkbox" 
+                          checked={studentLedger.fees.filter(f => f.status !== "paid" && (f.fee?.title || "").toLowerCase().includes(feeSearchTerm.toLowerCase())).length > 0 && paymentForm.feeIds.length === studentLedger.fees.filter(f => f.status !== "paid" && (f.fee?.title || "").toLowerCase().includes(feeSearchTerm.toLowerCase())).length}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              const filteredFeeIds = studentLedger.fees.filter(f => f.status !== "paid" && (f.fee?.title || "").toLowerCase().includes(feeSearchTerm.toLowerCase())).map(f => f.id);
+                              let totalAmt = 0;
+                              filteredFeeIds.forEach(id => {
+                                const fObj = studentLedger.fees.find(fee => fee.id === id);
+                                if (fObj) totalAmt += (Number(fObj.fee?.amount || 0) - Number(fObj.total_paid_amount || 0));
+                              });
+                              setPaymentForm({ ...paymentForm, feeIds: filteredFeeIds, amount: totalAmt });
+                            } else {
+                              setPaymentForm({ ...paymentForm, feeIds: [], amount: "" });
+                            }
+                          }}
+                        />
+                        Select All
+                      </label>
+                    </div>
                   </div>
                   <div style={{ flex: 1, overflowY: "auto", border: "1px solid var(--glass-border)", borderRadius: "8px", padding: "0.5rem", background: "rgba(255,255,255,0.05)" }}>
                     {studentLedger.fees.filter(f => f.status !== "paid" && (f.fee?.title || "").toLowerCase().includes(feeSearchTerm.toLowerCase())).map(f => {
@@ -524,8 +560,13 @@ const Ledger = () => {
                               });
                             }}
                           />
-                          <span style={{ flex: 1, fontSize: "0.875rem" }}>{f.fee?.title}</span>
-                          <span style={{ fontWeight: "600", fontSize: "0.875rem", color: "#ef4444" }}>₹{due}</span>
+                          <span style={{ flex: 1, fontSize: "0.875rem" }}>
+                            {f.fee?.title}
+                            {f.is_future && (
+                              <span style={{ marginLeft: "0.5rem", padding: "1px 5px", borderRadius: "3px", background: "rgba(59, 130, 246, 0.1)", color: "#3b82f6", fontSize: "0.6rem", fontWeight: "700", letterSpacing: "0.5px", verticalAlign: "middle" }}>ADVANCE</span>
+                            )}
+                          </span>
+                          <span style={{ fontWeight: "600", fontSize: "0.875rem", color: f.is_future ? "#3b82f6" : "#ef4444" }}>₹{due}</span>
                         </label>
                       );
                     })}

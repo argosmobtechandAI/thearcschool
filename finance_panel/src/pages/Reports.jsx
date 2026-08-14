@@ -10,7 +10,7 @@ import { useSortableData } from "../hooks/useSortableData";
 
 const Reports = () => {
   const dispatch = useDispatch();
-  const { users, classes, loadingUsers, loadingClasses } = useSelector((state) => state.data);
+  const { users, classes, loadingUsers, loadingClasses, academicYear } = useSelector((state) => state.data);
 
   const [balancesMap, setBalancesMap] = useState({});
 
@@ -46,7 +46,7 @@ const Reports = () => {
 
   useEffect(() => {
     if (students.length > 0) {
-      api.post("/finance_panel/studentBalances", { students: students.map(s => ({ id: s.id, type: s.type, fee_exempted: s.fee_exempted, classes: s.classes, bus_fee: s.bus_fee })) })
+      api.post("/finance_panel/studentBalances", { students: students.map(s => ({ id: s.id, type: s.type, fee_exempted: s.fee_exempted, classes: s.classes, bus_fee: s.bus_fee, admission_date: s.admission_date, created_at: s.created_at })) })
         .then(res => {
           if (res.data.success) {
             const bMap = {};
@@ -230,6 +230,7 @@ const Reports = () => {
             setStartDate={setStartDate} 
             setEndDate={setEndDate} 
             defaultRange="mtd" 
+            academicYear={academicYear}
           />
         </TableFilterHeader>
         </div>

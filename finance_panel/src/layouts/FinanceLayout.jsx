@@ -1,21 +1,57 @@
+import React, { useState, useEffect } from "react";
 import { Outlet, useNavigate, NavLink, useLocation, Link } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
-import { LogOut, LayoutDashboard, FileSpreadsheet, BarChart, Settings, ExternalLink, IndianRupee, TrendingDown, TrendingUp, Users, Image as ImageIcon } from "lucide-react";
+import { LogOut, LayoutDashboard, FileSpreadsheet, BarChart, Settings, ExternalLink, IndianRupee, TrendingDown, TrendingUp, Users, Image as ImageIcon, Calendar } from "lucide-react";
 import { logout } from "../features/authSlice";
 import { setGlobalDateRange } from "../features/dataSlice";
+import { setAcademicYear } from "../features/settingsSlice";
 import DateRangePicker from "../components/DateRangePicker";
+import CloseYearModal from "../components/CloseYearModal";
 
 const FinanceLayout = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const { user } = useSelector((state) => state.auth);
+  const { academicYear } = useSelector((state) => state.settings);
   const { globalDateRange } = useSelector((state) => state.data);
+
+  useEffect(() => {
+    // Only initialize the date range to the academic year if it hasn't been set yet
+    if (academicYear && academicYear !== "ALL" && !globalDateRange.startDate && !globalDateRange.endDate) {
+      const startYear = parseInt(academicYear.split("-")[0]);
+      const startDate = `${startYear}-04-01`;
+      
+      const academicEndDateObj = new Date(`${startYear + 1}-03-31`);
+      const today = new Date();
+      let endDate;
+      
+      if (today < academicEndDateObj) {
+        // Format today as YYYY-MM-DD
+        endDate = today.toISOString().split('T')[0];
+      } else {
+        endDate = `${startYear + 1}-03-31`;
+      }
+      
+      dispatch(setGlobalDateRange({ startDate, endDate }));
+    }
+  }, [academicYear, dispatch, globalDateRange.startDate, globalDateRange.endDate]);
+
+  const [isCloseYearModalOpen, setIsCloseYearModalOpen] = useState(false);
 
   const location = useLocation();
 
   const handleLogout = () => {
     dispatch(logout());
     navigate("/login");
+  };
+
+  const generateAcademicYears = () => {
+    const years = [];
+    const currentYear = new Date().getFullYear();
+    for (let i = currentYear - 4; i <= currentYear + 1; i++) {
+      years.push(`${i}-${i + 1}`);
+    }
+    return years.reverse();
   };
 
   const navLinkStyle = ({ isActive }) => ({
@@ -138,12 +174,55 @@ const FinanceLayout = () => {
       <main style={{ flex: 1, display: "flex", flexDirection: "column", height: "100vh", overflow: "hidden", background: "var(--bg-main)" }}>
         <div style={{ flex: 1, padding: "1.5rem", overflowY: "auto" }}>
           {location.pathname !== "/fee-structures" && (
-            <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "-2.5rem", position: "relative", zIndex: 10, pointerEvents: "none" }}>
+            <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "-2.5rem", position: "relative", zIndex: 10, pointerEvents: "none", gap: "1rem" }}>
+              <div style={{ pointerEvents: "auto", display: "flex", alignItems: "center", background: "white", padding: "0 0.75rem", borderRadius: "8px", border: "1px solid var(--glass-border)", height: "38px" }}>
+                <Calendar size={16} style={{ color: "var(--text-secondary)", marginRight: "0.5rem" }} />
+                <select 
+                  value={academicYear}
+                  onChange={(e) => {
+                    const selectedYear = e.target.value;
+                    dispatch(setAcademicYear(selectedYear));
+                    if (selectedYear !== "ALL") {
+                      const startYear = parseInt(selectedYear.split("-")[0]);
+                      const startDate = `${startYear}-04-01`;
+                      const academicEndDateObj = new Date(`${startYear + 1}-03-31`);
+                      const today = new Date();
+                      let endDate;
+                      if (today < academicEndDateObj) {
+                        endDate = today.toISOString().split('T')[0];
+                      } else {
+                        endDate = `${startYear + 1}-03-31`;
+                      }
+                      dispatch(setGlobalDateRange({ startDate, endDate }));
+                    }
+                  }}
+                  style={{ border: "none", outline: "none", background: "transparent", fontSize: "0.875rem", fontWeight: "500", color: "var(--text-primary)", cursor: "pointer" }}
+                >
+                  {generateAcademicYears().map(year => (
+                    <option key={year} value={year}>{year}</option>
+                  ))}
+                </select>
+              </div>
+              
+              {(user?.type === "admin" || user?.type === "super_admin") && (
+                <div style={{ pointerEvents: "auto" }}>
+                  <button 
+                    className="btn btn-primary" 
+                    onClick={() => setIsCloseYearModalOpen(true)}
+                    style={{ height: "38px", background: "#ef4444", border: "none" }}
+                  >
+                    Close Year
+                  </button>
+                </div>
+              )}
+
               <div style={{ pointerEvents: "auto" }}>
                 <DateRangePicker 
                   startDate={globalDateRange.startDate}
                   endDate={globalDateRange.endDate}
                   onChange={(start, end) => dispatch(setGlobalDateRange({ startDate: start, endDate: end }))}
+                  defaultRange="custom" // Prevent internal overwrite of MTD
+                  academicYear={academicYear}
                 />
               </div>
             </div>
@@ -151,6 +230,13 @@ const FinanceLayout = () => {
           <Outlet />
         </div>
       </main>
+
+      <CloseYearModal 
+        isOpen={isCloseYearModalOpen} 
+        onClose={() => setIsCloseYearModalOpen(false)} 
+        currentAcademicYear={academicYear} 
+        generateAcademicYears={generateAcademicYears}
+      />
     </div>
   );
 };

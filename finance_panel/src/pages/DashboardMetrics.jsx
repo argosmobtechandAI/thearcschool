@@ -20,6 +20,7 @@ const DashboardMetrics = () => {
   const { users, classes, loadingUsers, loadingClasses, globalDateRange } = useSelector((state) => state.data);
   const { startDate, endDate } = globalDateRange;
   const { user } = useSelector((state) => state.auth);
+  const { academicYear } = useSelector((state) => state.settings);
   const isFinanceTeam = user?.type === 'finance' || user?.type === 'accountant';
 
   const [searchTerm, setSearchTerm] = useState("");
@@ -57,7 +58,10 @@ const DashboardMetrics = () => {
 
   useEffect(() => {
     if (students.length > 0) {
-      api.post("/finance_panel/studentBalances", { students: students.map(s => ({ id: s.id, type: s.type, fee_exempted: s.fee_exempted, classes: s.classes, bus_fee: s.bus_fee })) })
+      api.post("/finance_panel/studentBalances", { 
+        students: students.map(s => ({ id: s.id, type: s.type, fee_exempted: s.fee_exempted, classes: s.classes, bus_fee: s.bus_fee, admission_date: s.admission_date, created_at: s.created_at })),
+        academic_year: academicYear
+      })
         .then(res => {
           if (res.data.success) {
             const bMap = {};
@@ -67,7 +71,7 @@ const DashboardMetrics = () => {
         })
         .catch(console.error);
     }
-  }, [students, refreshTrigger]);
+  }, [students, refreshTrigger, academicYear]);
 
   useEffect(() => {
     if (currentView === "collected") {
@@ -85,6 +89,7 @@ const DashboardMetrics = () => {
           const params = new URLSearchParams();
           if (startDate) params.append("startDate", startDate);
           if (endDate) params.append("endDate", endDate);
+          if (academicYear) params.append("academic_year", academicYear);
           const res = await api.get(`/finance_panel/getAllPayments?${params.toString()}`);
           if (res.data.success) {
             const grouped = res.data.payments.reduce((acc, curr) => {
@@ -141,7 +146,7 @@ const DashboardMetrics = () => {
       };
       fetchPayments();
     }
-  }, [currentView, startDate, endDate, refreshTrigger]);
+  }, [currentView, startDate, endDate, academicYear, refreshTrigger]);
 
 
 
@@ -331,7 +336,7 @@ const DashboardMetrics = () => {
     setIsPaymentModalOpen(true);
     setLedgerLoading(true);
     try {
-      const res = await api.get(`/finance_panel/getStudentLedger/${student.id}`);
+      const res = await api.get(`/finance_panel/getStudentLedger/${student.id}?academic_year=${academicYear}`);
       if (res.data.success) {
         setStudentLedger(res.data.data);
       }

@@ -3,7 +3,7 @@ import { supabase, supabaseAdmin } from "../../config/supabaseClient.js";
 export const getDashboardStats = async (req, res) => {
   try {
     await autoMaterializeTransportFees();
-    const { startDate, endDate } = req.query;
+    const { startDate, endDate, academic_year } = req.query;
 
     const { count: totalStudents, error: countError } = await supabase
       .from("user")
@@ -23,14 +23,14 @@ export const getDashboardStats = async (req, res) => {
 
     const { data: allStudents, error: studentsError } = await supabase
       .from("user")
-      .select("id, fee_exempted, bus_fee, created_at")
+      .select("id, fee_exempted, bus_fee, created_at, admission_date")
       .eq("type", "student")
       .eq("status", "active");
 
     // 1. Fetch legacy ad-hoc fees
     const { data: feesData } = await supabase
       .from("student_fees")
-      .select("student_id, total_paid_amount, fee(amount, title, due_date)");
+      .select("student_id, total_paid_amount, created_at, fee(amount, title, due_date)");
 
     // 2. Fetch class mappings
     const { data: classMappings } = await supabase
@@ -51,7 +51,7 @@ export const getDashboardStats = async (req, res) => {
 
     // 3. Fetch fee structures for the current academic year
     const { getCurrentAcademicYear } = await import("./virtualFeeCalculator.js");
-    const academicYear = getCurrentAcademicYear();
+    const academicYear = academic_year || getCurrentAcademicYear();
     const { data: structures } = await supabase
       .from("fee_structures")
       .select("*")
@@ -89,7 +89,7 @@ export const getDashboardStats = async (req, res) => {
         
         if (!s.fee_exempted) {
           const sClassName = studentClassMap[s.id];
-          totalVirtualDue = calculateTotalVirtualDueForStudent(s, sClassName, structures, sPayments, sessionStartYear, monthsPassed, lateFeePenaltyAmount);
+          totalVirtualDue = calculateTotalVirtualDueForStudent(s, sClassName, structures, sPayments, sessionStartYear, monthsPassed, lateFeePenaltyAmount, 0, academicYear);
         }
 
         const sFees = (feesData || []).filter(f => f.student_id === s.id);
@@ -97,7 +97,15 @@ export const getDashboardStats = async (req, res) => {
         sFees.forEach(f => {
           let amount = Number(f.fee?.amount || 0);
           const feeTitle = f.fee?.title || "";
-          const dueDateObj = f.fee?.due_date ? new Date(f.fee.due_date) : null;
+          let dueDateObj = f.fee?.due_date ? new Date(f.fee.due_date) : null;
+          if (!dueDateObj && f.created_at) dueDateObj = new Date(f.created_at);
+          
+          if (dueDateObj) {
+             const acStart = new Date(sessionStartYear, 3, 1);
+             const acEnd = new Date(sessionStartYear + 1, 2, 31, 23, 59, 59);
+             if (dueDateObj < acStart || dueDateObj > acEnd) return;
+             if (endDate && dueDateObj > new Date(endDate)) return;
+          }
           
           const relatedPayments = sPayments.filter(p => p.remarks && p.remarks.includes(feeTitle));
           const feeTotalPaid = relatedPayments.reduce((acc, p) => acc + Number(p.amount_paid || 0), 0);
@@ -142,11 +150,23 @@ export const getDashboardStats = async (req, res) => {
 
     // Add fee income from payments_ledger
     let ledgerQuery = supabase.from("payments_ledger").select("amount_paid");
+    const sYear = parseInt(academicYear.split("-")[0]);
+    const aStart = new Date(sYear, 3, 1).toISOString();
+    const aEnd = new Date(sYear + 1, 2, 31, 23, 59, 59).toISOString();
+
     if (startDate) {
-      ledgerQuery = ledgerQuery.gte("created_at", `${startDate}T00:00:00.000Z`);
+      ledgerQuery = ledgerQuery.gte("created_at", startDate > aStart ? startDate : aStart);
+    } else {
+      ledgerQuery = ledgerQuery.gte("created_at", aStart);
     }
+    
     if (endDate) {
-      ledgerQuery = ledgerQuery.lte("created_at", `${endDate}T23:59:59.999Z`);
+      const eDay = new Date(endDate);
+      eDay.setHours(23, 59, 59, 999);
+      const eIso = eDay.toISOString();
+      ledgerQuery = ledgerQuery.lte("created_at", eIso < aEnd ? eIso : aEnd);
+    } else {
+      ledgerQuery = ledgerQuery.lte("created_at", aEnd);
     }
     
     const { data: ledgerData, error: ledgerError } = await ledgerQuery;
@@ -180,7 +200,7 @@ export const getStudentBalances = async (req, res) => {
     // Auto-materialize transport fees before generating balances
     await autoMaterializeTransportFees();
 
-    const { students, startDate, endDate } = req.body;
+    const { students, startDate, endDate, includeFuture, academic_year } = req.body;
     if (!students || !Array.isArray(students)) {
       return res.status(400).json({ success: false, message: "Students array is required" });
     }
@@ -189,7 +209,7 @@ export const getStudentBalances = async (req, res) => {
     // 1. Fetch legacy ad-hoc fees
     const { data: feesData } = await supabase
       .from("student_fees")
-      .select("student_id, total_paid_amount, fee(amount, title, due_date)");
+      .select("student_id, total_paid_amount, created_at, fee(amount, title, due_date)");
 
     // 2. Fetch class mappings to match with fee_structures
     const { data: classMappings } = await supabase
@@ -215,22 +235,35 @@ export const getStudentBalances = async (req, res) => {
 
     // 3. Fetch fee structures for the current academic year
     const { getCurrentAcademicYear } = await import("./virtualFeeCalculator.js");
-    const academicYear = getCurrentAcademicYear();
+    const academicYear = academic_year || getCurrentAcademicYear();
     const { data: structures } = await supabase
       .from("fee_structures")
       .select("*")
       .eq("academic_year", academicYear);
 
-    // 4. Fetch all payments from payments_ledger filtered by dates
+    // 4. Fetch all payments from payments_ledger filtered by dates and academic_year
     let paymentsQuery = supabase
       .from("payments_ledger")
       .select("student_id, amount_paid, created_at, remarks");
       
-    if (startDate) paymentsQuery = paymentsQuery.gte("created_at", startDate);
+    // Filter payments strictly by the selected academic year to ensure isolation
+    const startYear = parseInt(academicYear.split("-")[0]);
+    const academicStart = new Date(startYear, 3, 1).toISOString(); // April 1st
+    const academicEnd = new Date(startYear + 1, 2, 31, 23, 59, 59).toISOString(); // March 31st
+
+    if (startDate) {
+        paymentsQuery = paymentsQuery.gte("created_at", startDate > academicStart ? startDate : academicStart);
+    } else {
+        paymentsQuery = paymentsQuery.gte("created_at", academicStart);
+    }
+
     if (endDate) {
       const endOfDay = new Date(endDate);
       endOfDay.setHours(23, 59, 59, 999);
-      paymentsQuery = paymentsQuery.lte("created_at", endOfDay.toISOString());
+      const endIso = endOfDay.toISOString();
+      paymentsQuery = paymentsQuery.lte("created_at", endIso < academicEnd ? endIso : academicEnd);
+    } else {
+        paymentsQuery = paymentsQuery.lte("created_at", academicEnd);
     }
     
     const { data: paymentsData } = await paymentsQuery;
@@ -244,7 +277,9 @@ export const getStudentBalances = async (req, res) => {
     const currentMonth = referenceDate.getMonth();
     const currentYear = referenceDate.getFullYear();
     
-    let monthsPassed = 12; // Full academic year
+    let monthsPassed = (currentYear - sessionStartYear) * 12 + (currentMonth - 3) + 1;
+    if (monthsPassed < 0) monthsPassed = 0;
+    if (monthsPassed > 12) monthsPassed = 12;
     
     // If startDate is set and is later than April, we should theoretically subtract the start months,
     // but typically schools want to see outstanding balances. However, to respect the "Period Dues"
@@ -271,16 +306,24 @@ export const getStudentBalances = async (req, res) => {
       if (!s.fee_exempted) {
         const sClassName = studentClassMap[s.id];
         const { calculateTotalVirtualDueForStudent } = await import("./virtualFeeCalculator.js");
-        totalVirtualDue = calculateTotalVirtualDueForStudent(s, sClassName, structures, sPayments, sessionStartYear, monthsPassed, lateFeePenaltyAmount, startMonthsPassed);
+        totalVirtualDue = calculateTotalVirtualDueForStudent(s, sClassName, structures, sPayments, sessionStartYear, monthsPassed, lateFeePenaltyAmount, startMonthsPassed, academicYear);
       }
 
       // Legacy specific student ad-hoc fees
       const sFees = (feesData || []).filter(f => f.student_id === s.id);
       let totalAdHocDue = 0;
+      const academicStartObj = new Date(sessionStartYear, 3, 1);
+      const academicEndObj = new Date(sessionStartYear + 1, 2, 31, 23, 59, 59);
+
       sFees.forEach(f => {
         let amount = Number(f.fee?.amount || 0);
         const feeTitle = f.fee?.title || "";
-        const dueDateObj = f.fee?.due_date ? new Date(f.fee.due_date) : null;
+        let dueDateObj = f.fee?.due_date ? new Date(f.fee.due_date) : null;
+        if (!dueDateObj && f.created_at) dueDateObj = new Date(f.created_at);
+        
+        if (dueDateObj) {
+            if (dueDateObj < academicStartObj || dueDateObj > academicEndObj) return; // filter by academic year bounds
+        }
         
         const relatedPayments = sPayments.filter(p => p.remarks && p.remarks.includes(feeTitle));
         const feeTotalPaid = relatedPayments.reduce((acc, p) => acc + Number(p.amount_paid || 0), 0);
@@ -341,9 +384,13 @@ export const getStudentLedger = async (req, res) => {
   try {
     await autoMaterializeTransportFees();
     const { studentId } = req.params;
+    const { includeFuture, academic_year } = req.query;
+
+    const { getCurrentAcademicYear } = await import("./virtualFeeCalculator.js");
+    const academicYear = academic_year || getCurrentAcademicYear();
 
     // 1. Calculate Virtual Dues & fetch Payments
-    const { virtualDues, payments } = await calculateVirtualDues(studentId);
+    const { virtualDues, payments } = await calculateVirtualDues(studentId, academicYear, includeFuture === 'true');
 
     // 2. Map payments to dues using fee title in remarks
     // (This is now handled automatically inside calculateVirtualDues)
@@ -707,6 +754,35 @@ export const createFeeStructureController = async (req, res) => {
 // NEW FULL FINANCE MODULE API (INCOME/EXPENSE)
 // ==========================================
 
+export const deleteStudentFee = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Check if any payments are tied to this student_fee
+    const { data: payments, error: checkError } = await supabaseAdmin
+      .from("payments_ledger")
+      .select("id")
+      .eq("fee_id", id);
+      
+    if (checkError) throw checkError;
+
+    if (payments && payments.length > 0) {
+      return res.status(400).json({ success: false, message: "Cannot delete this fee because payments have already been made against it." });
+    }
+
+    const { error: deleteError } = await supabaseAdmin
+      .from("student_fees")
+      .delete()
+      .eq("id", id);
+
+    if (deleteError) throw deleteError;
+
+    return res.status(200).json({ success: true, message: "Fee deleted successfully" });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
 export const getCategories = async (req, res) => {
   try {
     const { type } = req.query; // optional filter by INCOME or EXPENSE
@@ -846,7 +922,10 @@ export const getFinanceDashboard = async (req, res) => {
       return res.status(403).json({ success: false, message: "You do not have permission to view revenue data." });
     }
     
-    const { startDate, endDate } = req.query;
+    const { startDate, endDate, academic_year } = req.query;
+    
+    const { getCurrentAcademicYear } = await import("./virtualFeeCalculator.js");
+    const academicYear = academic_year || getCurrentAcademicYear();
     
     let expenseQuery = supabase.from("transactions").select("amount, category:transaction_categories(*)").eq("type", "EXPENSE");
     if (startDate) expenseQuery = expenseQuery.gte("transaction_date", startDate);
@@ -862,12 +941,29 @@ export const getFinanceDashboard = async (req, res) => {
     const { data: incomes, error: incomeError } = await incomeQuery;
     if (incomeError) throw incomeError;
     
-    // Fetch fee income from payments_ledger (using created_at timestamps)
-    let feeQuery = supabase.from("payments_ledger").select("amount_paid");
-    if (startDate) feeQuery = feeQuery.gte("created_at", `${startDate}T00:00:00.000Z`);
-    if (endDate) feeQuery = feeQuery.lte("created_at", `${endDate}T23:59:59.999Z`);
+    // Fetch fee income from payments_ledger
+    const sessionStartYearObj = parseInt(academicYear.split("-")[0]);
+    const academicStart = new Date(sessionStartYearObj, 3, 1).toISOString();
+    const academicEnd = new Date(sessionStartYearObj + 1, 2, 31, 23, 59, 59).toISOString();
+
+    let paymentsQuery = supabase.from("payments_ledger").select("student_id, amount_paid, created_at, remarks");
     
-    const { data: fees, error: feeError } = await feeQuery;
+    if (startDate) {
+      paymentsQuery = paymentsQuery.gte("created_at", startDate > academicStart ? startDate : academicStart);
+    } else {
+      paymentsQuery = paymentsQuery.gte("created_at", academicStart);
+    }
+
+    if (endDate) {
+      const endOfDay = new Date(endDate);
+      endOfDay.setHours(23, 59, 59, 999);
+      const endIso = endOfDay.toISOString();
+      paymentsQuery = paymentsQuery.lte("created_at", endIso < academicEnd ? endIso : academicEnd);
+    } else {
+      paymentsQuery = paymentsQuery.lte("created_at", academicEnd);
+    }
+
+    const { data: fees, error: feeError } = await paymentsQuery;
     if (feeError) throw feeError;
     
     const totalFeeIncome = fees.reduce((sum, f) => sum + Number(f.amount_paid || 0), 0);
@@ -931,8 +1027,110 @@ export const updateStudentBusFee = async (req, res) => {
 
     if (error) throw error;
 
+    // Cleanup future unpaid transport fees if bus service is stopped
+    if (!bus_fee || bus_fee === 0) {
+      const today = new Date();
+      const currentMonthStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
+      
+      const { data: allTransportFees } = await supabaseAdmin
+        .from("student_fees")
+        .select("id, total_paid_amount, fee!inner(id, title, due_date)")
+        .eq("student_id", studentId)
+        .like("fee.title", "Transport Fee - %");
+
+      const idsToDelete = [];
+      
+      if (allTransportFees) {
+        allTransportFees.forEach(f => {
+          if ((!f.total_paid_amount || f.total_paid_amount === 0) && f.fee?.due_date) {
+            const feeDueMonth = f.fee.due_date.substring(0, 7);
+            // Delete fees due in the current month or future months
+            if (feeDueMonth >= currentMonthStr) {
+               idsToDelete.push(f.id);
+            }
+          }
+        });
+      }
+
+      if (idsToDelete.length > 0) {
+         await supabaseAdmin.from("student_fees").delete().in("id", idsToDelete);
+      }
+    }
+
     return res.status(200).json({ success: true, message: "Bus fee updated successfully", user: updatedUser });
   } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+export const closeFinancialYear = async (req, res) => {
+  try {
+    const { currentAcademicYear, newAcademicYear } = req.body;
+    if (!currentAcademicYear || !newAcademicYear) {
+      return res.status(400).json({ success: false, message: "Missing current or new academic year" });
+    }
+
+    // Calculate balances for all active students for the current year
+    const { data: students, error: studentError } = await supabase
+      .from("user")
+      .select("id, fee_exempted, classes:class_students(class_id), bus_fee")
+      .eq("type", "student")
+      .eq("status", "active");
+
+    if (studentError) throw studentError;
+
+    const { calculateVirtualDues } = await import("./virtualFeeCalculator.js");
+
+    const arrearsFees = [];
+    for (const student of students) {
+      if (student.fee_exempted) continue;
+      const { virtualDues, payments } = await calculateVirtualDues(student.id, currentAcademicYear, true);
+      
+      const totalDue = virtualDues.reduce((sum, fee) => sum + (Number(fee.fee.amount) || 0), 0);
+      const totalPaid = payments.reduce((sum, p) => sum + (Number(p.amount_paid) || 0), 0);
+      const balance = totalDue - totalPaid;
+
+      if (balance > 0) {
+        arrearsFees.push({
+          student_id: student.id,
+          fee: {
+            title: `Arrears from ${currentAcademicYear}`,
+            amount: balance,
+            due_date: new Date(parseInt(newAcademicYear.split("-")[0]), 3, 10).toISOString().split('T')[0], // April 10th of new year
+            fee_type: "Arrears"
+          }
+        });
+      }
+    }
+
+    // Insert arrears into fee and student_fees tables
+    for (const arrear of arrearsFees) {
+      const { data: feeData, error: feeError } = await supabase
+        .from("fee")
+        .insert(arrear.fee)
+        .select()
+        .single();
+      
+      if (feeError) throw feeError;
+
+      const { error: studentFeeError } = await supabase
+        .from("student_fees")
+        .insert({
+          student_id: arrear.student_id,
+          fee_id: feeData.id,
+          status: "pending",
+          total_paid_amount: 0
+        });
+      
+      if (studentFeeError) throw studentFeeError;
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: `Successfully closed ${currentAcademicYear} and carried forward arrears for ${arrearsFees.length} students.`,
+      carriedForwardCount: arrearsFees.length
+    });
+  } catch (error) {
+    console.error("Close Financial Year Error:", error);
     return res.status(500).json({ success: false, message: error.message });
   }
 };

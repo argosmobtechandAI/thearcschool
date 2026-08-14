@@ -3,7 +3,7 @@ import { Router } from "express";
 import { auth } from "../../middlewares/authMiddleware.js";
 import { authorizeRoles } from "../../middlewares/roleMiddleware.js";
 
-import { getStudentLedger, logPayment, updatePayment, deletePayment, getAccountantStats, getDashboardStats, getAllPayments, getStudentBalances, getFeeStructures, updateFeeStructure, createFeeStructureController, deleteFeeStructureController, getCategories, createCategory, logTransaction, getTransactions, getFinanceDashboard, toggleRevenueAccess, updateTransaction, deleteTransaction, deleteCategory, updateStudentBusFee } from "./controller.js";
+import { getStudentLedger, logPayment, updatePayment, deletePayment, deleteStudentFee, getAccountantStats, getDashboardStats, getAllPayments, getStudentBalances, getFeeStructures, updateFeeStructure, createFeeStructureController, deleteFeeStructureController, getCategories, createCategory, logTransaction, getTransactions, getFinanceDashboard, toggleRevenueAccess, updateTransaction, deleteTransaction, deleteCategory, updateStudentBusFee, closeFinancialYear } from "./controller.js";
 
 const feeRouter = Router();
 
@@ -29,6 +29,7 @@ feeRouter.put("/student/:studentId/busFee", authorizeRoles(...editRoles), update
 feeRouter.put("/feeStructures/:id", authorizeRoles(...editRoles), updateFeeStructure);
 feeRouter.post("/feeStructures", authorizeRoles(...editRoles), createFeeStructureController);
 feeRouter.delete("/feeStructures/:id", authorizeRoles(...editRoles), deleteFeeStructureController);
+feeRouter.delete("/studentFee/:id", authorizeRoles(...editRoles), deleteStudentFee);
 feeRouter.post("/logPayment", authorizeRoles(...editRoles), logPayment);
 feeRouter.put("/payments/:id", authorizeRoles(...editRoles), updatePayment);
 feeRouter.delete("/payments/:id", authorizeRoles(...editRoles), deletePayment);
@@ -48,5 +49,8 @@ feeRouter.get("/financeDashboard", authorizeRoles(...viewRoles), getFinanceDashb
 
 // Super Admin toggles revenue access
 feeRouter.put("/users/:userId/revenue-access", authorizeRoles('super_admin', 'admin'), toggleRevenueAccess);
+
+// Admin closes financial year
+feeRouter.post("/closeFinancialYear", authorizeRoles('super_admin', 'admin'), closeFinancialYear);
 
 export default feeRouter;

@@ -9,6 +9,7 @@ import api from "../services/api";
 const Dashboard = () => {
   const dispatch = useDispatch();
   const { financeStats, loadingFinanceStats, globalDateRange } = useSelector((state) => state.data);
+  const { academicYear } = useSelector((state) => state.settings);
   const { startDate, endDate } = globalDateRange;
 
   const { user } = useSelector((state) => state.auth);
@@ -17,12 +18,12 @@ const Dashboard = () => {
   const [spotlightOfToday, setSpotlightOfToday] = useState(null);
 
   useEffect(() => {
-    dispatch(fetchFinanceStats({ startDate, endDate }));
+    dispatch(fetchFinanceStats({ startDate, endDate, academic_year: academicYear }));
     
     const fetchDashboard = async () => {
       setLoadingDashboard(true);
       try {
-        const res = await api.get(`/finance_panel/financeDashboard?startDate=${startDate || ''}&endDate=${endDate || ''}`);
+        const res = await api.get(`/finance_panel/financeDashboard?startDate=${startDate || ''}&endDate=${endDate || ''}&academic_year=${academicYear || ''}`);
         if (res.data.success) {
           setDashboardData(res.data.data);
         }
@@ -48,7 +49,7 @@ const Dashboard = () => {
       fetchDashboard();
     }
     fetchSpotlight();
-  }, [dispatch, startDate, endDate, user]);
+  }, [startDate, endDate, academicYear, dispatch]);
 
   const dateParams = `${startDate ? `&startDate=${startDate}` : ""}${endDate ? `&endDate=${endDate}` : ""}`;
 

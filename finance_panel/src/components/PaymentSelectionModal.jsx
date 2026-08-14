@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useMemo } from "react";
-import { Search, X, Check, Filter } from "lucide-react";
+import { Search, X, Check, Filter, CalendarClock } from "lucide-react";
 import api from "../services/api";
 import { toast } from "react-toastify";
 import { generateReceiptPDF } from "../utils/exportUtils";
@@ -9,6 +9,7 @@ const PaymentSelectionModal = ({ isOpen, onClose, selectedStudent, onPaymentSucc
   const [studentLedger, setStudentLedger] = useState({ fees: [], payments: [] });
   
   const [searchTerm, setSearchTerm] = useState("");
+  const [showFuture, setShowFuture] = useState(false);
   const [paymentForm, setPaymentForm] = useState({ feeIds: [], amount: "", paymentMode: "Cash", remarks: "" });
   const [isPaying, setIsPaying] = useState(false);
 
@@ -18,10 +19,17 @@ const PaymentSelectionModal = ({ isOpen, onClose, selectedStudent, onPaymentSucc
     }
   }, [isOpen, selectedStudent]);
 
+  useEffect(() => {
+    if (isOpen && selectedStudent?.id) {
+      setPaymentForm({ feeIds: [], amount: "", paymentMode: "Cash", remarks: "" });
+      fetchLedger();
+    }
+  }, [showFuture]);
+
   const fetchLedger = async () => {
     setLedgerLoading(true);
     try {
-      const res = await api.get(`/finance_panel/getStudentLedger/${selectedStudent.id}`);
+      const res = await api.get(`/finance_panel/getStudentLedger/${selectedStudent.id}?includeFuture=${showFuture}`);
       if (res.data.success) {
         setStudentLedger(res.data.data);
       }
@@ -194,6 +202,26 @@ const PaymentSelectionModal = ({ isOpen, onClose, selectedStudent, onPaymentSucc
                     style={{ width: "100%", paddingLeft: "35px", fontSize: "0.875rem" }}
                   />
                 </div>
+                <label style={{ display: "flex", alignItems: "center", gap: "0.5rem", cursor: "pointer", marginLeft: "auto", fontSize: "0.8125rem", color: showFuture ? "var(--accent-primary)" : "var(--text-secondary)", fontWeight: "500", userSelect: "none", transition: "color 0.2s" }}>
+                  <CalendarClock size={15} />
+                  Show Future Dues
+                  <div
+                    onClick={() => setShowFuture(!showFuture)}
+                    style={{
+                      width: "36px", height: "20px", borderRadius: "10px",
+                      background: showFuture ? "var(--accent-primary)" : "rgba(0,0,0,0.15)",
+                      position: "relative", cursor: "pointer", transition: "background 0.2s",
+                      flexShrink: 0
+                    }}
+                  >
+                    <div style={{
+                      width: "16px", height: "16px", borderRadius: "50%",
+                      background: "white", position: "absolute", top: "2px",
+                      left: showFuture ? "18px" : "2px", transition: "left 0.2s",
+                      boxShadow: "0 1px 3px rgba(0,0,0,0.2)"
+                    }} />
+                  </div>
+                </label>
               </div>
 
               {/* Data Table */}
@@ -232,10 +260,15 @@ const PaymentSelectionModal = ({ isOpen, onClose, selectedStudent, onPaymentSucc
                             />
                           </td>
                           <td style={{ padding: "0.75rem 1rem", color: "var(--text-secondary)", fontSize: "0.875rem" }}>{idx + 1}</td>
-                          <td style={{ padding: "0.75rem 1rem", fontWeight: "500", fontSize: "0.875rem", color: "var(--text-primary)" }}>{f.fee?.title || "-"}</td>
+                          <td style={{ padding: "0.75rem 1rem", fontWeight: "500", fontSize: "0.875rem", color: "var(--text-primary)" }}>
+                            {f.fee?.title || "-"}
+                            {f.is_future && (
+                              <span style={{ marginLeft: "0.5rem", padding: "2px 6px", borderRadius: "4px", background: "rgba(59, 130, 246, 0.1)", color: "#3b82f6", fontSize: "0.625rem", fontWeight: "700", letterSpacing: "0.5px", verticalAlign: "middle" }}>ADVANCE</span>
+                            )}
+                          </td>
                           <td style={{ padding: "0.75rem 1rem", color: "var(--text-secondary)", fontSize: "0.875rem" }}>{f.fee?.due_date ? new Date(f.fee.due_date).toLocaleDateString() : "-"}</td>
                           <td style={{ padding: "0.75rem 1rem", textAlign: "right", color: "var(--text-secondary)", fontSize: "0.875rem" }}>₹{amount.toLocaleString()}</td>
-                          <td style={{ padding: "0.75rem 1rem", textAlign: "right", fontWeight: "600", color: "#ef4444", fontSize: "0.875rem" }}>₹{due.toLocaleString()}</td>
+                          <td style={{ padding: "0.75rem 1rem", textAlign: "right", fontWeight: "600", color: f.is_future ? "#3b82f6" : "#ef4444", fontSize: "0.875rem" }}>₹{due.toLocaleString()}</td>
                         </tr>
                       );
                     }) : (

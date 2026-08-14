@@ -10,7 +10,7 @@ export const getCurrentAcademicYear = () => {
 };
 
 // Generate virtual dues for a student
-export const calculateVirtualDues = async (studentId, academicYear = getCurrentAcademicYear()) => {
+export const calculateVirtualDues = async (studentId, academicYear = getCurrentAcademicYear(), includeFuture = false) => {
   // 1. Fetch student details
   const { data: student, error: studentErr } = await supabase
     .from("user")
@@ -53,13 +53,29 @@ export const calculateVirtualDues = async (studentId, academicYear = getCurrentA
   const currentYear = today.getFullYear();
   const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 
+  // Reference point for determining which months are "future"
+  const currentMonthStart = new Date(currentYear, currentMonth, 1);
+
   // 3. Generate the dues dynamically for ALL configured fee structures
   structures.forEach(struct => {
     const structAcademicYear = struct.academic_year;
     if (!structAcademicYear) return;
+    
+    // Filter by academicYear if one is specifically requested
+    if (academicYear !== "ALL" && structAcademicYear !== academicYear) return;
+    
     const sessionStartYear = parseInt(structAcademicYear.split("-")[0]);
     
-    let monthsPassed = 12; // Always generate for the full academic year so parents can pay in advance
+    // By default, only generate dues up to the current month
+    // When includeFuture=true, generate the full year (for advance payments)
+    let monthsPassed;
+    if (includeFuture) {
+      monthsPassed = 12;
+    } else {
+      monthsPassed = (currentYear - sessionStartYear) * 12 + (currentMonth - 3) + 1;
+      if (monthsPassed < 0) monthsPassed = 0;
+      if (monthsPassed > 12) monthsPassed = 12;
+    }
 
     let frequency = 'monthly';
     let baseCategory = struct.fee_category;
@@ -79,7 +95,7 @@ export const calculateVirtualDues = async (studentId, academicYear = getCurrentA
     let joinMonthStart = new Date(sessionStartYear, 3, 1); // default April 1st of session
     
     // Override if student joined later
-    let admissionDateStr = student.admission_date;
+    let admissionDateStr = student.admission_date || student.created_at;
     if (admissionDateStr) {
       const admissionDate = new Date(admissionDateStr);
       // Only adjust if they joined after the session started
@@ -94,28 +110,40 @@ export const calculateVirtualDues = async (studentId, academicYear = getCurrentA
         const monthIndex = 3; // April always
         const year = sessionStartYear;
         const dueDate = `${year}-04-10`;
+        const sessionEndDate = new Date(year + 1, 2, 31);
         
-        virtualDues.push({
-          id: `virtual-${struct.id}-${monthIndex}-${year}`,
-          academic_year: structAcademicYear,
-          fee: {
-            title: `${categoryTitle} - ${year}-${year+1}`,
-            base_title: `${categoryTitle} - ${year}-${year+1}`,
-            amount: struct.amount,
-            due_date: dueDate,
-            fee_type: "Annual"
-          },
-          status: "pending",
-          total_paid_amount: 0,
-          category: struct.fee_category,
-          month: monthIndex,
-          year: year
-        });
+        if (sessionEndDate < joinMonthStart) {
+          // Student joined after this academic year ended, do not charge
+        } else {
+          const dueMonthStartAnnual = new Date(year, monthIndex, 1);
+          virtualDues.push({
+            id: `virtual-${struct.id}-${monthIndex}-${year}`,
+            academic_year: structAcademicYear,
+            is_future: dueMonthStartAnnual > currentMonthStart,
+            fee: {
+              title: `${categoryTitle} - ${year}-${year+1}`,
+              base_title: `${categoryTitle} - ${year}-${year+1}`,
+              amount: struct.amount,
+              due_date: dueDate,
+              fee_type: "Annual"
+            },
+            status: "pending",
+            total_paid_amount: 0,
+            category: struct.fee_category,
+            month: monthIndex,
+            year: year
+          });
+        }
       }
     } else if (frequency === 'one_time') {
       if (monthsPassed > 0) {
         let monthIndex = 3; // April default
         let year = sessionStartYear;
+        const sessionEndDate = new Date(year + 1, 2, 31);
+        
+        if (sessionEndDate < joinMonthStart) {
+           // Student joined after this academic year ended, do not charge
+        } else {
         
         if (struct.created_at) {
           const createdDate = new Date(struct.created_at);
@@ -131,9 +159,11 @@ export const calculateVirtualDues = async (studentId, academicYear = getCurrentA
         
         const dueDate = `${year}-${String(monthIndex + 1).padStart(2, '0')}-10`;
         
+        const dueMonthStartOneTime = new Date(year, monthIndex, 1);
         virtualDues.push({
           id: `virtual-${struct.id}-${monthIndex}-${year}`,
           academic_year: structAcademicYear,
+          is_future: dueMonthStartOneTime > currentMonthStart,
           fee: {
             title: `${categoryTitle} - ${year}-${year+1}`,
             base_title: `${categoryTitle} - ${year}-${year+1}`,
@@ -147,6 +177,7 @@ export const calculateVirtualDues = async (studentId, academicYear = getCurrentA
           month: monthIndex,
           year: year
         });
+        }
       }
     } else {
       // Monthly
@@ -161,6 +192,7 @@ export const calculateVirtualDues = async (studentId, academicYear = getCurrentA
           virtualDues.push({
             id: `virtual-${struct.id}-${monthIndex}-${year}`,
             academic_year: structAcademicYear,
+            is_future: dueMonthStart > currentMonthStart,
             fee: {
               title: `${categoryTitle} - ${monthNames[monthIndex]} ${year}`,
               base_title: `${categoryTitle} - ${monthNames[monthIndex]} ${year}`,
@@ -189,8 +221,38 @@ export const calculateVirtualDues = async (studentId, academicYear = getCurrentA
     physicalFees.forEach(fee => {
       const actualFee = fee.fee || {};
       const feeTitle = actualFee.title || "Ad-Hoc Fee";
+      
+      const dueMonth = actualFee.due_date ? new Date(actualFee.due_date).getMonth() : new Date().getMonth();
+      const dueYear = actualFee.due_date ? new Date(actualFee.due_date).getFullYear() : new Date().getFullYear();
+      const dueMonthStart = new Date(dueYear, dueMonth, 1);
+      
+      const isFuture = dueMonthStart > currentMonthStart;
+      
+      if (!includeFuture && isFuture) {
+        return; // Skip future physical fees if includeFuture is false
+      }
+
+      // Filter by academicYear
+      if (academicYear !== "ALL") {
+        const startYear = parseInt(academicYear.split("-")[0]);
+        // academic year bounds: April 1st of startYear to March 31st of startYear + 1
+        const academicStart = new Date(startYear, 3, 1);
+        const academicEnd = new Date(startYear + 1, 2, 31, 23, 59, 59);
+        if (actualFee.due_date) {
+            const dueDate = new Date(actualFee.due_date);
+            if (dueDate < academicStart || dueDate > academicEnd) {
+                return;
+            }
+        } else {
+            // If no due date, fallback to checking if we are currently inside the requested academic year
+            const today = new Date();
+            if (today < academicStart || today > academicEnd) return;
+        }
+      }
+      
       virtualDues.push({
         id: `physical-${fee.id}`,
+        is_future: isFuture,
         fee: {
           title: feeTitle,
           base_title: feeTitle,
@@ -201,8 +263,8 @@ export const calculateVirtualDues = async (studentId, academicYear = getCurrentA
         status: "pending",
         total_paid_amount: fee.total_paid_amount || 0,
         category: feeTitle.toLowerCase().includes("transport") ? "transport" : "ad-hoc",
-        month: actualFee.due_date ? new Date(actualFee.due_date).getMonth() : new Date().getMonth(),
-        year: actualFee.due_date ? new Date(actualFee.due_date).getFullYear() : new Date().getFullYear()
+        month: dueMonth,
+        year: dueYear
       });
     });
   }
@@ -314,10 +376,9 @@ export const calculateVirtualDues = async (studentId, academicYear = getCurrentA
   return { virtualDues: filteredVirtualDues, payments, structures: filteredStructures };
 };
 
-export const calculateTotalVirtualDueForStudent = (student, sClassName, structures, sPayments, sessionStartYear, monthsPassed, lateFeePenaltyAmount = 10, startMonthsPassed = 0) => {
+export const calculateTotalVirtualDueForStudent = (student, sClassName, structures, sPayments, sessionStartYear, monthsPassed, lateFeePenaltyAmount = 10, startMonthsPassed = 0, academicYear = "ALL") => {
   let totalVirtualDue = 0;
-  if (student.fee_exempted) return 0;
-
+  
   const todayDate = new Date();
   const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 
@@ -339,7 +400,11 @@ export const calculateTotalVirtualDueForStudent = (student, sClassName, structur
     return Math.max(0, penaltyEndDayNumber - dueDayNumber);
   };
 
-  const sStructures = (structures || []).filter(st => st.class_name === sClassName || !st.class_name);
+  const sStructures = (structures || []).filter(st => {
+    if (st.class_name && st.class_name !== sClassName) return false;
+    if (academicYear !== "ALL" && st.academic_year && st.academic_year !== academicYear) return false;
+    return true;
+  });
 
   sStructures.forEach(struct => {
     let frequency = 'monthly';
@@ -361,7 +426,7 @@ export const calculateTotalVirtualDueForStudent = (student, sClassName, structur
     let joinMonthStart = new Date(sessionStartYear, 3, 1); // default April 1st of session
 
     // Override if student joined later
-    let admissionDateStr = student.admission_date;
+    let admissionDateStr = student.admission_date || student.created_at;
     if (admissionDateStr) {
       const admissionDate = new Date(admissionDateStr);
       // Only adjust if they joined after the session started

@@ -15,11 +15,12 @@ export const fetchUsers = createAsyncThunk(
 
 export const fetchFinanceStats = createAsyncThunk(
   "data/fetchFinanceStats",
-  async ({ startDate, endDate } = {}, { rejectWithValue }) => {
+  async ({ startDate, endDate, academic_year } = {}, { rejectWithValue }) => {
     try {
       const params = new URLSearchParams();
       if (startDate) params.append("startDate", startDate);
       if (endDate) params.append("endDate", endDate);
+      if (academic_year) params.append("academic_year", academic_year);
       const url = `/finance_panel/dashboardStats${params.toString() ? `?${params.toString()}` : ""}`;
       const response = await api.get(url);
       return response.data.stats;
