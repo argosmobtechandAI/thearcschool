@@ -60,6 +60,8 @@ const DashboardMetrics = () => {
     if (students.length > 0) {
       api.post("/finance_panel/studentBalances", { 
         students: students.map(s => ({ id: s.id, type: s.type, fee_exempted: s.fee_exempted, classes: s.classes, bus_fee: s.bus_fee, admission_date: s.admission_date, created_at: s.created_at })),
+        startDate,
+        endDate,
         academic_year: academicYear
       })
         .then(res => {
@@ -71,7 +73,7 @@ const DashboardMetrics = () => {
         })
         .catch(console.error);
     }
-  }, [students, refreshTrigger, academicYear]);
+  }, [students, refreshTrigger, academicYear, startDate, endDate]);
 
   useEffect(() => {
     if (currentView === "collected") {

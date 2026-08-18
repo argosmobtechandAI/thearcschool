@@ -78,13 +78,13 @@ android {
     buildToolsVersion rootProject.ext.buildToolsVersion
     compileSdk rootProject.ext.compileSdkVersion
 
-    namespace "com.teacher_app"
+    namespace "com.teacher_app1"
     defaultConfig {
-        applicationId "com.teacherapp"
+        applicationId "com.teacher_app1"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 3
-        versionName "3.0"
+        versionCode 5
+        versionName "5"
     }
     signingConfigs {
         debug {

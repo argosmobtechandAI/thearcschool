@@ -323,6 +323,14 @@ export const getStudentBalances = async (req, res) => {
         
         if (dueDateObj) {
             if (dueDateObj < academicStartObj || dueDateObj > academicEndObj) return; // filter by academic year bounds
+            if (startDate) {
+              const parsedStart = new Date(startDate);
+              if (!isNaN(parsedStart.getTime()) && dueDateObj < parsedStart) return;
+            }
+            if (endDate && !includeFuture) {
+              const parsedEnd = new Date(endDate);
+              if (!isNaN(parsedEnd.getTime()) && dueDateObj > parsedEnd) return;
+            }
         }
         
         const relatedPayments = sPayments.filter(p => p.remarks && p.remarks.includes(feeTitle));
@@ -1028,7 +1036,7 @@ export const updateStudentBusFee = async (req, res) => {
     if (error) throw error;
 
     // Cleanup future unpaid transport fees if bus service is stopped
-    if (!bus_fee || bus_fee === 0) {
+    if (Number(bus_fee) === 0) {
       const today = new Date();
       const currentMonthStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
       

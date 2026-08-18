@@ -7,6 +7,63 @@
   "client": [
     {
       "client_info": {
+        "mobilesdk_app_id": "1:349267453118:android:c2d23d7a6ab8a43d1feaef",
+        "android_client_info": {
+          "package_name": "com.student_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBd21GLxzD7KrrL9dUup3iJ2Uq2Gbrn4oA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:349267453118:android:0a71d8dd7afc69d61feaef",
+        "android_client_info": {
+          "package_name": "com.student_app1"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBd21GLxzD7KrrL9dUup3iJ2Uq2Gbrn4oA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:349267453118:android:0a810c4512c7acbd1feaef",
+        "android_client_info": {
+          "package_name": "com.teacher_app1"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBd21GLxzD7KrrL9dUup3iJ2Uq2Gbrn4oA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
         "mobilesdk_app_id": "1:349267453118:android:4d0ef8f866f43c5d1feaef",
         "android_client_info": {
           "package_name": "com.teacherapp"
