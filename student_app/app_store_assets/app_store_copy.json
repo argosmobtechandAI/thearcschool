@@ -1,0 +1,22 @@
+{
+  "app_name": "The Arc School",
+  "subtitle": "Student & Parent School Portal",
+  "primary_category": "Education",
+  "secondary_category": "Productivity",
+  "promotional_text": "Access your timetable, coursework, exam results, attendance, and school circulars in one unified place with The Arc School Student App.",
+  "keywords": "the arc school,student portal,school timetable,homework,exam results,attendance,school app,grades",
+  "support_url": "https://arcschool.cloud/support",
+  "marketing_url": "https://arcschool.cloud",
+  "privacy_policy_url": "https://arcschool.cloud/privacy",
+  "copyright": "2026 ARGOSMOB TECH & AI PRIVATE LIMITED",
+  "app_review": {
+    "sign_in_required": true,
+    "demo_user": "student.test@arcschool.cloud",
+    "demo_password": "ArcTest@2026#",
+    "notes": "This app is the student portal for The Arc School. Please log in using the provided demo student account to test all features including Dashboard, Timetable, Coursework/Homework, Results, and School Circulars."
+  },
+  "screenshots_spec": {
+    "display_6_7": "1284x2778",
+    "display_6_5": "1242x2688"
+  }
+}
