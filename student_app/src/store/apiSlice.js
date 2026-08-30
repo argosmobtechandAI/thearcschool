@@ -6,11 +6,17 @@ export const apiSlice = createApi({
   reducerPath: 'api',
   baseQuery: fetchBaseQuery({
     baseUrl: API_URL,
-    prepareHeaders: async (headers) => {
+    prepareHeaders: async (headers, { getState }) => {
       try {
-        const credentials = await Keychain.getGenericPassword();
-        if (credentials && credentials.password) {
-          headers.set('Authorization', `Bearer ${credentials.password}`);
+        let token = getState()?.auth?.token;
+        if (!token) {
+          const credentials = await Keychain.getGenericPassword();
+          if (credentials && credentials.password) {
+            token = credentials.password;
+          }
+        }
+        if (token) {
+          headers.set('Authorization', `Bearer ${token}`);
         }
       } catch (error) {
         console.log('Error fetching token for headers:', error);

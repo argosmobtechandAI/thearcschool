@@ -2,7 +2,8 @@ import React, { useState, useCallback } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl, Image } from 'react-native';
 import { useDispatch, useSelector } from 'react-redux';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useGetDashboardQuery } from '../../store/apiSlice';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { apiSlice, useGetDashboardQuery } from '../../store/apiSlice';
 import { logout } from '../../store/authSlice';
 import * as Keychain from 'react-native-keychain';
 import Icon from 'react-native-vector-icons/Feather';
@@ -46,12 +47,27 @@ const ProfileScreen = ({ navigation }) => {
     .split(' ').map(p => p[0]).slice(0, 2).join('').toUpperCase();
 
   const handleLogout = async () => {
+    setShowLogoutModal(false);
+    try {
+      await AsyncStorage.clear();
+    } catch (e) {
+      try {
+        await AsyncStorage.multiRemove(['@auth_user', '@auth_token']);
+      } catch (err) {
+        console.warn("Error clearing storage on logout:", err);
+      }
+    }
     try {
       await Keychain.resetGenericPassword();
-      dispatch(logout());
     } catch (e) {
-      console.error("Error logging out:", e);
+      console.warn("Error resetting keychain:", e);
     }
+    try {
+      dispatch(apiSlice.util.resetApiState());
+    } catch (e) {
+      console.warn("Error resetting api state:", e);
+    }
+    dispatch(logout());
   };
 
   return (

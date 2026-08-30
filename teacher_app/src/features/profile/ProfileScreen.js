@@ -46,15 +46,26 @@ const ProfileScreen = ({ navigation }) => {
 
   const handleLogout = async () => {
     try {
+      await AsyncStorage.clear();
+    } catch (e) {
+      try {
+        await AsyncStorage.multiRemove(['@auth_user', '@auth_token']);
+      } catch (err) {
+        console.warn("Error clearing storage on logout:", err);
+      }
+    }
+    try {
       await Keychain.resetGenericPassword();
-      await AsyncStorage.removeItem('@auth_user');
-      await AsyncStorage.removeItem('@auth_token');
+    } catch (e) {
+      console.warn("Error resetting keychain:", e);
+    }
+    try {
       dispatch(apiSlice.util.resetApiState());
       dispatch(clearAppState());
-      dispatch(logout());
     } catch (e) {
-      console.error("Error during logout:", e);
+      console.warn("Error resetting app/api state:", e);
     }
+    dispatch(logout());
   };
 
   const InfoCard = ({ icon, title, value, color }) => (

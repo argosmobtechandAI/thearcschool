@@ -22,7 +22,7 @@ const SplashScreen = ({ onFinish }) => {
         const storedUser = await AsyncStorage.getItem('@auth_user');
         const storedToken = await AsyncStorage.getItem('@auth_token');
         if (storedUser && storedToken) {
-          dispatch(setCredentials({ user: JSON.parse(storedUser) }));
+          dispatch(setCredentials({ user: JSON.parse(storedUser), token: storedToken }));
         }
       } catch (e) {
         console.error('Failed to restore login state', e);

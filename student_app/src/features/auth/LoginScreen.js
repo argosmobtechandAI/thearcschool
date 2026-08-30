@@ -31,7 +31,7 @@ const LoginScreen = () => {
         await Keychain.setGenericPassword('token', response.token);
         await AsyncStorage.setItem('@auth_user', JSON.stringify(response.user));
         await AsyncStorage.setItem('@auth_token', response.token);
-        dispatch(setCredentials({ user: response.user }));
+        dispatch(setCredentials({ user: response.user, token: response.token }));
 
         // Register FCM Token
         const { requestUserPermission, getFCMToken } = require('../../utils/notificationHandler');
