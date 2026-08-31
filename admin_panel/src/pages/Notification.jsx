@@ -247,7 +247,7 @@ export default function Notifications() {
   }
 
   return (
-    <div style={{ padding: "1rem", display: "flex", flexDirection: "column", gap: "1rem", height: "calc(100vh - 40px)", overflow: "hidden" }}>
+    <div style={{ padding: "0 0 1rem 0", display: "flex", flexDirection: "column", gap: "1rem", height: "100%", width: "100%", overflow: "hidden" }}>
       {/* Header and Filter Block */}
       <div className="glass-panel animate-fade-in" style={{ padding: "1rem 1.5rem", display: "flex", flexDirection: "column", gap: "1rem" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "1rem" }}>

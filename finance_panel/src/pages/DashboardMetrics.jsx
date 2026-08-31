@@ -496,18 +496,8 @@ const DashboardMetrics = () => {
   }
 
   return (
-    <div className="animate-fade-in">
-      <div style={{ display: "flex", alignItems: "center", gap: "1rem", marginBottom: "0.5rem" }}>
-        <button onClick={() => navigate("/dashboard")} className="btn btn-ghost" style={{ padding: "0.25rem 0.5rem" }}>
-          <ArrowLeft size={18} />
-        </button>
-        <div>
-          <h1 style={{ fontSize: "1.25rem", fontWeight: "700", color: "var(--text-primary)", marginBottom: "0" }}>Dashboard Metrics</h1>
-          <p style={{ color: "var(--text-secondary)", fontSize: "0.75rem", margin: "0" }}>Detailed breakdown of financial metrics.</p>
-        </div>
-      </div>
-
-      <div style={{ display: "flex", gap: "0.5rem", marginBottom: "0.75rem", overflowX: "auto", paddingBottom: "0.25rem" }}>
+    <div className="animate-fade-in" style={{ width: "100%", display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+      <div style={{ display: "flex", gap: "0.5rem", overflowX: "auto", paddingBottom: "0.25rem" }}>
         {viewOptions.map(opt => (
           <button
             key={opt.id}
@@ -795,19 +785,56 @@ const DashboardMetrics = () => {
       />
       {/* Edit Payment Modal */}
       {isEditPaymentModalOpen && editingPayment && (
-        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 50, padding: "1rem" }}>
-          <div className="glass-panel modal-content animate-fade-in" style={{ width: "100%", maxWidth: "800px", maxHeight: "90vh", display: "flex", flexDirection: "column", padding: "2rem", overflow: "hidden" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.5rem", flexShrink: 0 }}>
-              <h2 style={{ fontSize: "1.25rem", fontWeight: "700" }}>Edit Payment</h2>
-              <button onClick={() => { setIsEditPaymentModalOpen(false); setEditingPayment(null); }} style={{ background: "none", border: "none", cursor: "pointer", fontSize: "1.5rem", color: "var(--text-secondary)" }}>&times;</button>
+        <div 
+          className="animate-fade-in"
+          style={{ 
+            position: "fixed", 
+            inset: 0, 
+            background: "rgba(15, 23, 42, 0.55)", 
+            backdropFilter: "blur(6px)", 
+            display: "flex", 
+            alignItems: "center", 
+            justifyContent: "center", 
+            zIndex: 1000, 
+            padding: "1rem" 
+          }}
+          onClick={() => { setIsEditPaymentModalOpen(false); setEditingPayment(null); }}
+        >
+          <div 
+            className="glass-panel modal-content" 
+            style={{ 
+              width: "100%", 
+              maxWidth: "680px", 
+              maxHeight: "88vh", 
+              display: "flex", 
+              flexDirection: "column", 
+              padding: "1.5rem", 
+              borderRadius: "14px",
+              background: "#ffffff",
+              border: "1px solid var(--glass-border)",
+              boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.15)",
+              gap: "1.15rem"
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid var(--glass-border)", paddingBottom: "0.85rem" }}>
+              <h2 style={{ fontSize: "1.15rem", fontWeight: "800", color: "var(--text-primary)", margin: 0 }}>Edit Payment Record</h2>
+              <button 
+                onClick={() => { setIsEditPaymentModalOpen(false); setEditingPayment(null); }} 
+                className="btn btn-ghost"
+                style={{ width: "32px", height: "32px", padding: 0, borderRadius: "8px", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-secondary)" }}
+              >
+                <X size={18} />
+              </button>
             </div>
+
             <form onSubmit={handleEditPaymentSubmit} style={{ display: "flex", flexDirection: "column", gap: "1rem", overflow: "hidden", flex: 1 }}>
               {editingPayment.isGrouped ? (
-                <div style={{ display: "flex", flexDirection: "column", gap: "1rem", overflow: "hidden", flex: 1 }}>
-                  <div style={{ padding: "1rem", background: "rgba(0,0,0,0.02)", borderRadius: "8px", border: "1px solid var(--glass-border)", flexShrink: 0 }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "1rem" }}>
-                      <label style={{ fontSize: "0.875rem", fontWeight: "600", margin: 0 }}>Global Payment Mode</label>
-                      <select className="input-glass" style={{ width: "100%", maxWidth: "250px" }} value={editingPayment.payment_mode} onChange={e => setEditingPayment({...editingPayment, payment_mode: e.target.value})}>
+                <div style={{ display: "flex", flexDirection: "column", gap: "0.85rem", overflow: "hidden", flex: 1 }}>
+                  <div style={{ padding: "0.75rem 1rem", background: "rgba(248, 250, 252, 0.8)", borderRadius: "8px", border: "1px solid var(--glass-border)" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "0.75rem" }}>
+                      <label style={{ fontSize: "0.75rem", fontWeight: "700", textTransform: "uppercase", color: "var(--text-secondary)", margin: 0 }}>Global Payment Mode</label>
+                      <select className="input-glass" style={{ width: "100%", maxWidth: "200px", height: "34px", margin: 0, fontSize: "0.82rem", fontWeight: "600" }} value={editingPayment.payment_mode} onChange={e => setEditingPayment({...editingPayment, payment_mode: e.target.value})}>
                         <option value="Cash">Cash</option>
                         <option value="Cheque">Cheque</option>
                         <option value="Online">Online / UPI</option>
@@ -817,17 +844,17 @@ const DashboardMetrics = () => {
                     </div>
                   </div>
                   
-                  <div style={{ overflowY: "auto", display: "flex", flexDirection: "column", gap: "0.75rem", paddingRight: "0.5rem", flex: 1 }}>
+                  <div style={{ overflowY: "auto", display: "flex", flexDirection: "column", gap: "0.65rem", maxHeight: "300px", paddingRight: "0.25rem" }}>
                     {editingPayment.groupedPayments.map((gp, idx) => (
-                      <div key={gp.id} style={{ padding: "1rem", border: "1px solid var(--glass-border)", borderRadius: "8px", background: "rgba(0,0,0,0.02)" }}>
-                        <p style={{ fontSize: "0.875rem", fontWeight: "600", marginBottom: "0.75rem", color: "var(--text-primary)" }}>
+                      <div key={gp.id} style={{ padding: "0.75rem 0.85rem", border: "1px solid var(--glass-border)", borderRadius: "8px", background: "#ffffff" }}>
+                        <p style={{ fontSize: "0.82rem", fontWeight: "700", marginBottom: "0.5rem", color: "var(--text-primary)" }}>
                           {gp.fee?.title || gp.remarks || "Fee Item"}
                         </p>
-                        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "1rem" }}>
+                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1.5fr", gap: "0.75rem" }}>
                           <div>
-                            <label style={{ display: "block", fontSize: "0.75rem", marginBottom: "0.25rem", color: "var(--text-secondary)" }}>Amount Paid (₹)</label>
+                            <label style={{ display: "block", fontSize: "0.72rem", fontWeight: "700", textTransform: "uppercase", marginBottom: "0.25rem", color: "var(--text-secondary)" }}>Amount Paid (₹)</label>
                             <input 
-                              type="number" required min="0" className="input-glass" style={{ width: "100%", padding: "0.5rem" }} 
+                              type="number" required min="0" className="input-glass" style={{ width: "100%", height: "34px", margin: 0, fontSize: "0.84rem", fontWeight: "600" }} 
                               value={gp.amount_paid} 
                               onChange={e => {
                                 const newGrouped = [...editingPayment.groupedPayments];
@@ -837,9 +864,9 @@ const DashboardMetrics = () => {
                             />
                           </div>
                           <div>
-                            <label style={{ display: "block", fontSize: "0.75rem", marginBottom: "0.25rem", color: "var(--text-secondary)" }}>Remarks</label>
+                            <label style={{ display: "block", fontSize: "0.72rem", fontWeight: "700", textTransform: "uppercase", marginBottom: "0.25rem", color: "var(--text-secondary)" }}>Remarks</label>
                             <input 
-                              type="text" className="input-glass" style={{ width: "100%", padding: "0.5rem" }} 
+                              type="text" className="input-glass" style={{ width: "100%", height: "34px", margin: 0, fontSize: "0.84rem" }} 
                               value={gp.remarks || ""} 
                               onChange={e => {
                                 const newGrouped = [...editingPayment.groupedPayments];
@@ -854,15 +881,15 @@ const DashboardMetrics = () => {
                   </div>
                 </div>
               ) : (
-                <div style={{ display: "flex", flexDirection: "column", gap: "1rem", overflowY: "auto", paddingRight: "0.5rem" }}>
-                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "1rem" }}>
+                <div style={{ display: "flex", flexDirection: "column", gap: "0.85rem" }}>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.85rem" }}>
                     <div>
-                      <label style={{ display: "block", fontSize: "0.875rem", marginBottom: "0.5rem" }}>Amount Paid (₹)</label>
-                      <input type="number" required min="1" className="input-glass" style={{ width: "100%" }} value={editingPayment.amount_paid} onChange={e => setEditingPayment({...editingPayment, amount_paid: e.target.value})} />
+                      <label style={{ display: "block", fontSize: "0.74rem", fontWeight: "700", textTransform: "uppercase", marginBottom: "0.35rem", color: "var(--text-secondary)" }}>Amount Paid (₹) *</label>
+                      <input type="number" required min="1" className="input-glass" style={{ width: "100%", height: "36px", margin: 0, fontSize: "0.9rem", fontWeight: "700" }} value={editingPayment.amount_paid} onChange={e => setEditingPayment({...editingPayment, amount_paid: e.target.value})} />
                     </div>
                     <div>
-                      <label style={{ display: "block", fontSize: "0.875rem", marginBottom: "0.5rem" }}>Payment Mode</label>
-                      <select className="input-glass" style={{ width: "100%" }} value={editingPayment.payment_mode} onChange={e => setEditingPayment({...editingPayment, payment_mode: e.target.value})}>
+                      <label style={{ display: "block", fontSize: "0.74rem", fontWeight: "700", textTransform: "uppercase", marginBottom: "0.35rem", color: "var(--text-secondary)" }}>Payment Mode</label>
+                      <select className="input-glass" style={{ width: "100%", height: "36px", margin: 0, fontSize: "0.84rem", fontWeight: "600" }} value={editingPayment.payment_mode} onChange={e => setEditingPayment({...editingPayment, payment_mode: e.target.value})}>
                         <option value="Cash">Cash</option>
                         <option value="Cheque">Cheque</option>
                         <option value="Online">Online / UPI</option>
@@ -872,16 +899,16 @@ const DashboardMetrics = () => {
                     </div>
                   </div>
                   <div>
-                    <label style={{ display: "block", fontSize: "0.875rem", marginBottom: "0.5rem" }}>Remarks</label>
-                    <input type="text" className="input-glass" style={{ width: "100%" }} value={editingPayment.remarks || ""} onChange={e => setEditingPayment({...editingPayment, remarks: e.target.value})} />
+                    <label style={{ display: "block", fontSize: "0.74rem", fontWeight: "700", textTransform: "uppercase", marginBottom: "0.35rem", color: "var(--text-secondary)" }}>Remarks / Ref No</label>
+                    <input type="text" className="input-glass" style={{ width: "100%", height: "36px", margin: 0, fontSize: "0.84rem" }} value={editingPayment.remarks || ""} onChange={e => setEditingPayment({...editingPayment, remarks: e.target.value})} />
                   </div>
                 </div>
               )}
-              <div style={{ display: "flex", gap: "1rem", marginTop: "1rem", flexShrink: 0 }}>
-                <button type="button" onClick={() => { setIsEditPaymentModalOpen(false); setEditingPayment(null); }} className="btn btn-ghost" style={{ flex: 1, justifyContent: "center", border: "1px solid var(--glass-border)" }}>
+              <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.65rem", paddingTop: "0.75rem", borderTop: "1px solid var(--glass-border)" }}>
+                <button type="button" onClick={() => { setIsEditPaymentModalOpen(false); setEditingPayment(null); }} className="btn btn-ghost" style={{ padding: "0.4rem 1rem", fontSize: "0.8rem", border: "1px solid var(--glass-border)" }}>
                   Cancel
                 </button>
-                <button type="submit" disabled={isPaying} className="btn btn-primary" style={{ flex: 1, justifyContent: "center" }}>
+                <button type="submit" disabled={isPaying} className="btn btn-primary" style={{ padding: "0.4rem 1.25rem", fontSize: "0.8rem", fontWeight: "700" }}>
                   {isPaying ? "Saving..." : "Save Changes"}
                 </button>
               </div>

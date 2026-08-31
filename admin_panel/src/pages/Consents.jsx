@@ -225,7 +225,7 @@ const Consents = () => {
   };
 
   return (
-    <div className="page-container" style={{ padding: "2rem", height: "100vh", overflow: "auto" }}>
+    <div className="page-container" style={{ padding: "0 0 2rem 0", width: "100%" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "2rem" }}>
         <div>
           <h1 style={{ fontSize: "1.875rem", fontWeight: "700", color: "var(--text-primary)" }}>Student Consents</h1>

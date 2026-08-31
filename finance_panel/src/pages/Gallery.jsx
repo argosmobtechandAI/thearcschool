@@ -36,11 +36,7 @@ const Gallery = () => {
   const previewYtId = previewItem ? getYoutubeId(previewItem.media_url) : null;
 
   return (
-    <div className="animate-fade-in" style={{ padding: "1rem", maxWidth: "1200px", margin: "0 auto" }}>
-      <div style={{ marginBottom: "2rem" }}>
-        <h1 style={{ fontSize: "2rem", fontWeight: "700", color: "var(--text-primary)", marginBottom: "0.5rem" }}>School Media Gallery</h1>
-        <p style={{ color: "var(--text-secondary)" }}>View latest event highlights, school photos, and promotional videos.</p>
-      </div>
+    <div className="animate-fade-in" style={{ width: "100%", display: "flex", flexDirection: "column", gap: "1rem" }}>
 
       {loading ? (
         <p>Loading media gallery...</p>
@@ -110,29 +106,46 @@ const Gallery = () => {
 
       {/* Media Preview Modal */}
       {previewItem && (
-        <div className="modal-backdrop" onClick={() => setPreviewItem(null)} style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, backgroundColor: "rgba(0,0,0,0.8)", display: "flex", justifyContent: "center", alignItems: "center", zIndex: 1000 }}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ width: "95%", maxWidth: "800px", padding: 0, border: "none", overflow: "hidden", display: "flex", flexDirection: "column", borderRadius: "16px", backgroundColor: "#0f172a" }}>
-            <div style={{ width: "100%", height: "450px", backgroundColor: "#000", display: "flex", justifyContent: "center", alignItems: "center" }}>
+        <div 
+          className="animate-fade-in" 
+          onClick={() => setPreviewItem(null)} 
+          style={{ position: "fixed", inset: 0, backgroundColor: "rgba(15, 23, 42, 0.75)", backdropFilter: "blur(8px)", display: "flex", justifyContent: "center", alignItems: "center", zIndex: 1000, padding: "1rem" }}
+        >
+          <div 
+            className="modal-content" 
+            onClick={(e) => e.stopPropagation()} 
+            style={{ width: "100%", maxWidth: "780px", padding: 0, border: "1px solid rgba(255,255,255,0.1)", overflow: "hidden", display: "flex", flexDirection: "column", borderRadius: "16px", backgroundColor: "#0f172a", boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.5)", position: "relative" }}
+          >
+            <button 
+              onClick={() => setPreviewItem(null)}
+              style={{ position: "absolute", top: "1rem", right: "1rem", zIndex: 10, background: "rgba(0,0,0,0.6)", border: "1px solid rgba(255,255,255,0.2)", borderRadius: "8px", width: "32px", height: "32px", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", cursor: "pointer" }}
+            >
+              <X size={18} />
+            </button>
+
+            <div style={{ width: "100%", maxHeight: "420px", backgroundColor: "#000", display: "flex", justifyContent: "center", alignItems: "center" }}>
               {previewItem.media_type === 'video' ? (
                 previewYtId ? (
                   <iframe 
                     src={`https://www.youtube.com/embed/${previewYtId}?autoplay=1`} 
-                    style={{ width: "100%", height: "100%", border: "none" }} 
+                    style={{ width: "100%", height: "420px", border: "none" }} 
                     allow="autoplay; encrypted-media" 
                     allowFullScreen 
                   />
                 ) : (
-                  <video src={previewItem.media_url} controls autoPlay style={{ width: "100%", height: "100%" }} />
+                  <video src={previewItem.media_url} controls autoPlay style={{ width: "100%", maxHeight: "420px" }} />
                 )
               ) : (
-                <img src={previewItem.media_url} alt={previewItem.title} style={{ width: "100%", height: "100%", objectFit: "contain" }} />
+                <img src={previewItem.media_url} alt={previewItem.title} style={{ width: "100%", maxHeight: "420px", objectFit: "contain" }} />
               )}
             </div>
-            <div style={{ padding: "1.5rem", backgroundColor: "rgba(15, 23, 42, 0.95)" }}>
-              <h2 style={{ fontSize: "1.5rem", fontWeight: "700", color: "#fff", marginBottom: "0.5rem" }}>{previewItem.title}</h2>
-              <p style={{ fontSize: "0.95rem", color: "#94a3b8", lineHeight: "1.5" }}>{previewItem.description || "No description provided."}</p>
-              <button onClick={() => setPreviewItem(null)} className="btn btn-ghost" style={{ alignSelf: "flex-end", marginTop: "1rem", color: "#fff", border: "1px solid rgba(255,255,255,0.2)" }}>
-                Close Preview
+            <div style={{ padding: "1.25rem 1.5rem", backgroundColor: "rgba(15, 23, 42, 0.95)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <div>
+                <h2 style={{ fontSize: "1.15rem", fontWeight: "700", color: "#fff", marginBottom: "0.25rem" }}>{previewItem.title}</h2>
+                <p style={{ fontSize: "0.85rem", color: "#94a3b8", margin: 0 }}>{previewItem.description || "No description provided."}</p>
+              </div>
+              <button onClick={() => setPreviewItem(null)} className="btn btn-ghost" style={{ color: "#fff", border: "1px solid rgba(255,255,255,0.2)", padding: "0.4rem 1rem", fontSize: "0.8rem", flexShrink: 0 }}>
+                Close
               </button>
             </div>
           </div>

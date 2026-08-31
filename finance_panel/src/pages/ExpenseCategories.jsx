@@ -60,13 +60,8 @@ const ExpenseCategories = () => {
   };
 
   return (
-    <div className="animate-fade-in">
-      <div style={{ marginBottom: "2rem" }}>
-        <h1 style={{ fontSize: "1.875rem", fontWeight: "700", color: "var(--text-primary)", marginBottom: "0.25rem" }}>Expense Categories</h1>
-        <p style={{ color: "var(--text-secondary)" }}>Manage categories for school overheads and expenses.</p>
-      </div>
-
-      <div style={{ display: "grid", gridTemplateColumns: "minmax(300px, 1fr) 2fr", gap: "1.5rem" }}>
+    <div className="animate-fade-in" style={{ width: "100%", display: "flex", flexDirection: "column", gap: "1rem" }}>
+      <div style={{ display: "grid", gridTemplateColumns: "minmax(300px, 1fr) 2fr", gap: "1.25rem" }}>
         {/* Add Form */}
         <div className="glass-panel" style={{ padding: "1.5rem", height: "fit-content" }}>
           <h2 style={{ fontSize: "1.125rem", fontWeight: "600", marginBottom: "1.25rem", display: "flex", alignItems: "center", gap: "0.5rem", color: "#ef4444" }}>

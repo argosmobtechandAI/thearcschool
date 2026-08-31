@@ -19,6 +19,7 @@ import IncomeCategories from './pages/IncomeCategories';
 import ExpenseCategories from './pages/ExpenseCategories';
 import ProfitLoss from './pages/ProfitLoss';
 import Gallery from './pages/Gallery';
+import TransportManagement from './pages/TransportManagement';
 import FinanceLayout from './layouts/FinanceLayout';
 
 const PrivateRoute = ({ children }) => {
@@ -48,6 +49,7 @@ function App() {
           <Route path="metrics" element={<DashboardMetrics />} />
           <Route path="student-master" element={<StudentMaster />} />
           <Route path="student-master/:id" element={<StudentFinanceDetails />} />
+          <Route path="transport" element={<TransportManagement />} />
           <Route path="gallery" element={<Gallery />} />
         </Route>
         

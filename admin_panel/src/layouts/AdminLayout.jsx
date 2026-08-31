@@ -1,7 +1,36 @@
 import { Outlet, useNavigate, NavLink, useLocation } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import { useEffect, useState } from "react";
-import { LogOut, LayoutDashboard, Users, BookOpen, UserCircle, Settings, UserCheck, IndianRupee, FileEdit, Clock, Calendar, ClipboardCheck, Bell, DollarSign, MessageSquare, Info, ShieldAlert, MapPin, ExternalLink, TrendingUp, FileSignature, Quote, Award, FileText, Sparkles, Image as ImageIcon } from "lucide-react";
+import { 
+  LogOut, 
+  LayoutDashboard, 
+  Users, 
+  BookOpen, 
+  UserCircle, 
+  Settings, 
+  UserCheck, 
+  IndianRupee, 
+  FileEdit, 
+  Clock, 
+  Calendar, 
+  ClipboardCheck, 
+  Bell, 
+  DollarSign, 
+  MessageSquare, 
+  Info, 
+  ShieldAlert, 
+  MapPin, 
+  ExternalLink, 
+  TrendingUp, 
+  FileSignature, 
+  Quote, 
+  Award, 
+  FileText, 
+  Sparkles, 
+  Image as ImageIcon,
+  GraduationCap,
+  Briefcase
+} from "lucide-react";
 import { toast } from "react-toastify";
 import { logout } from "../features/authSlice";
 import { addLiveChatMessage, fetchSystemMonitorList } from "../features/dataSlice";
@@ -9,6 +38,76 @@ import { messaging } from "../config/firebase";
 import { getToken, onMessage } from "firebase/messaging";
 import api from "../services/api";
 import { socket } from "../lib/socket";
+
+const NavItem = ({ to, href, icon: Icon, color, bg, children, badge }) => {
+  const content = (
+    <>
+      <div 
+        style={{ 
+          width: "26px", 
+          height: "26px", 
+          borderRadius: "7px", 
+          background: bg, 
+          color: color, 
+          display: "flex", 
+          alignItems: "center", 
+          justifyContent: "center", 
+          flexShrink: 0,
+          boxShadow: `0 1px 3px ${bg}`
+        }}
+      >
+        <Icon size={14} strokeWidth={2.4} />
+      </div>
+      <span style={{ flex: 1, fontSize: "0.82rem", fontWeight: "600" }}>{children}</span>
+      {badge}
+    </>
+  );
+
+  if (href) {
+    return (
+      <a
+        href={href}
+        target="_blank"
+        rel="noopener noreferrer"
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: "0.6rem",
+          padding: "0.35rem 0.65rem",
+          borderRadius: "8px",
+          color: "var(--text-secondary)",
+          textDecoration: "none",
+          transition: "all 0.2s ease",
+          marginBottom: "2px"
+        }}
+        className="table-row-hover"
+      >
+        {content}
+      </a>
+    );
+  }
+
+  return (
+    <NavLink
+      to={to}
+      style={({ isActive }) => ({
+        display: "flex",
+        alignItems: "center",
+        gap: "0.6rem",
+        padding: "0.35rem 0.65rem",
+        borderRadius: "8px",
+        color: isActive ? "var(--accent-primary)" : "var(--text-primary)",
+        background: isActive ? "var(--accent-light)" : "transparent",
+        textDecoration: "none",
+        transition: "all 0.2s ease",
+        marginBottom: "2px",
+        borderLeft: isActive ? "3px solid var(--accent-primary)" : "3px solid transparent"
+      })}
+    >
+      {content}
+    </NavLink>
+  );
+};
 
 const AdminLayout = () => {
   const dispatch = useDispatch();
@@ -52,7 +151,6 @@ const AdminLayout = () => {
 
       const fetchUnread = async () => {
         try {
-          // Fetch admin's own notifications
           const res = await api.get('/admin_panel/notifications');
           if (res.data && res.data.data) {
             const unreadNotifs = res.data.data.filter(n => !n.is_read && n.type !== 'live_chat').length;
@@ -75,7 +173,6 @@ const AdminLayout = () => {
             <p style={{ margin: 0 }}>{payload.notification.body}</p>
           </div>
         );
-        // Increment unread count based on type
         if (payload.data?.type === 'live_chat') {
           setUnreadChats(prev => prev + 1);
         } else {
@@ -137,26 +234,18 @@ const AdminLayout = () => {
     }
   }, [location.pathname]);
 
-  const navLinkStyle = ({ isActive }) => ({
-    display: "flex", alignItems: "center", gap: "0.5rem", padding: "0.35rem 0.75rem", 
-    borderRadius: "6px", fontWeight: "500", transition: "all 0.3s", fontSize: "0.8rem",
-    textDecoration: "none",
-    background: isActive ? "var(--accent-light)" : "transparent",
-    color: isActive ? "var(--accent-primary)" : "var(--text-secondary)",
-  });
-
   const NavGroup = ({ title }) => (
     <div style={{ 
-      marginTop: "1.25rem", 
-      marginBottom: "0.5rem", 
+      marginTop: "1.1rem", 
+      marginBottom: "0.35rem", 
       padding: "0 0.5rem", 
       borderBottom: "1px solid var(--glass-border)", 
-      paddingBottom: "0.3rem" 
+      paddingBottom: "0.25rem" 
     }}>
       <span style={{ 
-        fontSize: "0.75rem", 
+        fontSize: "0.72rem", 
         textTransform: "uppercase", 
-        letterSpacing: "0.1em", 
+        letterSpacing: "0.08em", 
         color: "var(--accent-primary)", 
         fontWeight: "800" 
       }}>{title}</span>
@@ -164,7 +253,7 @@ const AdminLayout = () => {
   );
 
   return (
-    <div style={{ display: "flex", height: "100vh", overflow: "hidden" }}>
+    <div style={{ display: "flex", height: "100%", width: "100%", overflow: "hidden" }}>
       <style>
         {`
           .sidebar-nav::-webkit-scrollbar {
@@ -172,56 +261,99 @@ const AdminLayout = () => {
           }
         `}
       </style>
+      
       {/* Sidebar */}
-      <aside className="glass-panel" style={{ width: "230px", padding: "0.75rem", display: "flex", flexDirection: "column", borderTopLeftRadius: 0, borderBottomLeftRadius: 0, height: "100vh", overflow: "hidden" }}>
-        <div style={{ marginBottom: "1.5rem", display: "flex", alignItems: "center", gap: "0.75rem" }}>
-          <img src="/thearcschoollogo.jpeg" alt="The Arc School" style={{ height: "48px", width: "48px", borderRadius: "50%", objectFit: "cover" }} />
+      <aside className="glass-panel" style={{ width: "235px", padding: "0.85rem", display: "flex", flexDirection: "column", borderTopLeftRadius: 0, borderBottomLeftRadius: 0, height: "100%", overflow: "hidden" }}>
+        
+        {/* Brand Header */}
+        <div style={{ marginBottom: "1.25rem", display: "flex", alignItems: "center", gap: "0.75rem" }}>
+          <img src="/thearcschoollogo.jpeg" alt="The Arc School" style={{ height: "44px", width: "44px", borderRadius: "50%", objectFit: "cover", boxShadow: "0 2px 5px rgba(0,0,0,0.1)" }} />
           <div>
-            <h2 style={{ fontSize: "1.25rem", fontWeight: "700", color: "var(--text-primary)", lineHeight: 1.2 }}>The Arc School</h2>
-            <p style={{ color: "var(--text-secondary)", fontSize: "0.875rem" }}>Admin Portal</p>
+            <h2 style={{ fontSize: "1.15rem", fontWeight: "800", color: "var(--text-primary)", lineHeight: 1.2 }}>The Arc School</h2>
+            <p style={{ color: "var(--text-secondary)", fontSize: "0.78rem", fontWeight: "600" }}>Admin Portal</p>
           </div>
         </div>
 
+        {/* Navigation Items with Solid Colorful Badges */}
         <nav className="sidebar-nav" style={{ flex: 1, display: "flex", flexDirection: "column", gap: "0.15rem", overflowY: "auto", overflowX: "hidden", scrollbarWidth: "none", msOverflowStyle: "none", paddingBottom: "1rem" }}>
-          <NavLink to="/dashboard" style={navLinkStyle}>
-            <LayoutDashboard size={16} /> Dashboard
-          </NavLink>
+          
+          <NavItem to="/dashboard" icon={LayoutDashboard} color="#059669" bg="rgba(16, 185, 129, 0.15)">
+            Dashboard
+          </NavItem>
           
           {((user?.type === "admin" || user?.type === "super_admin") || user?.type === "principal") && (
             <>
               <NavGroup title="People" />
-              <NavLink to="/users/parent" style={navLinkStyle}><Users size={16} /> Parents</NavLink>
-              <NavLink to="/users/student" style={navLinkStyle}><Users size={16} /> Students</NavLink>
-              <NavLink to="/users/teacher" style={navLinkStyle}><UserCircle size={16} /> Teachers</NavLink>
+              <NavItem to="/users/parent" icon={Users} color="#db2777" bg="rgba(219, 39, 119, 0.15)">
+                Parents
+              </NavItem>
+              <NavItem to="/users/student" icon={GraduationCap} color="#2563eb" bg="rgba(37, 99, 235, 0.15)">
+                Students
+              </NavItem>
+              <NavItem to="/users/teacher" icon={UserCircle} color="#d97706" bg="rgba(217, 119, 6, 0.15)">
+                Teachers
+              </NavItem>
+
               <NavGroup title="Staff" />
-              <NavLink to="/users/finance" style={navLinkStyle}><IndianRupee size={16} /> Accountants</NavLink>
-              <NavLink to="/users/admission" style={navLinkStyle}><UserCheck size={16} /> Counselors</NavLink>
+              <NavItem to="/users/finance" icon={IndianRupee} color="#0d9488" bg="rgba(13, 148, 136, 0.15)">
+                Accountants
+              </NavItem>
+              <NavItem to="/users/admission" icon={UserCheck} color="#7c3aed" bg="rgba(124, 58, 237, 0.15)">
+                Counselors
+              </NavItem>
             </>
           )}
           
           {((user?.type === "admin" || user?.type === "super_admin") || user?.type === "principal") && (
             <>
               <NavGroup title="Academics" />
-              <NavLink to="/admissions" style={navLinkStyle}><UserCheck size={16} /> Admissions Pipeline</NavLink>
-              <NavLink to="/attendance" style={navLinkStyle}><UserCheck size={16} /> Attendance</NavLink>
-              <NavLink to="/circulars" style={navLinkStyle}><FileText size={16} /> Circulars</NavLink>
-              <NavLink to="/classes" style={navLinkStyle}><BookOpen size={16} /> Classes</NavLink>
-              <NavLink to="/coursework" style={navLinkStyle}><FileText size={16} /> Coursework</NavLink>
-              <NavLink to="/communication/inbox" style={navLinkStyle}>
-                <MessageSquare size={16} /> Communication
-                {unreadChats > 0 && (
+              <NavItem to="/admissions" icon={TrendingUp} color="#0284c7" bg="rgba(2, 132, 199, 0.15)">
+                Admissions Pipeline
+              </NavItem>
+              <NavItem to="/attendance" icon={UserCheck} color="#16a34a" bg="rgba(22, 163, 74, 0.15)">
+                Attendance
+              </NavItem>
+              <NavItem to="/circulars" icon={FileText} color="#ea580c" bg="rgba(234, 88, 12, 0.15)">
+                Circulars
+              </NavItem>
+              <NavItem to="/classes" icon={BookOpen} color="#6366f1" bg="rgba(99, 102, 241, 0.15)">
+                Classes
+              </NavItem>
+              <NavItem to="/coursework" icon={FileEdit} color="#0284c7" bg="rgba(2, 132, 199, 0.15)">
+                Coursework
+              </NavItem>
+              <NavItem 
+                to="/communication/inbox" 
+                icon={MessageSquare} 
+                color="#10b981" 
+                bg="rgba(16, 185, 129, 0.15)"
+                badge={unreadChats > 0 ? (
                   <span style={{ width: "8px", height: "8px", backgroundColor: "#22c55e", borderRadius: "50%", marginLeft: "auto" }} />
-                )}
-              </NavLink>
-              <NavLink to="/consents" style={navLinkStyle}><FileSignature size={16} /> Consents</NavLink>
-              <NavLink to="/exams" style={navLinkStyle}><ClipboardCheck size={16} /> Exams & Grading</NavLink>
-              <NavLink to="/notification" style={navLinkStyle}>
-                <Bell size={16} /> Notifications
-              </NavLink>
-              <NavLink to="/school-info" style={navLinkStyle}><Info size={16} /> School Info</NavLink>
-              <NavLink to="/subject-teachers" style={navLinkStyle}><Users size={16} /> Subject Teachers</NavLink>
-              <NavLink to="/subjects" style={navLinkStyle}><BookOpen size={16} /> Subjects</NavLink>
-              <NavLink to="/timetable" style={navLinkStyle}><Clock size={16} /> Timetable</NavLink>
+                ) : null}
+              >
+                Communication
+              </NavItem>
+              <NavItem to="/consents" icon={FileSignature} color="#c026d3" bg="rgba(192, 38, 211, 0.15)">
+                Consents
+              </NavItem>
+              <NavItem to="/exams" icon={ClipboardCheck} color="#e11d48" bg="rgba(225, 29, 72, 0.15)">
+                Exams & Grading
+              </NavItem>
+              <NavItem to="/notification" icon={Bell} color="#f59e0b" bg="rgba(245, 158, 11, 0.15)">
+                Notifications
+              </NavItem>
+              <NavItem to="/school-info" icon={Info} color="#0891b2" bg="rgba(8, 145, 178, 0.15)">
+                School Info
+              </NavItem>
+              <NavItem to="/subject-teachers" icon={Users} color="#4f46e5" bg="rgba(79, 70, 229, 0.15)">
+                Subject Teachers
+              </NavItem>
+              <NavItem to="/subjects" icon={BookOpen} color="#0d9488" bg="rgba(13, 148, 136, 0.15)">
+                Subjects
+              </NavItem>
+              <NavItem to="/timetable" icon={Clock} color="#6366f1" bg="rgba(99, 102, 241, 0.15)">
+                Timetable
+              </NavItem>
             </>
           )}
 
@@ -229,20 +361,35 @@ const AdminLayout = () => {
             <>
               <NavGroup title="Management" />
               {((user?.type === "admin" || user?.type === "super_admin") || user?.type === "principal") && (
-                <NavLink to="/annual-planner" style={navLinkStyle}><Calendar size={16} /> Annual Planner</NavLink>
+                <NavItem to="/annual-planner" icon={Calendar} color="#3b82f6" bg="rgba(59, 130, 246, 0.15)">
+                  Annual Planner
+                </NavItem>
               )}
-              <NavLink to="/fees" style={navLinkStyle}><IndianRupee size={16} /> Fees</NavLink>
+              <NavItem to="/fees" icon={IndianRupee} color="#15803d" bg="rgba(21, 128, 61, 0.15)">
+                Fees
+              </NavItem>
               {((user?.type === "admin" || user?.type === "super_admin") || user?.type === "principal") && (
-                <NavLink to="/gallery" style={navLinkStyle}><ImageIcon size={16} /> Gallery</NavLink>
+                <NavItem to="/gallery" icon={ImageIcon} color="#db2777" bg="rgba(219, 39, 119, 0.15)">
+                  Gallery
+                </NavItem>
               )}
-              <NavLink to="/pnl" style={navLinkStyle}><TrendingUp size={16} /> Profit & Loss</NavLink>
+              <NavItem to="/pnl" icon={TrendingUp} color="#b45309" bg="rgba(180, 83, 9, 0.15)">
+                Profit & Loss
+              </NavItem>
               {((user?.type === "admin" || user?.type === "super_admin") || user?.type === "principal") && (
                 <>
-                  <NavLink to="/rooms" style={navLinkStyle}><MapPin size={16} /> Rooms Management</NavLink>
-                  <NavLink to="/spotlight" style={navLinkStyle}><Sparkles size={16} /> Spotlight of the Day</NavLink>
-
-                  <NavLink to="/student-of-week" style={navLinkStyle}><Award size={16} /> Student of the Week</NavLink>
-                  <NavLink to="/thoughts" style={navLinkStyle}><Quote size={16} /> Thought of the Day</NavLink>
+                  <NavItem to="/rooms" icon={MapPin} color="#0891b2" bg="rgba(8, 145, 178, 0.15)">
+                    Rooms Management
+                  </NavItem>
+                  <NavItem to="/spotlight" icon={Sparkles} color="#d97706" bg="rgba(217, 119, 6, 0.15)">
+                    Spotlight of the Day
+                  </NavItem>
+                  <NavItem to="/student-of-week" icon={Award} color="#9333ea" bg="rgba(147, 51, 234, 0.15)">
+                    Student of the Week
+                  </NavItem>
+                  <NavItem to="/thoughts" icon={Quote} color="#7c3aed" bg="rgba(124, 58, 237, 0.15)">
+                    Thought of the Day
+                  </NavItem>
                 </>
               )}
             </>
@@ -251,34 +398,48 @@ const AdminLayout = () => {
           {((user?.type === "admin" || user?.type === "super_admin") || user?.type === "principal") && (
             <>
               <NavGroup title="Portals" />
-              <a href="https://admissions.arcschool.cloud" target="_blank" rel="noopener noreferrer" style={{ ...navLinkStyle({ isActive: false }), color: "var(--text-secondary)" }}>
-                <ExternalLink size={16} /> Admission Portal
-              </a>
-              <a href="https://finance.arcschool.cloud" target="_blank" rel="noopener noreferrer" style={{ ...navLinkStyle({ isActive: false }), color: "var(--text-secondary)" }}>
-                <ExternalLink size={16} /> Finance Portal
-              </a>
+              <NavItem href="https://admissions.arcschool.cloud" icon={ExternalLink} color="#2563eb" bg="rgba(37, 99, 235, 0.15)">
+                Admission Portal
+              </NavItem>
+              <NavItem href="https://finance.arcschool.cloud" icon={ExternalLink} color="#16a34a" bg="rgba(22, 163, 74, 0.15)">
+                Finance Portal
+              </NavItem>
             </>
           )}
         </nav>
 
-        <div style={{ marginTop: "auto", borderTop: "1px solid var(--glass-border)", paddingTop: "1rem" }}>
-          <div style={{ marginBottom: "1rem", display: "flex", alignItems: "center", gap: "0.75rem" }}>
-            <div style={{ width: "40px", height: "40px", borderRadius: "50%", background: "var(--accent-light)", color: "var(--accent-primary)", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: "bold" }}>
+        {/* User profile & Logout */}
+        <div style={{ marginTop: "auto", borderTop: "1px solid var(--glass-border)", paddingTop: "0.85rem" }}>
+          <div style={{ marginBottom: "0.75rem", display: "flex", alignItems: "center", gap: "0.65rem" }}>
+            <div style={{ width: "36px", height: "36px", borderRadius: "50%", background: "rgba(27, 139, 59, 0.15)", color: "var(--accent-primary)", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: "700", fontSize: "0.95rem" }}>
               {user?.name?.charAt(0) || "A"}
             </div>
-            <div>
-              <p style={{ fontSize: "0.875rem", fontWeight: "600" }}>{user?.name || "Admin"}</p>
-              <p style={{ fontSize: "0.75rem", color: "var(--text-secondary)", textTransform: "capitalize" }}>{user?.type || "Administrator"}</p>
+            <div style={{ overflow: "hidden" }}>
+              <p style={{ fontSize: "0.82rem", fontWeight: "700", color: "var(--text-primary)", whiteSpace: "nowrap", textOverflow: "ellipsis", overflow: "hidden" }}>{user?.name || "System Admin"}</p>
+              <p style={{ fontSize: "0.72rem", color: "var(--text-secondary)", textTransform: "capitalize" }}>{user?.type || "Super_admin"}</p>
             </div>
           </div>
-          <button onClick={handleLogout} className="btn btn-ghost" style={{ width: "100%", justifyContent: "center", color: "#ef4444" }}>
-            <LogOut size={18} /> Logout
+          
+          <button 
+            onClick={handleLogout} 
+            className="btn btn-ghost" 
+            style={{ 
+              width: "100%", 
+              justifyContent: "center", 
+              color: "#dc2626",
+              backgroundColor: "rgba(220, 38, 38, 0.06)",
+              border: "1px solid rgba(220, 38, 38, 0.15)",
+              fontSize: "0.8rem",
+              padding: "0.4rem 0.75rem"
+            }}
+          >
+            <LogOut size={16} strokeWidth={2.4} /> Logout
           </button>
         </div>
       </aside>
 
       {/* Main Content */}
-      <main style={{ flex: 1, padding: "1.5rem", overflowY: "auto", height: "100vh" }}>
+      <main style={{ flex: 1, padding: "1.25rem", overflowY: "auto", height: "100%", width: "100%" }}>
         <Outlet />
       </main>
     </div>

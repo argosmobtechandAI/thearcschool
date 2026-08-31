@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useMemo } from "react";
-import { Search, X, Check, Filter, CalendarClock } from "lucide-react";
+import { Search, X, Check, CalendarClock, IndianRupee, CreditCard } from "lucide-react";
 import api from "../services/api";
 import { toast } from "react-toastify";
 import { generateReceiptPDF } from "../utils/exportUtils";
@@ -89,33 +89,28 @@ const PaymentSelectionModal = ({ isOpen, onClose, selectedStudent, onPaymentSucc
 
     setIsPaying(true);
     try {
-        let remainingAmount = Number(paymentForm.amount);
-        let totalPaymentAmount = 0;
-        const paymentsPayload = [];
+      let remainingAmount = Number(paymentForm.amount);
+      const paymentsPayload = [];
+      
+      for (const feeId of paymentForm.feeIds) {
+        const feeObj = studentLedger.fees.find(f => f.id === feeId);
+        if (!feeObj) continue;
         
-        for (const feeId of paymentForm.feeIds) {
-            const feeObj = studentLedger.fees.find(f => f.id === feeId);
-            if (!feeObj) continue;
-            
-            const dueAmount = Number(feeObj.fee?.amount || 0) - Number(feeObj.total_paid_amount || 0);
-            if (remainingAmount <= 0) break;
-            
-            const paymentAmount = Math.min(remainingAmount, dueAmount);
-            totalPaymentAmount += paymentAmount;
-            
-            paymentsPayload.push({
-                feeId: feeId,
-                amount: paymentAmount,
-                title: feeObj.fee?.title || "Fee"
-            });
-            
-            remainingAmount -= paymentAmount;
-        }
+        const dueAmount = Number(feeObj.fee?.amount || 0) - Number(feeObj.total_paid_amount || 0);
+        if (remainingAmount <= 0) break;
 
-        if (totalPaymentAmount === 0) {
-            setIsPaying(false);
-            return toast.error("Invalid payment configuration");
-        }
+        const payForThisFee = Math.min(remainingAmount, dueAmount);
+        paymentsPayload.push({
+          feeId: feeId,
+          amount: payForThisFee,
+          title: feeObj.fee?.title
+        });
+        remainingAmount -= payForThisFee;
+      }
+
+      if (remainingAmount > 0 && paymentsPayload.length > 0) {
+        paymentsPayload[paymentsPayload.length - 1].amount += remainingAmount;
+      }
 
       const res = await api.post("/finance_panel/logPayment", {
         data: {
@@ -125,22 +120,23 @@ const PaymentSelectionModal = ({ isOpen, onClose, selectedStudent, onPaymentSucc
           payments: paymentsPayload
         }
       });
+
       if (res.data.success) {
         toast.success("Payment recorded successfully");
         
         const completePayments = res.data.payments.map((p, idx) => ({
-            ...p,
-            fee_title: paymentsPayload[idx]?.title || p.remarks,
-            student_name: selectedStudent.name,
-            admission_number: selectedStudent.admission_number,
-            class_name: selectedStudent.className
+          ...p,
+          fee_title: paymentsPayload[idx]?.title || p.remarks,
+          student_name: selectedStudent.name,
+          admission_number: selectedStudent.admission_number,
+          class_name: selectedStudent.className
         }));
 
         try {
-            generateReceiptPDF(completePayments, selectedStudent, res.data.receipt);
+          generateReceiptPDF(completePayments, selectedStudent, res.data.receipt);
         } catch (pdfErr) {
-            console.error("PDF gen err", pdfErr);
-            toast.error("Receipt generation failed, but payment was recorded.");
+          console.error("PDF gen err", pdfErr);
+          toast.error("Receipt generation failed, but payment was recorded.");
         }
 
         if (onPaymentSuccess) onPaymentSuccess();
@@ -158,89 +154,123 @@ const PaymentSelectionModal = ({ isOpen, onClose, selectedStudent, onPaymentSucc
   if (!isOpen || !selectedStudent) return null;
 
   return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100, padding: "2rem" }}>
-      <div className="glass-panel modal-content animate-fade-in" style={{ width: "100%", maxWidth: "1000px", height: "85vh", display: "flex", flexDirection: "column", overflow: "hidden" }}>
-        
+    <div 
+      className="animate-fade-in" 
+      style={{ 
+        position: "fixed", 
+        inset: 0, 
+        background: "rgba(15, 23, 42, 0.55)", 
+        backdropFilter: "blur(6px)", 
+        display: "flex", 
+        alignItems: "center", 
+        justifyContent: "center", 
+        zIndex: 1000, 
+        padding: "1rem" 
+      }} 
+      onClick={onClose}
+    >
+      <div 
+        className="glass-panel modal-content" 
+        style={{ 
+          width: "100%", 
+          maxWidth: "840px", 
+          maxHeight: "88vh", 
+          display: "flex", 
+          flexDirection: "column", 
+          borderRadius: "14px", 
+          background: "#ffffff",
+          border: "1px solid var(--glass-border)",
+          boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.15)",
+          overflow: "hidden" 
+        }}
+        onClick={(e) => e.stopPropagation()}
+      >
         {/* Header */}
-        <div style={{ padding: "1.5rem 2rem", borderBottom: "1px solid var(--glass-border)", display: "flex", justifyContent: "space-between", alignItems: "center", background: "rgba(0,0,0,0.02)" }}>
-          <div>
-            <h2 style={{ fontSize: "1.5rem", fontWeight: "700", color: "var(--text-primary)" }}>Log Payment</h2>
-            <p style={{ color: "var(--text-secondary)", fontSize: "0.875rem", marginTop: "4px" }}>Select dues to clear for {selectedStudent.name} (Adm: {selectedStudent.admission_number || "-"})</p>
+        <div style={{ padding: "1.2rem 1.5rem", borderBottom: "1px solid var(--glass-border)", display: "flex", justifyContent: "space-between", alignItems: "center", background: "#f8fafc" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
+            <div style={{ width: "38px", height: "38px", borderRadius: "9px", background: "rgba(5, 150, 105, 0.12)", color: "#059669", display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <CreditCard size={20} strokeWidth={2.4} />
+            </div>
+            <div>
+              <h2 style={{ fontSize: "1.2rem", fontWeight: "800", color: "var(--text-primary)", lineHeight: 1.2 }}>Log Student Payment</h2>
+              <p style={{ color: "var(--text-secondary)", fontSize: "0.8rem", marginTop: "2px" }}>
+                Student: <strong>{selectedStudent.name}</strong> • Adm: {selectedStudent.admission_number || "N/A"}
+              </p>
+            </div>
           </div>
-          <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--text-secondary)" }}>
-            <X size={24} />
+          <button 
+            onClick={onClose} 
+            className="btn btn-ghost" 
+            style={{ width: "32px", height: "32px", padding: 0, borderRadius: "8px", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-secondary)" }}
+            title="Close modal"
+          >
+            <X size={18} />
           </button>
         </div>
 
         {/* Body */}
-        <div style={{ flex: 1, overflow: "hidden", display: "flex", flexDirection: "column", padding: "1.5rem 2rem" }}>
+        <div style={{ flex: 1, overflowY: "auto", display: "flex", flexDirection: "column", padding: "1.25rem 1.5rem", gap: "1rem" }}>
           
           {ledgerLoading ? (
-             <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center" }}>Checking dues...</div>
-          ) : selectedStudent.fee_exempted ? (
-            <div style={{ padding: "2rem", textAlign: "center", background: "rgba(16, 185, 129, 0.1)", borderRadius: "8px", color: "#10b981", margin: "auto" }}>
-              <p style={{ fontWeight: "600", fontSize: "1.1rem" }}>Student is fee exempted.</p>
-              <p style={{ fontSize: "0.875rem", marginTop: "0.5rem" }}>No dues are generated for this student.</p>
+            <div style={{ padding: "3rem", textAlign: "center", color: "var(--text-secondary)", fontSize: "0.85rem" }}>
+              Checking fee records...
             </div>
-          ) : studentLedger.fees.filter(f => f.status !== "paid").length === 0 ? (
-            <div style={{ padding: "2rem", textAlign: "center", background: "rgba(0, 0, 0, 0.02)", borderRadius: "8px", color: "var(--text-secondary)", margin: "auto" }}>
-              <Check size={48} style={{ margin: "0 auto 1rem auto", opacity: 0.2 }} />
-              <p style={{ fontWeight: "600", fontSize: "1.1rem" }}>No pending dues. All clear!</p>
+          ) : selectedStudent.fee_exempted ? (
+            <div style={{ padding: "2.5rem 1.5rem", textAlign: "center", background: "rgba(16, 185, 129, 0.05)", borderRadius: "10px", border: "1px dashed rgba(16, 185, 129, 0.4)", color: "#059669", margin: "auto" }}>
+              <p style={{ fontWeight: "700", fontSize: "1.05rem" }}>Student is fee exempted.</p>
+              <p style={{ fontSize: "0.82rem", marginTop: "0.35rem", color: "var(--text-secondary)" }}>No fee dues are active for this account.</p>
+            </div>
+          ) : studentLedger.fees?.filter(f => f.status !== "paid").length === 0 ? (
+            <div style={{ padding: "2.5rem 1.5rem", textAlign: "center", background: "rgba(16, 185, 129, 0.05)", borderRadius: "10px", border: "1px dashed rgba(16, 185, 129, 0.4)", color: "var(--text-primary)", margin: "auto" }}>
+              <Check size={36} color="#059669" style={{ margin: "0 auto 0.5rem auto" }} />
+              <p style={{ fontWeight: "700", fontSize: "1.05rem" }}>No Pending Dues!</p>
+              <p style={{ fontSize: "0.82rem", color: "var(--text-secondary)", marginTop: "0.25rem" }}>All fee components for this student are fully settled.</p>
             </div>
           ) : (
             <>
-              {/* Toolbar */}
-              <div style={{ display: "flex", gap: "1rem", marginBottom: "1rem", alignItems: "center" }}>
-                <div style={{ position: "relative", width: "300px" }}>
-                  <Search size={16} style={{ position: "absolute", left: "10px", top: "50%", transform: "translateY(-50%)", color: "var(--text-secondary)" }} />
+              {/* Filter Toolbar */}
+              <div style={{ display: "flex", gap: "0.75rem", alignItems: "center", flexWrap: "wrap" }}>
+                <div style={{ position: "relative", minWidth: "240px", flex: 1 }}>
+                  <Search size={15} style={{ position: "absolute", left: "10px", top: "50%", transform: "translateY(-50%)", color: "var(--text-secondary)" }} />
                   <input
                     type="text"
                     className="input-glass"
-                    placeholder="Search by fee title or date..."
+                    placeholder="Search by fee title or due date..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    style={{ width: "100%", paddingLeft: "35px", fontSize: "0.875rem" }}
+                    style={{ width: "100%", paddingLeft: "32px", fontSize: "0.82rem", height: "34px", margin: 0 }}
                   />
                 </div>
-                <label style={{ display: "flex", alignItems: "center", gap: "0.5rem", cursor: "pointer", marginLeft: "auto", fontSize: "0.8125rem", color: showFuture ? "var(--accent-primary)" : "var(--text-secondary)", fontWeight: "500", userSelect: "none", transition: "color 0.2s" }}>
-                  <CalendarClock size={15} />
-                  Show Future Dues
-                  <div
-                    onClick={() => setShowFuture(!showFuture)}
-                    style={{
-                      width: "36px", height: "20px", borderRadius: "10px",
-                      background: showFuture ? "var(--accent-primary)" : "rgba(0,0,0,0.15)",
-                      position: "relative", cursor: "pointer", transition: "background 0.2s",
-                      flexShrink: 0
-                    }}
-                  >
-                    <div style={{
-                      width: "16px", height: "16px", borderRadius: "50%",
-                      background: "white", position: "absolute", top: "2px",
-                      left: showFuture ? "18px" : "2px", transition: "left 0.2s",
-                      boxShadow: "0 1px 3px rgba(0,0,0,0.2)"
-                    }} />
-                  </div>
+                <label style={{ display: "flex", alignItems: "center", gap: "0.5rem", cursor: "pointer", fontSize: "0.78rem", color: showFuture ? "#2563eb" : "var(--text-secondary)", fontWeight: "600", userSelect: "none" }}>
+                  <CalendarClock size={14} />
+                  Include Future Dues
+                  <input
+                    type="checkbox"
+                    checked={showFuture}
+                    onChange={() => setShowFuture(!showFuture)}
+                    style={{ cursor: "pointer", accentColor: "#2563eb" }}
+                  />
                 </label>
               </div>
 
-              {/* Data Table */}
-              <div style={{ flex: 1, overflowY: "auto", border: "1px solid var(--glass-border)", borderRadius: "8px", background: "var(--glass-bg)" }}>
-                <table style={{ width: "100%", borderCollapse: "collapse", whiteSpace: "nowrap" }}>
-                  <thead style={{ position: "sticky", top: 0, background: "rgba(0,0,0,0.03)", backdropFilter: "blur(4px)", zIndex: 10 }}>
-                    <tr style={{ borderBottom: "2px solid var(--glass-border)" }}>
-                      <th style={{ padding: "0.75rem", textAlign: "center", width: "50px" }}>
+              {/* Dues Selection Table */}
+              <div style={{ maxHeight: "240px", overflowY: "auto", border: "1px solid var(--glass-border)", borderRadius: "8px", background: "#fff" }}>
+                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.82rem" }}>
+                  <thead style={{ position: "sticky", top: 0, background: "#f8fafc", zIndex: 10, borderBottom: "2px solid var(--glass-border)" }}>
+                    <tr>
+                      <th style={{ padding: "0.6rem 0.75rem", textAlign: "center", width: "40px" }}>
                         <input 
                           type="checkbox" 
                           checked={pendingDues.length > 0 && paymentForm.feeIds.length === pendingDues.length}
                           onChange={handleSelectAll}
+                          style={{ cursor: "pointer", accentColor: "#059669" }}
                         />
                       </th>
-                      <th style={{ padding: "0.75rem 1rem", textAlign: "left", fontSize: "0.75rem", fontWeight: "600", color: "var(--text-secondary)" }}>S.NO</th>
-                      <th style={{ padding: "0.75rem 1rem", textAlign: "left", fontSize: "0.75rem", fontWeight: "600", color: "var(--text-secondary)" }}>FEE TITLE</th>
-                      <th style={{ padding: "0.75rem 1rem", textAlign: "left", fontSize: "0.75rem", fontWeight: "600", color: "var(--text-secondary)" }}>DUE DATE</th>
-                      <th style={{ padding: "0.75rem 1rem", textAlign: "right", fontSize: "0.75rem", fontWeight: "600", color: "var(--text-secondary)" }}>AMOUNT</th>
-                      <th style={{ padding: "0.75rem 1rem", textAlign: "right", fontSize: "0.75rem", fontWeight: "600", color: "var(--text-secondary)" }}>BALANCE</th>
+                      <th style={{ padding: "0.6rem 0.75rem", textAlign: "left", fontSize: "0.72rem" }}>S.No</th>
+                      <th style={{ padding: "0.6rem 0.75rem", textAlign: "left", fontSize: "0.72rem" }}>Fee Title</th>
+                      <th style={{ padding: "0.6rem 0.75rem", textAlign: "left", fontSize: "0.72rem" }}>Due Date</th>
+                      <th style={{ padding: "0.6rem 0.75rem", textAlign: "right", fontSize: "0.72rem" }}>Total Amount</th>
+                      <th style={{ padding: "0.6rem 0.75rem", textAlign: "right", fontSize: "0.72rem" }}>Balance Due</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -251,30 +281,39 @@ const PaymentSelectionModal = ({ isOpen, onClose, selectedStudent, onPaymentSucc
                       const isChecked = paymentForm.feeIds.includes(f.id);
                       
                       return (
-                        <tr key={f.id} style={{ borderBottom: "1px solid var(--glass-border)", background: isChecked ? "rgba(59, 130, 246, 0.05)" : "transparent" }} className="hover-row">
-                          <td style={{ padding: "0.75rem", textAlign: "center" }}>
+                        <tr 
+                          key={f.id} 
+                          style={{ borderBottom: "1px solid var(--glass-border)", background: isChecked ? "rgba(5, 150, 105, 0.04)" : "transparent", cursor: "pointer" }}
+                          onClick={(e) => {
+                            if (e.target.tagName !== 'INPUT') {
+                              handleSelectRow({ target: { checked: !isChecked } }, f);
+                            }
+                          }}
+                        >
+                          <td style={{ padding: "0.6rem 0.75rem", textAlign: "center" }}>
                             <input 
                               type="checkbox" 
                               checked={isChecked}
                               onChange={(e) => handleSelectRow(e, f)}
+                              style={{ cursor: "pointer", accentColor: "#059669" }}
                             />
                           </td>
-                          <td style={{ padding: "0.75rem 1rem", color: "var(--text-secondary)", fontSize: "0.875rem" }}>{idx + 1}</td>
-                          <td style={{ padding: "0.75rem 1rem", fontWeight: "500", fontSize: "0.875rem", color: "var(--text-primary)" }}>
+                          <td style={{ padding: "0.6rem 0.75rem", color: "var(--text-secondary)" }}>{idx + 1}</td>
+                          <td style={{ padding: "0.6rem 0.75rem", fontWeight: "600", color: "var(--text-primary)" }}>
                             {f.fee?.title || "-"}
                             {f.is_future && (
-                              <span style={{ marginLeft: "0.5rem", padding: "2px 6px", borderRadius: "4px", background: "rgba(59, 130, 246, 0.1)", color: "#3b82f6", fontSize: "0.625rem", fontWeight: "700", letterSpacing: "0.5px", verticalAlign: "middle" }}>ADVANCE</span>
+                              <span style={{ marginLeft: "0.4rem", padding: "1px 5px", borderRadius: "4px", background: "rgba(59, 130, 246, 0.1)", color: "#2563eb", fontSize: "0.65rem", fontWeight: "700" }}>ADVANCE</span>
                             )}
                           </td>
-                          <td style={{ padding: "0.75rem 1rem", color: "var(--text-secondary)", fontSize: "0.875rem" }}>{f.fee?.due_date ? new Date(f.fee.due_date).toLocaleDateString() : "-"}</td>
-                          <td style={{ padding: "0.75rem 1rem", textAlign: "right", color: "var(--text-secondary)", fontSize: "0.875rem" }}>₹{amount.toLocaleString()}</td>
-                          <td style={{ padding: "0.75rem 1rem", textAlign: "right", fontWeight: "600", color: f.is_future ? "#3b82f6" : "#ef4444", fontSize: "0.875rem" }}>₹{due.toLocaleString()}</td>
+                          <td style={{ padding: "0.6rem 0.75rem", color: "var(--text-secondary)" }}>{f.fee?.due_date ? new Date(f.fee.due_date).toLocaleDateString("en-IN") : "-"}</td>
+                          <td style={{ padding: "0.6rem 0.75rem", textAlign: "right", color: "var(--text-secondary)" }}>₹{amount.toLocaleString()}</td>
+                          <td style={{ padding: "0.6rem 0.75rem", textAlign: "right", fontWeight: "800", color: "#dc2626" }}>₹{due.toLocaleString()}</td>
                         </tr>
                       );
                     }) : (
                       <tr>
-                        <td colSpan="6" style={{ padding: "2rem", textAlign: "center", color: "var(--text-secondary)" }}>
-                          No dues match your search.
+                        <td colSpan="6" style={{ padding: "1.5rem", textAlign: "center", color: "var(--text-secondary)" }}>
+                          No dues match your filter query.
                         </td>
                       </tr>
                     )}
@@ -282,59 +321,68 @@ const PaymentSelectionModal = ({ isOpen, onClose, selectedStudent, onPaymentSucc
                 </table>
               </div>
 
-              {/* Checkout Footer */}
-              <div style={{ marginTop: "1.5rem", padding: "1.5rem", background: "rgba(0,0,0,0.02)", borderRadius: "8px", border: "1px solid var(--glass-border)" }}>
-                <form onSubmit={handlePaymentSubmit}>
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "1.5rem", alignItems: "end" }}>
+              {/* Checkout Form Card */}
+              <div style={{ padding: "1rem 1.15rem", background: "rgba(248, 250, 252, 0.9)", borderRadius: "10px", border: "1px solid var(--glass-border)" }}>
+                <form onSubmit={handlePaymentSubmit} style={{ display: "flex", flexDirection: "column", gap: "0.85rem" }}>
+                  <div style={{ display: "grid", gridTemplateColumns: "1.2fr 1fr 1.5fr", gap: "0.85rem", alignItems: "end" }}>
                     <div>
-                      <label style={{ display: "block", fontSize: "0.75rem", color: "var(--text-secondary)", marginBottom: "0.5rem" }}>Amount Paying (₹)</label>
+                      <label style={{ display: "block", fontSize: "0.72rem", fontWeight: "700", color: "var(--text-secondary)", marginBottom: "0.3rem", textTransform: "uppercase" }}>Amount Paying (₹) *</label>
                       <input 
                         type="number" 
                         required 
                         className="input-glass" 
-                        placeholder="Enter amount"
+                        placeholder="Amount (₹)"
                         value={paymentForm.amount}
                         onChange={(e) => setPaymentForm({...paymentForm, amount: e.target.value})}
-                        style={{ width: "100%", fontSize: "1.1rem", fontWeight: "600" }}
+                        style={{ width: "100%", fontSize: "0.95rem", fontWeight: "700", height: "36px", margin: 0 }}
                       />
                     </div>
                     <div>
-                      <label style={{ display: "block", fontSize: "0.75rem", color: "var(--text-secondary)", marginBottom: "0.5rem" }}>Payment Mode</label>
+                      <label style={{ display: "block", fontSize: "0.72rem", fontWeight: "700", color: "var(--text-secondary)", marginBottom: "0.3rem", textTransform: "uppercase" }}>Payment Mode</label>
                       <select 
                         className="input-glass" 
                         value={paymentForm.paymentMode} 
                         onChange={(e) => setPaymentForm({...paymentForm, paymentMode: e.target.value})}
-                        style={{ width: "100%" }}
+                        style={{ width: "100%", height: "36px", margin: 0, fontSize: "0.82rem", fontWeight: "600" }}
                       >
                         <option value="Cash">Cash</option>
+                        <option value="Online">Online / UPI</option>
                         <option value="Bank Transfer">Bank Transfer</option>
-                        <option value="UPI">UPI</option>
                         <option value="Cheque">Cheque</option>
+                        <option value="Concession">Concession / Discount</option>
                       </select>
                     </div>
                     <div>
-                      <label style={{ display: "block", fontSize: "0.75rem", color: "var(--text-secondary)", marginBottom: "0.5rem" }}>Remarks / Ref No (Optional)</label>
+                      <label style={{ display: "block", fontSize: "0.72rem", fontWeight: "700", color: "var(--text-secondary)", marginBottom: "0.3rem", textTransform: "uppercase" }}>Remarks / Ref No</label>
                       <input 
                         type="text" 
                         className="input-glass" 
+                        placeholder="Receipt reference, check no..."
                         value={paymentForm.remarks} 
                         onChange={(e) => setPaymentForm({...paymentForm, remarks: e.target.value})}
-                        style={{ width: "100%" }}
+                        style={{ width: "100%", height: "36px", margin: 0, fontSize: "0.82rem" }}
                       />
                     </div>
                   </div>
                   
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "1.5rem", paddingTop: "1.5rem", borderTop: "1px solid var(--glass-border)" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingTop: "0.75rem", borderTop: "1px solid var(--glass-border)" }}>
                     <div>
-                      <span style={{ color: "var(--text-secondary)", fontSize: "0.875rem" }}>Total Selected Fees: </span>
-                      <span style={{ fontWeight: "700", fontSize: "1.25rem", color: "var(--accent-primary)" }}>
-                        ₹{paymentForm.amount || 0}
+                      <span style={{ color: "var(--text-secondary)", fontSize: "0.78rem" }}>Selected Total: </span>
+                      <span style={{ fontWeight: "800", fontSize: "1.1rem", color: "#059669" }}>
+                        ₹{Number(paymentForm.amount || 0).toLocaleString()}
                       </span>
                     </div>
-                    <div style={{ display: "flex", gap: "1rem" }}>
-                      <button type="button" onClick={onClose} className="btn-ghost" style={{ padding: "0.75rem 1.5rem" }}>Cancel</button>
-                      <button type="submit" disabled={isPaying || !paymentForm.amount} className="btn-primary" style={{ padding: "0.75rem 2rem", fontSize: "1rem" }}>
-                        {isPaying ? "Processing..." : "Submit Payment"}
+                    <div style={{ display: "flex", gap: "0.65rem" }}>
+                      <button type="button" onClick={onClose} className="btn btn-ghost" style={{ padding: "0.4rem 1rem", fontSize: "0.8rem", border: "1px solid var(--glass-border)" }}>
+                        Cancel
+                      </button>
+                      <button 
+                        type="submit" 
+                        disabled={isPaying || !paymentForm.amount} 
+                        className="btn btn-primary" 
+                        style={{ padding: "0.4rem 1.25rem", fontSize: "0.82rem", fontWeight: "700", background: "#059669", borderColor: "#059669" }}
+                      >
+                        {isPaying ? "Recording..." : "Record & Print Receipt"}
                       </button>
                     </div>
                   </div>

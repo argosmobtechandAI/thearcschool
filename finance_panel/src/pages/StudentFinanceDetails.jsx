@@ -107,7 +107,7 @@ const StudentFinanceDetails = () => {
   }
 
   return (
-    <div className="animate-fade-in" style={{ padding: "1rem 2rem", height: "100%", display: "flex", flexDirection: "column" }}>
+    <div className="animate-fade-in" style={{ width: "100%", height: "100%", display: "flex", flexDirection: "column", gap: "1rem" }}>
       <div style={{ display: "flex", alignItems: "center", gap: "1rem", marginBottom: "1.5rem" }}>
         <button onClick={() => navigate(-1)} className="btn btn-ghost" style={{ padding: "8px" }}>
           <ChevronLeft size={20} />

@@ -31,13 +31,22 @@
   box-sizing: border-box;
 }
 
+html, body, #root {
+  height: 100%;
+  width: 100%;
+}
+
+html {
+  zoom: 0.82;
+}
+
 body {
   font-family: var(--font-family);
   background: var(--bg-primary);
   color: var(--text-primary);
-  min-height: 100vh;
+  min-height: 100%;
   -webkit-font-smoothing: antialiased;
-  font-size: 13px; /* Compact layout */
+  font-size: 13px;
 }
 
 h1, h2, h3, h4, h5, h6 {

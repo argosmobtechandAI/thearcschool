@@ -109,36 +109,32 @@ const FeeStructures = () => {
   };
 
   return (
-    <div className="animate-fade-in">
-      <div style={{ marginBottom: "2rem", display: "flex", justifyContent: "space-between", alignItems: "flex-end" }}>
-        <div>
-          <h1 style={{ fontSize: "1.875rem", fontWeight: "700", color: "var(--text-primary)", marginBottom: "0.25rem" }}>Fee Structures Configuration</h1>
-          <p style={{ color: "var(--text-secondary)" }}>Manage master amounts for tuition, transport, and admissions</p>
-        </div>
-        <div>
-          <label style={{ display: "block", fontSize: "0.875rem", color: "var(--text-secondary)", marginBottom: "0.5rem" }}>Academic Year</label>
+    <div className="animate-fade-in" style={{ width: "100%", display: "flex", flexDirection: "column", gap: "1rem" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "0.75rem" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+          <label style={{ fontSize: "0.82rem", fontWeight: "700", color: "var(--text-secondary)" }}>Academic Year:</label>
           <select 
             value={academicYear} 
             onChange={e => setAcademicYear(e.target.value)} 
             className="input-glass"
-            style={{ minWidth: "150px" }}
+            style={{ height: "34px", fontSize: "0.82rem", fontWeight: "600", minWidth: "140px", margin: 0 }}
           >
             <option value="2024-2025">2024-2025</option>
             <option value="2025-2026">2025-2026</option>
             <option value="2026-2027">2026-2027</option>
             <option value="2027-2028">2027-2028</option>
           </select>
-          
-          {isFinanceTeam && (
-            <button 
-              onClick={() => setIsCustomFeeModalOpen(true)} 
-              className="btn-primary" 
-              style={{ display: "inline-flex", alignItems: "center", padding: "0.5rem 1rem", borderRadius: "6px", fontSize: "0.875rem", fontWeight: "500", marginTop: "1rem" }}
-            >
-              <Plus size={16} style={{ marginRight: "0.5rem" }} /> Add Custom Fee
-            </button>
-          )}
         </div>
+        
+        {isFinanceTeam && (
+          <button 
+            onClick={() => setIsCustomFeeModalOpen(true)} 
+            className="btn btn-primary" 
+            style={{ display: "inline-flex", alignItems: "center", gap: "0.4rem", padding: "0.5rem 1rem", fontSize: "0.82rem", fontWeight: "700", background: "#7c3aed", borderColor: "#7c3aed" }}
+          >
+            <Plus size={16} strokeWidth={2.4} /> Add Custom Fee
+          </button>
+        )}
       </div>
 
       <div className="glass-panel" style={{ padding: "1.5rem" }}>
@@ -215,25 +211,61 @@ const FeeStructures = () => {
 
       {/* Add Custom Fee Modal */}
       {isCustomFeeModalOpen && (
-        <div style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, backgroundColor: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100 }}>
-          <div className="glass-panel" style={{ padding: "2rem", width: "100%", maxWidth: "400px", position: "relative" }}>
-            <button 
-              onClick={() => setIsCustomFeeModalOpen(false)}
-              style={{ position: "absolute", top: "1rem", right: "1rem", background: "transparent", border: "none", cursor: "pointer", color: "var(--text-secondary)" }}
-            >
-              <X size={20} />
-            </button>
+        <div 
+          className="animate-fade-in"
+          style={{ 
+            position: "fixed", 
+            inset: 0, 
+            background: "rgba(15, 23, 42, 0.55)", 
+            backdropFilter: "blur(6px)",
+            display: "flex", 
+            alignItems: "center", 
+            justifyContent: "center", 
+            zIndex: 1000,
+            padding: "1rem"
+          }}
+          onClick={() => setIsCustomFeeModalOpen(false)}
+        >
+          <div 
+            className="glass-panel modal-content" 
+            style={{ 
+              padding: "1.5rem", 
+              width: "100%", 
+              maxWidth: "440px", 
+              borderRadius: "14px",
+              background: "#ffffff",
+              border: "1px solid var(--glass-border)",
+              boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.15)",
+              display: "flex",
+              flexDirection: "column",
+              gap: "1.15rem"
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid var(--glass-border)", paddingBottom: "0.85rem" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                <div style={{ width: "34px", height: "34px", borderRadius: "8px", background: "rgba(124, 58, 237, 0.12)", color: "#7c3aed", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  <Plus size={18} strokeWidth={2.4} />
+                </div>
+                <h2 style={{ fontSize: "1.15rem", fontWeight: "800", color: "var(--text-primary)", margin: 0 }}>Add Custom Fee</h2>
+              </div>
+              <button 
+                onClick={() => setIsCustomFeeModalOpen(false)}
+                className="btn btn-ghost"
+                style={{ width: "32px", height: "32px", padding: 0, borderRadius: "8px", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-secondary)" }}
+              >
+                <X size={18} />
+              </button>
+            </div>
             
-            <h2 style={{ fontSize: "1.25rem", fontWeight: "600", marginBottom: "1.5rem" }}>Add Custom Fee</h2>
-            
-            <form onSubmit={handleAddCustomFee}>
-              <div style={{ marginBottom: "1rem" }}>
-                <label style={{ display: "block", fontSize: "0.875rem", marginBottom: "0.5rem", color: "var(--text-secondary)" }}>Academic Year</label>
-                <input type="text" className="input-glass" value={academicYear} disabled style={{ width: "100%" }} />
+            <form onSubmit={handleAddCustomFee} style={{ display: "flex", flexDirection: "column", gap: "0.85rem" }}>
+              <div>
+                <label style={{ display: "block", fontSize: "0.74rem", fontWeight: "700", textTransform: "uppercase", marginBottom: "0.35rem", color: "var(--text-secondary)" }}>Academic Year</label>
+                <input type="text" className="input-glass" value={academicYear} disabled style={{ width: "100%", height: "36px", margin: 0, fontSize: "0.84rem", fontWeight: "600" }} />
               </div>
 
-              <div style={{ marginBottom: "1rem" }}>
-                <label style={{ display: "block", fontSize: "0.875rem", marginBottom: "0.5rem", color: "var(--text-secondary)" }}>Category Name (e.g. Lab Fee)</label>
+              <div>
+                <label style={{ display: "block", fontSize: "0.74rem", fontWeight: "700", textTransform: "uppercase", marginBottom: "0.35rem", color: "var(--text-secondary)" }}>Category Name (e.g. Lab Fee) *</label>
                 <input 
                   type="text" 
                   className="input-glass" 
@@ -241,30 +273,30 @@ const FeeStructures = () => {
                   onChange={(e) => setCustomCategory(e.target.value)} 
                   placeholder="Enter category name"
                   required
-                  style={{ width: "100%" }} 
+                  style={{ width: "100%", height: "36px", margin: 0, fontSize: "0.84rem" }} 
                 />
               </div>
 
-              <div style={{ marginBottom: "1rem" }}>
-                <label style={{ display: "block", fontSize: "0.875rem", marginBottom: "0.5rem", color: "var(--text-secondary)" }}>Class (Optional)</label>
+              <div>
+                <label style={{ display: "block", fontSize: "0.74rem", fontWeight: "700", textTransform: "uppercase", marginBottom: "0.35rem", color: "var(--text-secondary)" }}>Class (Optional)</label>
                 <select 
                   className="input-glass" 
                   value={customClass} 
                   onChange={(e) => setCustomClass(e.target.value)} 
-                  style={{ width: "100%", padding: "0.5rem" }} 
+                  style={{ width: "100%", height: "36px", margin: 0, fontSize: "0.84rem", fontWeight: "600" }} 
                 >
                   <option value="">All Classes (School-wide)</option>
-                  {uniqueClassNames.map(name => <option key={name} value={name}>{name}</option>)}
+                  {uniqueClassNames.map(name => <option key={name} value={name}>Class {name}</option>)}
                 </select>
               </div>
 
-              <div style={{ marginBottom: "1rem" }}>
-                <label style={{ display: "block", fontSize: "0.875rem", marginBottom: "0.5rem", color: "var(--text-secondary)" }}>Frequency</label>
+              <div>
+                <label style={{ display: "block", fontSize: "0.74rem", fontWeight: "700", textTransform: "uppercase", marginBottom: "0.35rem", color: "var(--text-secondary)" }}>Billing Frequency</label>
                 <select 
                   className="input-glass" 
                   value={customFrequency} 
                   onChange={(e) => setCustomFrequency(e.target.value)} 
-                  style={{ width: "100%", padding: "0.5rem" }} 
+                  style={{ width: "100%", height: "36px", margin: 0, fontSize: "0.84rem", fontWeight: "600" }} 
                 >
                   <option value="monthly">Monthly</option>
                   <option value="annual">Annual / Yearly</option>
@@ -272,8 +304,8 @@ const FeeStructures = () => {
                 </select>
               </div>
 
-              <div style={{ marginBottom: "1.5rem" }}>
-                <label style={{ display: "block", fontSize: "0.875rem", marginBottom: "0.5rem", color: "var(--text-secondary)" }}>Amount (₹)</label>
+              <div>
+                <label style={{ display: "block", fontSize: "0.74rem", fontWeight: "700", textTransform: "uppercase", marginBottom: "0.35rem", color: "var(--text-secondary)" }}>Amount (₹) *</label>
                 <input 
                   type="number" 
                   className="input-glass" 
@@ -281,13 +313,14 @@ const FeeStructures = () => {
                   onChange={(e) => setCustomAmount(e.target.value)} 
                   placeholder="0"
                   required
-                  style={{ width: "100%" }} 
+                  min="1"
+                  style={{ width: "100%", height: "36px", margin: 0, fontSize: "0.9rem", fontWeight: "700" }} 
                 />
               </div>
 
-              <div style={{ display: "flex", justifyContent: "flex-end", gap: "1rem" }}>
-                <button type="button" onClick={() => setIsCustomFeeModalOpen(false)} className="btn-ghost">Cancel</button>
-                <button type="submit" className="btn-primary" disabled={isAddingCustomFee}>
+              <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.65rem", paddingTop: "0.75rem", borderTop: "1px solid var(--glass-border)" }}>
+                <button type="button" onClick={() => setIsCustomFeeModalOpen(false)} className="btn btn-ghost" style={{ padding: "0.4rem 1rem", fontSize: "0.8rem", border: "1px solid var(--glass-border)" }}>Cancel</button>
+                <button type="submit" className="btn btn-primary" style={{ padding: "0.4rem 1.25rem", fontSize: "0.8rem", fontWeight: "700", background: "#7c3aed", borderColor: "#7c3aed" }} disabled={isAddingCustomFee}>
                   {isAddingCustomFee ? "Saving..." : "Save Custom Fee"}
                 </button>
               </div>

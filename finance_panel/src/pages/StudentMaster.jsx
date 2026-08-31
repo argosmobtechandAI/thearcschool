@@ -129,12 +129,7 @@ const StudentMaster = () => {
   }
 
   return (
-    <div className="animate-fade-in" style={{ padding: "1rem 2rem", height: "100%", display: "flex", flexDirection: "column" }}>
-      <div style={{ marginBottom: "1rem" }}>
-        <h1 style={{ fontSize: "1.875rem", fontWeight: "700", color: "var(--text-primary)", marginBottom: "0.25rem" }}>Student Master</h1>
-        <p style={{ color: "var(--text-secondary)", margin: 0 }}>View all enrolled students and their details.</p>
-      </div>
-
+    <div className="animate-fade-in" style={{ width: "100%", height: "100%", display: "flex", flexDirection: "column", gap: "1rem" }}>
       <div className="glass-panel" style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
         <div style={{ flexShrink: 0, padding: "1.5rem" }}>
           <TableFilterHeader

@@ -136,13 +136,8 @@ const IncomeLedger = () => {
   const { items: sortedData, requestSort, sortConfig } = useSortableData(filteredTransactions);
 
   return (
-    <div className="animate-fade-in">
-      <div style={{ marginBottom: "2rem" }}>
-        <h1 style={{ fontSize: "1.875rem", fontWeight: "700", color: "var(--text-primary)", marginBottom: "0.25rem" }}>Income Ledger</h1>
-        <p style={{ color: "var(--text-secondary)" }}>Record and view non-fee school income (e.g., Grants, Donations, Sales)</p>
-      </div>
-
-      <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: "1.5rem" }}>
+    <div className="animate-fade-in" style={{ width: "100%", display: "flex", flexDirection: "column", gap: "1rem" }}>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: "1.25rem" }}>
         {/* Log/Edit Income Form */}
         <div className="glass-panel" style={{ padding: "1.5rem" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.25rem" }}>

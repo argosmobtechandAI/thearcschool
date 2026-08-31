@@ -129,8 +129,8 @@ const Exams = () => {
 
   const handleExportPDF = () => {
     if (courseType !== "exam") return;
-    if (!classFilter || !selectedTitle) {
-      toast.warn("Please select a Class and Title to export the Date Sheet.");
+    if (!selectedTitle) {
+      toast.warn("Please select a Title to export the Date Sheet.");
       return;
     }
 
@@ -138,13 +138,13 @@ const Exams = () => {
     const pageWidth = doc.internal.pageSize.getWidth();
     doc.addImage(letterheadBase64, 'PNG', 0, 0, pageWidth, 40);
 
-    doc.setFontSize(16);
-    doc.text(`Date Sheet: ${selectedTitle} - Class ${classFilter}${sectionFilter ? ` (Section ${sectionFilter})` : ''}`, 14, 50);
+    doc.setFontSize(15);
+    doc.text(`Date Sheet: ${selectedTitle}${classFilter ? ` - Class ${classFilter}` : ' - All Classes (Consolidated)'}${sectionFilter ? ` (Section ${sectionFilter})` : ''}`, 14, 48);
 
-    const filtered = exams.filter(e => e.class === classFilter && e.title === selectedTitle);
+    const filtered = exams.filter(e => e.title === selectedTitle && (!classFilter || String(e.class) === String(classFilter)));
     const grouped = {};
     filtered.forEach(ex => {
-      const key = `${ex.subject}-${ex.date}-${ex.time}`;
+      const key = `${ex.class}-${ex.subject}-${ex.date}-${ex.time}`;
       if (!grouped[key]) grouped[key] = { ...ex, sectionsData: {} };
       grouped[key].sectionsData[ex.class_id] = {
         invigilator_id: ex.invigilator_id,
@@ -152,12 +152,15 @@ const Exams = () => {
       };
     });
 
-    const rows = Object.values(grouped).sort((a,b) => new Date(a.date) - new Date(b.date)).map(ex => {
+    const rows = Object.values(grouped).sort((a,b) => {
+      if (a.class !== b.class) return String(a.class).localeCompare(String(b.class), undefined, {numeric: true});
+      return new Date(a.date) - new Date(b.date);
+    }).map(ex => {
       let invigilatorName = "Multiple";
       let roomNum = "Multiple";
       
       if (sectionFilter) {
-        const classObj = classes?.find(c => String(c.className || c.name) === String(classFilter) && String(c.section) === String(sectionFilter));
+        const classObj = classes?.find(c => String(c.className || c.name) === String(ex.class) && String(c.section) === String(sectionFilter));
         if (classObj && ex.sectionsData[classObj.id]) {
             const tId = ex.sectionsData[classObj.id].invigilator_id;
             invigilatorName = users?.find(u => u.id === tId)?.name || "N/A";
@@ -178,6 +181,7 @@ const Exams = () => {
       }
 
       return [
+        `Class ${ex.class}`,
         ex.date,
         ex.time,
         ex.subject,
@@ -189,25 +193,26 @@ const Exams = () => {
     });
 
     autoTable(doc, {
-      startY: 55,
-      head: [['Date', 'Time', 'Subject', 'Duration', 'Marks', 'Invigilator', 'Room']],
+      startY: 53,
+      head: [['Class', 'Date', 'Time', 'Subject', 'Duration', 'Marks', 'Invigilator', 'Room']],
       body: rows,
     });
 
-    doc.save(`${selectedTitle}_Class_${classFilter}.pdf`);
+    doc.save(`${selectedTitle}_${classFilter ? `Class_${classFilter}` : 'All_Classes'}.pdf`);
+    toast.success("PDF exported successfully!");
   };
 
   const handleExportExcel = () => {
     if (courseType !== "exam") return;
-    if (!classFilter || !selectedTitle) {
-      toast.warn("Please select a Class and Title to export the Date Sheet.");
+    if (!selectedTitle) {
+      toast.warn("Please select a Title to export the Date Sheet.");
       return;
     }
 
-    const filtered = exams.filter(e => e.class === classFilter && e.title === selectedTitle);
+    const filtered = exams.filter(e => e.title === selectedTitle && (!classFilter || String(e.class) === String(classFilter)));
     const grouped = {};
     filtered.forEach(ex => {
-      const key = `${ex.subject}-${ex.date}-${ex.time}`;
+      const key = `${ex.class}-${ex.subject}-${ex.date}-${ex.time}`;
       if (!grouped[key]) grouped[key] = { ...ex, sectionsData: {} };
       grouped[key].sectionsData[ex.class_id] = {
         invigilator_id: ex.invigilator_id,
@@ -215,12 +220,15 @@ const Exams = () => {
       };
     });
 
-    const rows = Object.values(grouped).sort((a,b) => new Date(a.date) - new Date(b.date)).map(ex => {
+    const rows = Object.values(grouped).sort((a,b) => {
+      if (a.class !== b.class) return String(a.class).localeCompare(String(b.class), undefined, {numeric: true});
+      return new Date(a.date) - new Date(b.date);
+    }).map(ex => {
       let invigilatorName = "Multiple";
       let roomNum = "Multiple";
       
       if (sectionFilter) {
-        const classObj = classes?.find(c => String(c.className || c.name) === String(classFilter) && String(c.section) === String(sectionFilter));
+        const classObj = classes?.find(c => String(c.className || c.name) === String(ex.class) && String(c.section) === String(sectionFilter));
         if (classObj && ex.sectionsData[classObj.id]) {
             const tId = ex.sectionsData[classObj.id].invigilator_id;
             invigilatorName = users?.find(u => u.id === tId)?.name || "N/A";
@@ -241,6 +249,7 @@ const Exams = () => {
       }
 
       return {
+        Class: `Class ${ex.class}`,
         Date: ex.date,
         Time: ex.time,
         Subject: ex.subject,
@@ -254,7 +263,8 @@ const Exams = () => {
     const worksheet = XLSX.utils.json_to_sheet(rows);
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "Date Sheet");
-    XLSX.writeFile(workbook, `${selectedTitle}_Class_${classFilter}.xlsx`);
+    XLSX.writeFile(workbook, `${selectedTitle}_${classFilter ? `Class_${classFilter}` : 'All_Classes'}.xlsx`);
+    toast.success("Excel exported successfully!");
   };
 
   const handleFileUpload = async () => {

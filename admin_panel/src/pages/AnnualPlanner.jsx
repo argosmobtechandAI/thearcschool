@@ -320,7 +320,7 @@ const AnnualPlanner = () => {
         </div>
       </div>
 
-      <div className="glass-panel" style={{ flex: 1, padding: "1.5rem", height: "calc(100vh - 180px)", minHeight: "600px", display: "flex", flexDirection: "column" }}>
+      <div className="glass-panel" style={{ flex: 1, padding: "1.5rem", minHeight: "600px", display: "flex", flexDirection: "column" }}>
         {loading && <div style={{ textAlign: "center", padding: "2rem", color: "var(--text-secondary)" }}>Loading calendar...</div>}
         
         <div style={{ display: "flex", gap: "1rem", marginBottom: "1rem", flexWrap: "wrap" }}>

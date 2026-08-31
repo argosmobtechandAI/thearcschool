@@ -370,9 +370,8 @@ const Communication = () => {
                     background: var(--glass-bg);
                     border: 1px solid var(--glass-border);
                     border-radius: var(--radius-lg);
-                    overflow: hidden;
-                    height: calc(100vh - 140px);
-                    min-height: 500px;
+                    flex: 1;
+                    min-height: 600px;
                 }
                 @media (min-width: 768px) {
                     .split-panel { flex-direction: row; }

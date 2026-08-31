@@ -317,14 +317,7 @@ const Ledger = () => {
   };
 
   return (
-    <div className="animate-fade-in">
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "2rem" }}>
-        <div>
-          <h1 style={{ fontSize: "1.875rem", fontWeight: "700", color: "var(--text-primary)", marginBottom: "0.25rem" }}>Student Ledger</h1>
-          <p style={{ color: "var(--text-secondary)" }}>Manage fee collections and student accounts</p>
-        </div>
-      </div>
-
+    <div className="animate-fade-in" style={{ width: "100%", display: "flex", flexDirection: "column", gap: "1rem" }}>
       <div className="glass-panel" style={{ padding: "1.5rem" }}>
         <div style={{ flexShrink: 0 }}>
           <TableFilterHeader

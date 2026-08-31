@@ -959,7 +959,7 @@ export default function TimeTable() {
       </div>
 
       {selectedClass ? (
-        <div className="glass-panel" style={{ padding: "1rem", height: "calc(100vh - 220px)", display: "flex", flexDirection: "column" }}>
+        <div className="glass-panel" style={{ padding: "1rem", flex: 1, minHeight: "650px", display: "flex", flexDirection: "column" }}>
           <div style={{ flex: 1, marginTop: "0.5rem" }}>
             <DnDCalendar
               localizer={localizer}
