@@ -155,15 +155,48 @@ export const generateReceiptPDF = async (paymentsInput, student, receipt) => {
                 pageDoc.setFontSize(10);
                 pageDoc.setTextColor(0);
                 const receiptIdText = receipt?.receipt_number ? `REC-${String(receipt.receipt_number).padStart(6, '0')}` : `RCT-${String(firstPayment.id || '').substring(0, 8).toUpperCase() || Date.now()}`;
-                pageDoc.text(`Receipt No: ${receiptIdText}`, offsetX + 10, 70);
-                pageDoc.text(`Date: ${new Date(receipt?.created_at || firstPayment.created_at || Date.now()).toLocaleDateString()}`, offsetX + halfWidth - 10, 70, { align: 'right' });
+                pageDoc.text(`Receipt No: ${receiptIdText}`, offsetX + 10, 68);
+                pageDoc.text(`Date: ${new Date(receipt?.created_at || firstPayment.created_at || Date.now()).toLocaleDateString()}`, offsetX + halfWidth - 10, 68, { align: 'right' });
                 
                 let safeName = student.name || 'N/A';
                 if (safeName.length > 35) {
                     safeName = safeName.substring(0, 32) + '...';
                 }
-                pageDoc.text(`Student Name: ${safeName}`, offsetX + 10, 80);
-                pageDoc.text(`Admission No: ${student.admission_number || 'N/A'}`, offsetX + halfWidth - 10, 80, { align: 'right' });
+                pageDoc.text(`Student Name: ${safeName}`, offsetX + 10, 74.5);
+                pageDoc.text(`Admission No: ${student.admission_number || 'N/A'}`, offsetX + halfWidth - 10, 74.5, { align: 'right' });
+
+                let rawClass = 
+                    student?.className || 
+                    student?.class_name || 
+                    student?.class || 
+                    student?.standard || 
+                    student?.grade || 
+                    firstPayment?.class_name || 
+                    firstPayment?.className || 
+                    firstPayment?.student?.className || 
+                    firstPayment?.student?.class_name || 
+                    firstPayment?.student?.class || 
+                    receipt?.class_name || 
+                    receipt?.className || 
+                    '';
+
+                if (typeof rawClass === 'object' && rawClass !== null) {
+                    rawClass = rawClass.name || rawClass.title || rawClass.className || '';
+                }
+
+                let safeClass = String(rawClass || '').trim();
+                const section = student?.section || firstPayment?.section || firstPayment?.student?.section;
+                if (section && safeClass && safeClass !== 'N/A' && !safeClass.toLowerCase().includes(String(section).toLowerCase())) {
+                    safeClass = `${safeClass} - ${section}`;
+                } else if (!safeClass && section) {
+                    safeClass = String(section);
+                }
+
+                if (!safeClass) {
+                    safeClass = 'N/A';
+                }
+
+                pageDoc.text(`Class: ${safeClass}`, offsetX + 10, 81);
                 
                 pageDoc.setFontSize(8);
                 pageDoc.setTextColor(150);
@@ -186,7 +219,7 @@ export const generateReceiptPDF = async (paymentsInput, student, receipt) => {
         };
 
         autoTable(doc, {
-            startY: 85,
+            startY: 86,
             head: [["Fee Name", "Amount", "", "Fee Name", "Amount"]],
             body: tableData,
             theme: 'grid',
@@ -200,7 +233,7 @@ export const generateReceiptPDF = async (paymentsInput, student, receipt) => {
                 3: { cellWidth: 100 },
                 4: { cellWidth: 28.5, halign: 'right' }
             },
-            margin: { top: 85, left: 10, right: 10, bottom: 30 }, // explicitly set top margin so subsequent pages don't overlap header
+            margin: { top: 86, left: 10, right: 10, bottom: 30 }, // explicitly set top margin so subsequent pages don't overlap header
             didDrawPage: drawHeadersAndFooter,
             willDrawCell: (data) => {
                 // Hide borders and background for the gap column

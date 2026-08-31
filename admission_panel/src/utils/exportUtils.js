@@ -44,8 +44,12 @@ export const exportToPDF = (payment, student) => {
     doc.text(`Receipt No: RCT-${payment.id?.substring(0, 8).toUpperCase() || Date.now()}`, 14, 65);
     doc.text(`Date: ${new Date(payment.created_at || Date.now()).toLocaleDateString()}`, 140, 65);
     
-    doc.text(`Student Name: ${student.name || 'N/A'}`, 14, 80);
-    doc.text(`Admission No: ${student.admission_number || 'N/A'}`, 140, 80);
+    doc.text(`Student Name: ${student.name || 'N/A'}`, 14, 75);
+    doc.text(`Admission No: ${student.admission_number || 'N/A'}`, 140, 75);
+    
+    const rawClass = student.className || student.class_name || student.class || payment.class_name || payment.className || '';
+    const safeClass = (typeof rawClass === 'object' && rawClass !== null ? rawClass.name || rawClass.className : rawClass) || 'N/A';
+    doc.text(`Class: ${safeClass}`, 14, 83);
     
     const sanitize = (str) => str ? str.replace(/₹/g, 'Rs. ') : str;
 

@@ -225,7 +225,17 @@ const DashboardMetrics = () => {
           baseClassName = cls.name;
         }
       }
-      return { ...item, className, baseClassName };
+      const studentObj = item.student 
+        ? { ...item.student, className, baseClassName, section: u?.classes && classes.find(c => c.id === u.classes[0])?.section || "" } 
+        : (u ? { ...u, className, baseClassName } : { className, baseClassName });
+      const enrichedGrouped = (item.groupedPayments || []).map(gp => ({ ...gp, className, baseClassName, student: studentObj }));
+      return { 
+        ...item, 
+        className, 
+        baseClassName, 
+        student: studentObj, 
+        groupedPayments: enrichedGrouped.length > 0 ? enrichedGrouped : item.groupedPayments 
+      };
     }).filter(item => {
       const s = item.student;
       const matchesSearch = (s?.name?.toLowerCase() || "").includes(searchTerm.toLowerCase()) || 

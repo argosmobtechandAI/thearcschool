@@ -127,7 +127,11 @@ const Ledger = () => {
       
       return {
         ...s,
-        className: globalClasses.find(c => String(c.id) === String(s.classes?.[0]))?.name || "N/A",
+        className: (() => {
+          const cls = globalClasses.find(c => String(c.id) === String(s.classes?.[0]));
+          return cls ? `${cls.name} ${cls.section || ''}`.trim() : "N/A";
+        })(),
+        baseClassName: globalClasses.find(c => String(c.id) === String(s.classes?.[0]))?.name || "N/A",
         section: globalClasses.find(c => String(c.id) === String(s.classes?.[0]))?.section || "",
         doj: s.admission_date ? new Date(s.admission_date).toLocaleDateString() : (s.created_at ? new Date(s.created_at).toLocaleDateString() : "N/A"),
         total_due: b.totalDue,
@@ -252,7 +256,9 @@ const Ledger = () => {
         const completePayments = res.data.payments.map((p, idx) => ({
             ...p,
             fee_title: paymentsPayload[idx]?.title || p.remarks,
-            fee: { title: paymentsPayload[idx]?.title || "Fee" }
+            fee: { title: paymentsPayload[idx]?.title || "Fee" },
+            class_name: selectedStudent?.className,
+            className: selectedStudent?.className
         }));
         generateReceiptPDF(completePayments, selectedStudent, res.data.receipt);
 
