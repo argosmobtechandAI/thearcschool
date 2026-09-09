@@ -8,7 +8,7 @@ export class AttendanceService {
       return true;
     }
 
-    // Find existing record to upsert by primary key
+    // Find existing record to upsert by primary key or user_id + date
     const { data: existing } = await supabase
       .from("attendance")
       .select("id")
@@ -26,14 +26,21 @@ export class AttendanceService {
     
     if (existing) record.id = existing.id;
 
-    const { error } = await supabase.from("attendance").upsert(record);
+    const { error } = await supabase
+      .from("attendance")
+      .upsert(record, { onConflict: 'user_id, date' });
     if (error) throw new Error("Could not update attendance: " + error.message);
 
     try {
       const { FCMService } = await import("../../../services/fcmService.js");
-      const title = "Attendance Update";
-      const message = `Your attendance for ${data.date} is marked as ${formattedStatus}.`;
-      await FCMService.sendToUsers([id], title, message, { type: "attendance" });
+      const todayStr = new Date().toISOString().split('T')[0];
+      const isBackdated = data.date < todayStr;
+      const title = isBackdated ? "Backdated Attendance Update" : "Attendance Update";
+      const message = isBackdated 
+        ? `Your attendance for past date (${data.date}) has been marked as ${formattedStatus}.`
+        : `Your attendance for ${data.date} is marked as ${formattedStatus}.`;
+
+      await FCMService.sendToUsers([id], title, message, { type: "attendance", date: data.date, status: formattedStatus });
       await supabase.from("notifications").insert([{ user_id: id, title, message, type: "attendance", is_read: false }]);
     } catch (notifErr) {
       console.error("Attendance Notification Error:", notifErr);
@@ -68,19 +75,26 @@ export class AttendanceService {
       return record;
     });
 
-    const { error } = await supabase.from("attendance").upsert(dbRecords);
+    const { error } = await supabase
+      .from("attendance")
+      .upsert(dbRecords, { onConflict: 'user_id, date' });
     if (error) throw new Error("Could not bulk update attendance: " + error.message);
 
     try {
       const { FCMService } = await import("../../../services/fcmService.js");
       const notifsToInsert = [];
+      const todayStr = new Date().toISOString().split('T')[0];
       
       for (const rec of dbRecords) {
          if (!rec.status) continue;
-         const title = "Attendance Update";
-         const message = `Your attendance for ${rec.date} is marked as ${rec.status}.`;
-         // Sending push per user in a loop might be slow, but works for standard class sizes.
-         await FCMService.sendToUsers([rec.user_id], title, message, { type: "attendance" }).catch(e => console.error(e));
+         const isBackdated = rec.date < todayStr;
+         const title = isBackdated ? "Backdated Attendance Update" : "Attendance Update";
+         const message = isBackdated
+           ? `Your attendance for past date (${rec.date}) has been marked as ${rec.status}.`
+           : `Your attendance for ${rec.date} is marked as ${rec.status}.`;
+
+         // Sending push per user in a loop
+         await FCMService.sendToUsers([rec.user_id], title, message, { type: "attendance", date: rec.date, status: rec.status }).catch(e => console.error(e));
          notifsToInsert.push({ user_id: rec.user_id, title, message, type: "attendance", is_read: false });
       }
       

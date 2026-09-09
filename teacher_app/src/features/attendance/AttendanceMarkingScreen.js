@@ -1,11 +1,30 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Platform, RefreshControl } from 'react-native';
+import React, { useState, useEffect, useMemo } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Platform, RefreshControl, Modal } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/Feather';
 import { useSelector } from 'react-redux';
+import { Calendar } from 'react-native-calendars';
 import { useGetClassStudentsQuery, useSubmitBulkAttendanceMutation, useGetAttendanceQuery } from '../../store/apiSlice';
 import { colors, shadows } from '../../theme/colors';
 import CustomModal from '../../components/CustomModal';
+
+const getTodayString = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+};
+
+const getYesterdayString = () => {
+  const d = new Date();
+  d.setDate(d.getDate() - 1);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+};
+
+const formatDatePretty = (dateStr) => {
+  if (!dateStr) return '';
+  const [y, m, day] = dateStr.split('-');
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  return `${parseInt(day, 10)} ${months[parseInt(m, 10) - 1]} ${y}`;
+};
 
 const AttendanceMarkingScreen = ({ route, navigation }) => {
   const insets = useSafeAreaInsets();
@@ -18,12 +37,18 @@ const AttendanceMarkingScreen = ({ route, navigation }) => {
   const className = currentClass.className;
   const section = currentClass.section;
 
+  const today = useMemo(() => getTodayString(), []);
+  const yesterday = useMemo(() => getYesterdayString(), []);
+  
+  const [selectedDate, setSelectedDate] = useState(route.params?.date || today);
+  const [isCalendarVisible, setIsCalendarVisible] = useState(false);
+
   const { data: studentsData, isLoading: loadingStudents, refetch: refetchStudents, isFetching: fetchingStudents } = useGetClassStudentsQuery(classId);
   
-  const d = new Date();
-  const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-  
-  const { data: attendanceData, isLoading: loadingAttendance, refetch: refetchAttendance, isFetching: fetchingAttendance } = useGetAttendanceQuery({ classId, startDate: today, endDate: today });
+  const { data: attendanceData, isLoading: loadingAttendance, refetch: refetchAttendance, isFetching: fetchingAttendance } = useGetAttendanceQuery(
+    { classId, startDate: selectedDate, endDate: selectedDate },
+    { skip: !classId }
+  );
 
   const onRefresh = React.useCallback(() => {
     refetchStudents();
@@ -36,12 +61,20 @@ const AttendanceMarkingScreen = ({ route, navigation }) => {
   const [submitBulkAttendance, { isLoading: saving }] = useSubmitBulkAttendanceMutation();
   const [modalState, setModalState] = useState({ visible: false, type: 'info', title: '', message: '', onSuccess: null });
 
+  const existingRecords = attendanceData?.records || [];
+  const isAlreadyMarked = existingRecords.length > 0;
+  const isBackdated = selectedDate < today;
+
   useEffect(() => {
     if (studentsData?.students) {
-      const existingRecords = attendanceData?.records || [];
+      const records = attendanceData?.records || [];
       const merged = studentsData.students.map(s => {
-        const record = existingRecords.find(r => r.student_id === s.id);
-        return { ...s, _id: s.id, status: record ? record.status : 'present' }; // backend returns lowercase
+        const record = records.find(r => r.student_id === s.id);
+        return { 
+          ...s, 
+          _id: s.id, 
+          status: record ? record.status : 'present' 
+        };
       });
       setStudents(merged);
     }
@@ -57,22 +90,39 @@ const AttendanceMarkingScreen = ({ route, navigation }) => {
     setStudents(updated);
   };
 
+  const handlePrevDay = () => {
+    const curr = new Date(selectedDate);
+    curr.setDate(curr.getDate() - 1);
+    const prevStr = `${curr.getFullYear()}-${String(curr.getMonth() + 1).padStart(2, '0')}-${String(curr.getDate()).padStart(2, '0')}`;
+    setSelectedDate(prevStr);
+  };
+
+  const handleNextDay = () => {
+    if (selectedDate >= today) return;
+    const curr = new Date(selectedDate);
+    curr.setDate(curr.getDate() + 1);
+    const nextStr = `${curr.getFullYear()}-${String(curr.getMonth() + 1).padStart(2, '0')}-${String(curr.getDate()).padStart(2, '0')}`;
+    setSelectedDate(nextStr);
+  };
+
   const handleSubmit = async () => {
     try {
-      const attendanceData = students.map(s => ({
+      const payload = students.map(s => ({
         student_id: s._id,
-        date: today,
+        date: selectedDate,
         status: s.status
       }));
       
-      const res = await submitBulkAttendance(attendanceData).unwrap();
+      const res = await submitBulkAttendance(payload).unwrap();
       
       if (res.success) {
         setModalState({
           visible: true,
           type: 'success',
           title: 'Success',
-          message: 'Attendance saved successfully!',
+          message: isBackdated 
+            ? `Attendance for ${formatDatePretty(selectedDate)} updated successfully!`
+            : 'Attendance saved successfully!',
           onSuccess: () => navigation.goBack()
         });
       } else {
@@ -89,13 +139,13 @@ const AttendanceMarkingScreen = ({ route, navigation }) => {
         visible: true,
         type: 'error',
         title: 'Error',
-        message: 'An error occurred while saving attendance',
+        message: error?.data?.message || 'An error occurred while saving attendance',
         onSuccess: null
       });
     }
   };
 
-  const StatusPill = ({ currentStatus, targetStatus, onPress, activeColor, activeBg, label, icon }) => {
+  const StatusPill = ({ currentStatus, targetStatus, onPress, activeColor, activeBg, label }) => {
     const isActive = currentStatus === targetStatus;
     
     return (
@@ -122,6 +172,12 @@ const AttendanceMarkingScreen = ({ route, navigation }) => {
   const absentCount = students.filter(s => s.status === 'absent').length;
   const lateCount = students.filter(s => s.status === 'late').length;
 
+  const dateLabel = useMemo(() => {
+    if (selectedDate === today) return `Today, ${formatDatePretty(selectedDate)}`;
+    if (selectedDate === yesterday) return `Yesterday, ${formatDatePretty(selectedDate)}`;
+    return formatDatePretty(selectedDate);
+  }, [selectedDate, today, yesterday]);
+
   return (
     <View style={styles.container}>
       {/* Premium Sweeping Header */}
@@ -135,7 +191,7 @@ const AttendanceMarkingScreen = ({ route, navigation }) => {
             <Text style={styles.headerSubtitle}>Class {className} - {section}</Text>
           </View>
           <View style={{flexDirection: 'row'}}>
-            <TouchableOpacity style={styles.iconButton} onPress={handleMarkAllPresent}>
+            <TouchableOpacity style={styles.iconButton} onPress={handleMarkAllPresent} title="Mark All Present">
               <Icon name="check-square" size={24} color={colors.surface} />
             </TouchableOpacity>
           </View>
@@ -158,9 +214,67 @@ const AttendanceMarkingScreen = ({ route, navigation }) => {
         </View>
       </View>
 
-      <View style={styles.dateBanner}>
-        <Icon name="calendar" size={16} color={colors.primary} />
-        <Text style={styles.dateBannerText}>Today, {today}</Text>
+      {/* Interactive Date Navigation Bar */}
+      <View style={styles.dateNavContainer}>
+        <TouchableOpacity 
+          style={styles.dateNavArrow} 
+          onPress={handlePrevDay}
+          activeOpacity={0.7}
+        >
+          <Icon name="chevron-left" size={22} color={colors.primary} />
+        </TouchableOpacity>
+
+        <TouchableOpacity 
+          style={[styles.dateSelectorBtn, isBackdated && styles.dateSelectorBtnBackdated]} 
+          onPress={() => setIsCalendarVisible(true)}
+          activeOpacity={0.8}
+        >
+          <Icon name="calendar" size={16} color={isBackdated ? colors.warning : colors.primary} />
+          <Text style={[styles.dateSelectorText, isBackdated && { color: colors.warning }]}>
+            {dateLabel}
+          </Text>
+          {isBackdated && (
+            <View style={styles.backdatedBadge}>
+              <Text style={styles.backdatedBadgeText}>Past Date</Text>
+            </View>
+          )}
+          <Icon name="chevron-down" size={14} color={isBackdated ? colors.warning : colors.primary} style={{ marginLeft: 4 }} />
+        </TouchableOpacity>
+
+        <TouchableOpacity 
+          style={[styles.dateNavArrow, selectedDate >= today && styles.dateNavArrowDisabled]} 
+          onPress={handleNextDay}
+          disabled={selectedDate >= today}
+          activeOpacity={0.7}
+        >
+          <Icon 
+            name="chevron-right" 
+            size={22} 
+            color={selectedDate >= today ? colors.borderLight : colors.primary} 
+          />
+        </TouchableOpacity>
+      </View>
+
+      {/* Status Context Banner */}
+      <View style={[
+        styles.contextBanner,
+        isAlreadyMarked 
+          ? { backgroundColor: colors.success + '12', borderColor: colors.success + '30' }
+          : { backgroundColor: colors.primary + '10', borderColor: colors.primary + '25' }
+      ]}>
+        <Icon 
+          name={isAlreadyMarked ? "check-circle" : "info"} 
+          size={14} 
+          color={isAlreadyMarked ? colors.success : colors.primary} 
+        />
+        <Text style={[
+          styles.contextBannerText, 
+          { color: isAlreadyMarked ? colors.success : colors.primary }
+        ]}>
+          {isAlreadyMarked 
+            ? `Attendance already recorded for this date. You can edit & submit.`
+            : `No attendance recorded yet for this date. Mark and submit below.`}
+        </Text>
       </View>
 
       {loadingStudents || loadingAttendance ? (
@@ -171,7 +285,7 @@ const AttendanceMarkingScreen = ({ route, navigation }) => {
           showsVerticalScrollIndicator={false}
           refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} colors={[colors.primary]} />}
         >
-          {students.map((student, index) => {
+          {students.map((student) => {
             const isPresent = student.status === 'present';
             const isAbsent = student.status === 'absent';
             const isLate = student.status === 'late';
@@ -190,7 +304,7 @@ const AttendanceMarkingScreen = ({ route, navigation }) => {
                   onPress={() => navigation.navigate('StudentProfile', { student })}
                 >
                   <View style={[styles.studentAvatar, { backgroundColor: isPresent ? colors.success + '15' : isAbsent ? colors.danger + '15' : isLate ? colors.warning + '15' : colors.primary + '15' }]}>
-                    <Text style={[styles.avatarText, { color: isPresent ? colors.success : isAbsent ? colors.danger : isLate ? colors.warning : colors.primary }]}>{student.name.charAt(0)}</Text>
+                    <Text style={[styles.avatarText, { color: isPresent ? colors.success : isAbsent ? colors.danger : isLate ? colors.warning : colors.primary }]}>{student.name?.charAt(0)}</Text>
                   </View>
                   <View style={styles.studentInfo}>
                     <Text style={styles.studentName}>{student.name}</Text>
@@ -239,12 +353,76 @@ const AttendanceMarkingScreen = ({ route, navigation }) => {
             <ActivityIndicator color={colors.surface} />
           ) : (
             <>
-              <Icon name="check-circle" size={22} color={colors.surface} style={{ marginRight: 8 }} />
-              <Text style={styles.submitText}>Submit Attendance</Text>
+              <Icon name={isAlreadyMarked ? "refresh-cw" : "check-circle"} size={20} color={colors.surface} style={{ marginRight: 8 }} />
+              <Text style={styles.submitText}>
+                {isAlreadyMarked ? "Update Attendance" : "Submit Attendance"}
+              </Text>
             </>
           )}
         </TouchableOpacity>
       </View>
+
+      {/* Calendar Picker Modal */}
+      <Modal 
+        visible={isCalendarVisible} 
+        transparent 
+        animationType="fade"
+        onRequestClose={() => setIsCalendarVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Select Attendance Date</Text>
+              <TouchableOpacity onPress={() => setIsCalendarVisible(false)} style={styles.modalCloseBtn}>
+                <Icon name="x" size={20} color={colors.textMuted} />
+              </TouchableOpacity>
+            </View>
+
+            {/* Quick Presets */}
+            <View style={styles.quickPresetRow}>
+              <TouchableOpacity 
+                style={[styles.presetChip, selectedDate === today && styles.presetChipActive]}
+                onPress={() => {
+                  setSelectedDate(today);
+                  setIsCalendarVisible(false);
+                }}
+              >
+                <Text style={[styles.presetChipText, selectedDate === today && styles.presetChipTextActive]}>Today</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity 
+                style={[styles.presetChip, selectedDate === yesterday && styles.presetChipActive]}
+                onPress={() => {
+                  setSelectedDate(yesterday);
+                  setIsCalendarVisible(false);
+                }}
+              >
+                <Text style={[styles.presetChipText, selectedDate === yesterday && styles.presetChipTextActive]}>Yesterday</Text>
+              </TouchableOpacity>
+            </View>
+
+            <Calendar
+              current={selectedDate}
+              maxDate={today}
+              markedDates={{
+                [selectedDate]: { selected: true, selectedColor: colors.primary, textColor: colors.surface }
+              }}
+              onDayPress={(day) => {
+                if (day.dateString <= today) {
+                  setSelectedDate(day.dateString);
+                  setIsCalendarVisible(false);
+                }
+              }}
+              theme={{
+                todayTextColor: colors.primary,
+                arrowColor: colors.primary,
+                selectedDayBackgroundColor: colors.primary,
+                selectedDayTextColor: colors.surface,
+              }}
+            />
+          </View>
+        </View>
+      </Modal>
 
       <CustomModal
         visible={modalState.visible}
@@ -267,13 +445,13 @@ const styles = StyleSheet.create({
   
   headerContainer: {
     backgroundColor: colors.primary,
-    paddingBottom: 24,
+    paddingBottom: 20,
     borderBottomLeftRadius: 32,
     borderBottomRightRadius: 32,
     ...shadows.card,
     zIndex: 10,
   },
-  headerTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16, marginBottom: 20 },
+  headerTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16, marginBottom: 16 },
   headerTitle: { fontSize: 20, fontWeight: '800', color: colors.surface, letterSpacing: -0.5 },
   headerSubtitle: { fontSize: 13, color: 'rgba(255,255,255,0.8)', fontWeight: '600', marginTop: 2 },
   iconButton: { padding: 8, backgroundColor: 'rgba(255,255,255,0.15)', borderRadius: 12 },
@@ -282,7 +460,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     paddingHorizontal: 24,
-    marginTop: 8,
+    marginTop: 4,
   },
   statBox: {
     flex: 1,
@@ -291,26 +469,81 @@ const styles = StyleSheet.create({
   statValue: { fontSize: 24, fontWeight: '800', color: colors.surface },
   statLabel: { fontSize: 12, color: 'rgba(255,255,255,0.8)', fontWeight: '600', textTransform: 'uppercase', marginTop: 2 },
 
-  dateBanner: {
+  dateNavContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.primaryLight + '15',
-    alignSelf: 'center',
+    justifyContent: 'space-between',
     paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-    marginTop: 20,
-    marginBottom: 16,
+    marginTop: 14,
+    marginBottom: 6,
   },
-  dateBannerText: {
+  dateNavArrow: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    backgroundColor: colors.surface,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: colors.borderLight,
+    ...shadows.sm,
+  },
+  dateNavArrowDisabled: {
+    opacity: 0.35,
+  },
+  dateSelectorBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.primaryLight + '15',
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: colors.primary + '30',
+  },
+  dateSelectorBtnBackdated: {
+    backgroundColor: colors.warning + '15',
+    borderColor: colors.warning + '40',
+  },
+  dateSelectorText: {
     color: colors.primary,
     fontWeight: '700',
     fontSize: 13,
-    marginLeft: 8,
+    marginLeft: 6,
+    marginRight: 4,
+  },
+  backdatedBadge: {
+    backgroundColor: colors.warning,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 8,
+    marginLeft: 4,
+  },
+  backdatedBadgeText: {
+    color: colors.surface,
+    fontSize: 10,
+    fontWeight: '800',
+    textTransform: 'uppercase',
   },
 
-  scrollContent: { paddingHorizontal: 20, paddingBottom: 120 },
+  contextBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginHorizontal: 16,
+    marginBottom: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 10,
+    borderWidth: 1,
+    gap: 6,
+  },
+  contextBannerText: {
+    fontSize: 12,
+    fontWeight: '600',
+    flex: 1,
+  },
+
+  scrollContent: { paddingHorizontal: 16, paddingBottom: 120 },
 
   studentCard: {
     flexDirection: 'row', alignItems: 'center',
@@ -326,41 +559,98 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   studentAvatar: {
-    width: 48, height: 48, borderRadius: 24,
+    width: 46, height: 46, borderRadius: 23,
     justifyContent: 'center', alignItems: 'center',
-    marginRight: 14,
+    marginRight: 12,
   },
-  avatarText: { fontSize: 20, fontWeight: '800' },
+  avatarText: { fontSize: 19, fontWeight: '800' },
   studentInfo: { flex: 1 },
-  studentName: { fontSize: 16, fontWeight: '700', color: colors.text, marginBottom: 2 },
+  studentName: { fontSize: 15, fontWeight: '700', color: colors.text, marginBottom: 2 },
   studentRoll: { fontSize: 12, color: colors.textMuted, fontWeight: '600' },
   
   statusGroup: { flexDirection: 'row', alignItems: 'center' },
   statusPill: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     borderWidth: 1.5,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  statusPillText: { fontSize: 14, fontWeight: '800' },
+  statusPillText: { fontSize: 13, fontWeight: '800' },
 
   footerContainer: {
     position: 'absolute',
-    bottom: 24, left: 24, right: 24,
+    bottom: 24, left: 20, right: 20,
   },
   submitButton: {
     flexDirection: 'row',
     backgroundColor: colors.primary,
-    height: 56,
-    borderRadius: 28,
+    height: 54,
+    borderRadius: 27,
     justifyContent: 'center',
     alignItems: 'center',
     ...shadows.button,
   },
   submitButtonDisabled: { opacity: 0.7 },
   submitText: { color: colors.surface, fontSize: 16, fontWeight: '800', letterSpacing: 0.5 },
+
+  // Calendar Modal Styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  modalContent: {
+    width: '100%',
+    maxWidth: 380,
+    backgroundColor: colors.surface,
+    borderRadius: 24,
+    padding: 18,
+    ...shadows.card,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  modalTitle: {
+    fontSize: 17,
+    fontWeight: '800',
+    color: colors.text,
+  },
+  modalCloseBtn: {
+    padding: 6,
+  },
+  quickPresetRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 12,
+  },
+  presetChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 14,
+    backgroundColor: colors.background,
+    borderWidth: 1,
+    borderColor: colors.borderLight,
+  },
+  presetChipActive: {
+    backgroundColor: colors.primary + '15',
+    borderColor: colors.primary,
+  },
+  presetChipText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: colors.textMuted,
+  },
+  presetChipTextActive: {
+    color: colors.primary,
+    fontWeight: '700',
+  },
 });
 
 export default AttendanceMarkingScreen;

@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { fetchUsers, fetchClasses } from "../features/dataSlice";
 import { ChevronLeft, Download } from "lucide-react";
 import { toast } from "react-toastify";
@@ -12,14 +12,16 @@ const AttendanceFilteredView = () => {
   const { statusId } = useParams(); // 'present', 'absent', 'late', 'not-marked'
   const navigate = useNavigate();
   const dispatch = useDispatch();
+  const [searchParams] = useSearchParams();
+  const queryDate = searchParams.get("date");
   
   const { users, classes, loadingUsers } = useSelector((state) => state.data);
 
   const [attendanceRecords, setAttendanceRecords] = useState([]);
   const [loadingAttendance, setLoadingAttendance] = useState(false);
   
-  // We only look at today's snapshot for this filtered view
-  const todayString = formatDate(new Date());
+  // Use date query param if provided, otherwise default to today
+  const activeDateString = queryDate || formatDate(new Date());
 
   useEffect(() => {
     if (users.length === 0) dispatch(fetchUsers());
@@ -30,7 +32,7 @@ const AttendanceFilteredView = () => {
     try {
       setLoadingAttendance(true);
       const res = await api.get('/attendance', {
-        params: { startDate: todayString, endDate: todayString }
+        params: { startDate: activeDateString, endDate: activeDateString }
       });
       if (res.data.success) {
         setAttendanceRecords(res.data.records);
@@ -44,7 +46,7 @@ const AttendanceFilteredView = () => {
 
   useEffect(() => {
     fetchAttendance();
-  }, []);
+  }, [activeDateString]);
 
   const filteredStudents = useMemo(() => {
     if (!users || !classes) return [];
@@ -74,13 +76,13 @@ const AttendanceFilteredView = () => {
     return studentsWithStatus.filter(u => u.status === statusId);
   }, [users, classes, attendanceRecords, statusId]);
 
-  const handleSingleUpdate = async (userId, newStatus) => {
+  const handleSingleUpdate = async (userId, status) => {
     try {
       await api.put(`/attendance/${userId}`, { 
-        data: { date: todayString, status: newStatus } 
+        data: { date: activeDateString, status } 
       });
-      fetchAttendance(); // refresh the records to potentially remove them from this list
-      toast.success(`Attendance updated to ${newStatus}`);
+      fetchAttendance(); // refresh
+      toast.success("Attendance updated");
     } catch (err) {
       toast.error("Failed to update attendance");
     }
@@ -126,7 +128,7 @@ const AttendanceFilteredView = () => {
               Students {statusDisplayNames[statusId] || statusId}
             </h1>
             <p style={{ color: "var(--text-secondary)" }}>
-              Showing {filteredStudents.length} students across the entire school
+              Showing {filteredStudents.length} students across the entire school for {activeDateString}
             </p>
           </div>
         </div>

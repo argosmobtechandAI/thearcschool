@@ -521,7 +521,7 @@ const Attendance = () => {
               
               {/* Present Metric Card */}
               <div 
-                onClick={() => navigate('/attendance/status/present')} 
+                onClick={() => navigate(`/attendance/status/present?date=${selectedDate}`)} 
                 className="table-row-hover"
                 style={{ 
                   padding: "0.85rem 1rem", 
@@ -540,7 +540,7 @@ const Attendance = () => {
                   <div style={{ display: "flex", alignItems: "center", gap: "5px", marginBottom: "0.2rem" }}>
                     <span style={{ width: "7px", height: "7px", borderRadius: "50%", background: "#10b981" }}></span>
                     <p style={{ color: "#047857", fontSize: "0.72rem", fontWeight: "700", textTransform: "uppercase", letterSpacing: "0.04em" }}>
-                      Present Today
+                      Present
                     </p>
                   </div>
                   <div style={{ display: "flex", alignItems: "baseline", gap: "0.4rem" }}>
@@ -559,7 +559,7 @@ const Attendance = () => {
 
               {/* Absent Metric Card */}
               <div 
-                onClick={() => navigate('/attendance/status/absent')} 
+                onClick={() => navigate(`/attendance/status/absent?date=${selectedDate}`)} 
                 className="table-row-hover"
                 style={{ 
                   padding: "0.85rem 1rem", 
@@ -597,7 +597,7 @@ const Attendance = () => {
 
               {/* Late Metric Card */}
               <div 
-                onClick={() => navigate('/attendance/status/late')} 
+                onClick={() => navigate(`/attendance/status/late?date=${selectedDate}`)} 
                 className="table-row-hover"
                 style={{ 
                   padding: "0.85rem 1rem", 
@@ -635,7 +635,7 @@ const Attendance = () => {
 
               {/* Not Marked Metric Card */}
               <div 
-                onClick={() => navigate('/attendance/status/not-marked')} 
+                onClick={() => navigate(`/attendance/status/not-marked?date=${selectedDate}`)} 
                 className="table-row-hover"
                 style={{ 
                   padding: "0.85rem 1rem", 
@@ -1034,7 +1034,7 @@ const Attendance = () => {
                           </td>
                           <td style={{ padding: "0.75rem 1rem", textAlign: "right" }}>
                             <button
-                              onClick={() => navigate(`/attendance/class/${cls.id}`)}
+                              onClick={() => navigate(`/attendance/class/${cls.id}?date=${selectedDate}`)}
                               className="btn btn-ghost"
                               style={{ 
                                 fontSize: "0.78rem", 
@@ -1093,7 +1093,7 @@ const Attendance = () => {
                       return (
                         <div 
                           key={cls.id} 
-                          onClick={() => navigate(`/attendance/class/${cls.id}`)}
+                          onClick={() => navigate(`/attendance/class/${cls.id}?date=${selectedDate}`)}
                           className="glass-card hover-bg" 
                           style={{ 
                             padding: "1rem", 

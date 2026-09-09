@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { fetchUsers, fetchClasses } from "../features/dataSlice";
 import { ChevronLeft, CheckCircle, FileSpreadsheet, Download } from "lucide-react";
 import { toast } from "react-toastify";
@@ -13,6 +13,8 @@ const AttendanceClassView = () => {
   const { classId } = useParams();
   const navigate = useNavigate();
   const dispatch = useDispatch();
+  const [searchParams] = useSearchParams();
+  const queryDate = searchParams.get("date");
   
   const { users, classes, loadingUsers } = useSelector((state) => state.data);
 
@@ -26,7 +28,7 @@ const AttendanceClassView = () => {
   const [loadingAttendance, setLoadingAttendance] = useState(false);
   const [publicHolidays, setPublicHolidays] = useState([]);
   
-  const [selectedDate, setSelectedDate] = useState(formatDate(new Date()));
+  const [selectedDate, setSelectedDate] = useState(queryDate || formatDate(new Date()));
 
   useEffect(() => {
     api.get('/admin_panel/planner').then(res => {
@@ -229,8 +231,22 @@ const AttendanceClassView = () => {
                 type="date" 
                 className="input-glass" 
                 value={selectedDate} 
+                max={formatDate(new Date())}
                 onChange={(e) => setSelectedDate(e.target.value)} 
               />
+              {selectedDate < formatDate(new Date()) && (
+                <span style={{ 
+                  padding: "4px 8px", 
+                  borderRadius: "6px", 
+                  backgroundColor: "rgba(245, 158, 11, 0.15)", 
+                  color: "#d97706", 
+                  fontSize: "0.75rem", 
+                  fontWeight: "700",
+                  textTransform: "uppercase" 
+                }}>
+                  Backdated
+                </span>
+              )}
             </>
           ) : (
             <>

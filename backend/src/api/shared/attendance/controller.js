@@ -35,6 +35,11 @@ export const updateAttendance = async (req, res) => {
     const { id } = req.params;
     if (!id || !data?.date || !data?.status) return res.status(400).json({ success: false, message: "User ID, date and status are required" });
     
+    const todayStr = new Date().toISOString().split('T')[0];
+    if (data.date > todayStr) {
+      return res.status(400).json({ success: false, message: "Attendance cannot be marked for future dates" });
+    }
+
     // Verify user exists in public user table to avoid FK violations
     const { data: userRow } = await supabase.from("user").select("id").eq("id", req.user.id).maybeSingle();
     const markedBy = userRow ? req.user.id : null;
@@ -52,13 +57,19 @@ export const bulkUpdateAttendance = async (req, res) => {
     if (!data || !Array.isArray(data) || data.length === 0) {
       return res.status(400).json({ success: false, message: "Attendance records are required" });
     }
+
+    const todayStr = new Date().toISOString().split('T')[0];
+    const hasFutureDate = data.some(r => r.date && r.date > todayStr);
+    if (hasFutureDate) {
+      return res.status(400).json({ success: false, message: "Attendance cannot be marked for future dates" });
+    }
     
     // Verify user exists in public user table to avoid FK violations
     const { data: userRow } = await supabase.from("user").select("id").eq("id", req.user.id).maybeSingle();
     const markedBy = userRow ? req.user.id : null;
 
     await AttendanceService.bulkUpdateAttendance(data, markedBy);
-    return res.status(200).json({ success: true, message: "Bulk attendance updated successfully" });
+    return res.status(200).json({ success: true, message: "Bulk attendance updated successfully", count: data.length });
   } catch (e) {
     return res.status(500).json({ success: false, message: e.message });
   }
