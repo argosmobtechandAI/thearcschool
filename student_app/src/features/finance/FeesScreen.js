@@ -192,10 +192,10 @@ const FeesScreen = ({ navigation }) => {
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
             {isPaid && (
               <>
-                <TouchableOpacity onPress={() => generateReceiptPDF(record, user)} style={styles.iconActionBtn}>
+                <TouchableOpacity onPress={() => generateReceiptPDF(record, user, false)} style={styles.iconActionBtn}>
                   <Icon name="download" size={16} color={theme.colors.primary} />
                 </TouchableOpacity>
-                <TouchableOpacity onPress={() => generateReceiptPDF(record, user)} style={styles.iconActionBtn}>
+                <TouchableOpacity onPress={() => generateReceiptPDF(record, user, true)} style={styles.iconActionBtn}>
                   <Icon name="share-2" size={16} color={theme.colors.primary} />
                 </TouchableOpacity>
               </>
@@ -256,10 +256,10 @@ const FeesScreen = ({ navigation }) => {
         <View style={styles.feeBottomRow}>
           <Text style={styles.dueDate}>Paid on: {new Date(payment.created_at).toLocaleDateString()}</Text>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-            <TouchableOpacity onPress={() => generateReceiptPDF(payment, user)} style={styles.iconActionBtn}>
+            <TouchableOpacity onPress={() => generateReceiptPDF(payment, user, false)} style={styles.iconActionBtn}>
               <Icon name="download" size={16} color={theme.colors.primary} />
             </TouchableOpacity>
-            <TouchableOpacity onPress={() => generateReceiptPDF(payment, user)} style={styles.iconActionBtn}>
+            <TouchableOpacity onPress={() => generateReceiptPDF(payment, user, true)} style={styles.iconActionBtn}>
               <Icon name="share-2" size={16} color={theme.colors.primary} />
             </TouchableOpacity>
             <View style={[styles.statusChip, { backgroundColor: getStatusColor('paid') + '15' }]}>
@@ -482,7 +482,7 @@ const FeesScreen = ({ navigation }) => {
                       <Button 
                         label="Download Receipt"
                         icon="download"
-                        onPress={() => generateReceiptPDF(selectedFee, user)}
+                        onPress={() => generateReceiptPDF(selectedFee, user, false)}
                         style={{ marginTop: 16 }}
                       />
                     )}

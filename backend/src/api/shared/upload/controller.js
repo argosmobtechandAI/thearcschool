@@ -47,8 +47,9 @@ export const uploadFile = async (req, res) => {
     let fileUrl;
 
     if (isVPS) {
-      // On VPS the file is already saved to /var/www/arcschool/uploads/<category>/
-      const cdnBase = process.env.CDN_BASE_URL?.replace(/\/+$/, "") || "https://cdn.thearcschool.online";
+      const cdnBase = process.env.CDN_BASE_URL
+        ? process.env.CDN_BASE_URL.replace(/\/+$/, "")
+        : `${req.protocol}://${req.get("host")}/uploads`;
       fileUrl = `${cdnBase}/${category}/${req.file.filename}`;
     } else {
       // On local dev, return a localhost-accessible URL.

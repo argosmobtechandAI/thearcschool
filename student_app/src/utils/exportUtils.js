@@ -3,7 +3,9 @@ import { autoTable } from 'jspdf-autotable';
 import RNFS from 'react-native-fs';
 import notifee, { AndroidImportance } from '@notifee/react-native';
 import { letterheadBase64 } from './letterhead';
-import { Platform } from 'react-native';
+import { Platform, Alert } from 'react-native';
+import Share from 'react-native-share';
+import FileViewer from 'react-native-file-viewer';
 
 /**
  * Export data to a PDF file with a table and save it to device
@@ -61,32 +63,42 @@ export const exportToPDF = async (columns, data, fileName = "export", title = "E
         // Output PDF as base64 string
         const pdfBase64 = doc.output('datauristring').split(',')[1];
         
-        // Determine save path based on platform
-        const dirPath = Platform.OS === 'android' ? RNFS.DownloadDirectoryPath : RNFS.DocumentDirectoryPath;
-        const savePath = `${dirPath}/${fileName}_${Date.now()}.pdf`;
+        // Determine save path using CachesDirectoryPath to avoid Android scoped storage permission issues
+        const cleanName = `${fileName.replace(/[^a-zA-Z0-9_-]/g, '_')}_${Date.now()}.pdf`;
+        const dirPath = RNFS.CachesDirectoryPath;
+        const savePath = `${dirPath}/${cleanName}`;
 
         // Write the file
         await RNFS.writeFile(savePath, pdfBase64, 'base64');
         
-        // Share the file natively
-        import('react-native-share').then(ShareModule => {
-            const Share = ShareModule.default;
-            Share.open({
+        // Also try saving a copy to Downloads folder on Android if permitted
+        if (Platform.OS === 'android') {
+            try {
+                const downloadPath = `${RNFS.DownloadDirectoryPath}/${cleanName}`;
+                await RNFS.writeFile(downloadPath, pdfBase64, 'base64');
+            } catch (e) {
+                // Scoped storage fallback - continue with cache file
+            }
+        }
+
+        try {
+            await FileViewer.open(savePath, { showOpenWithDialog: true, showAppsSuggestions: true });
+        } catch (viewerErr) {
+            await Share.open({
                 title: `Share ${title}`,
                 url: `file://${savePath}`,
                 type: 'application/pdf',
-                filename: fileName,
+                filename: cleanName,
                 showAppsToView: true
             }).catch(err => {
                 if (err && err.message !== 'User did not share') {
                     console.log('Share error:', err);
                 }
             });
-        });
-
+        }
     } catch (error) {
         console.error("Error generating PDF: ", error);
-        throw error;
+        Alert.alert("PDF Export Error", error.message || "Failed to generate PDF document.");
     }
 };
 
@@ -94,8 +106,9 @@ export const exportToPDF = async (columns, data, fileName = "export", title = "E
  * Generate a PDF receipt for a fee payment
  * @param {Object} payment - Payment details object
  * @param {Object} student - Student details object
+ * @param {boolean} isShare - If true, directly open the share dialog
  */
-export const generateReceiptPDF = async (payment, student) => {
+export const generateReceiptPDF = async (payment, student, isShare = false) => {
     if (!payment || !student) return;
 
     try {
@@ -163,18 +176,28 @@ export const generateReceiptPDF = async (payment, student) => {
         // Output PDF as base64 string
         const pdfBase64 = doc.output('datauristring').split(',')[1];
         
-        // Determine save path based on platform
-        const fileName = `Receipt_${student.name || 'Student'}_${payment.id?.substring(0,6) || ''}`;
-        const dirPath = Platform.OS === 'android' ? RNFS.DownloadDirectoryPath : RNFS.DocumentDirectoryPath;
-        const savePath = `${dirPath}/${fileName}_${Date.now()}.pdf`;
+        // Determine save path using CachesDirectoryPath to avoid Android scoped storage permission issues
+        const studentClean = (student.name || 'Student').replace(/[^a-zA-Z0-9_-]/g, '_');
+        const paymentClean = (payment.id?.substring(0, 6) || 'receipt').replace(/[^a-zA-Z0-9_-]/g, '_');
+        const fileName = `Receipt_${studentClean}_${paymentClean}_${Date.now()}.pdf`;
+        const dirPath = RNFS.CachesDirectoryPath;
+        const savePath = `${dirPath}/${fileName}`;
 
         // Write the file
         await RNFS.writeFile(savePath, pdfBase64, 'base64');
         
-        // Share the file natively
-        import('react-native-share').then(ShareModule => {
-            const Share = ShareModule.default;
-            Share.open({
+        // Also try saving a copy to Downloads folder on Android if permitted
+        if (Platform.OS === 'android') {
+            try {
+                const downloadPath = `${RNFS.DownloadDirectoryPath}/${fileName}`;
+                await RNFS.writeFile(downloadPath, pdfBase64, 'base64');
+            } catch (e) {
+                // Scoped storage fallback - continue with cache file
+            }
+        }
+
+        if (isShare) {
+            await Share.open({
                 title: 'Share Receipt',
                 url: `file://${savePath}`,
                 type: 'application/pdf',
@@ -185,10 +208,25 @@ export const generateReceiptPDF = async (payment, student) => {
                     console.log('Share error:', err);
                 }
             });
-        });
-
+        } else {
+            try {
+                await FileViewer.open(savePath, { showOpenWithDialog: true, showAppsSuggestions: true });
+            } catch (viewerErr) {
+                await Share.open({
+                    title: 'Fee Receipt',
+                    url: `file://${savePath}`,
+                    type: 'application/pdf',
+                    filename: fileName,
+                    showAppsToView: true
+                }).catch(err => {
+                    if (err && err.message !== 'User did not share') {
+                        console.log('Share error:', err);
+                    }
+                });
+            }
+        }
     } catch (error) {
         console.error("Error generating receipt: ", error);
-        throw error;
+        Alert.alert("Receipt Error", error.message || "Failed to generate fee receipt.");
     }
 };

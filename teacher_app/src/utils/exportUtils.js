@@ -61,12 +61,22 @@ export const exportToPDF = async (columns, data, fileName = "export", title = "E
         // Output PDF as base64 string
         const pdfBase64 = doc.output('datauristring').split(',')[1];
         
-        // Determine save path based on platform
-        const dirPath = Platform.OS === 'android' ? RNFS.DownloadDirectoryPath : RNFS.DocumentDirectoryPath;
-        const savePath = `${dirPath}/${fileName}_${Date.now()}.pdf`;
+        // Determine save path using CachesDirectoryPath to avoid Android scoped storage permission issues
+        const cleanName = `${fileName.replace(/[^a-zA-Z0-9_-]/g, '_')}_${Date.now()}.pdf`;
+        const dirPath = RNFS.CachesDirectoryPath;
+        const savePath = `${dirPath}/${cleanName}`;
 
         // Write the file
         await RNFS.writeFile(savePath, pdfBase64, 'base64');
+
+        if (Platform.OS === 'android') {
+            try {
+                const downloadPath = `${RNFS.DownloadDirectoryPath}/${cleanName}`;
+                await RNFS.writeFile(downloadPath, pdfBase64, 'base64');
+            } catch (e) {
+                // Ignore scoped storage fallback
+            }
+        }
         
         // Create a notification channel (required for Android)
         await notifee.requestPermission();

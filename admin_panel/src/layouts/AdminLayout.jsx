@@ -398,10 +398,10 @@ const AdminLayout = () => {
           {((user?.type === "admin" || user?.type === "super_admin") || user?.type === "principal") && (
             <>
               <NavGroup title="Portals" />
-              <NavItem href="https://admissions.thearcschool.online" icon={ExternalLink} color="#2563eb" bg="rgba(37, 99, 235, 0.15)">
+              <NavItem href={import.meta.env.VITE_ADMISSIONS_URL || "https://admissions.thearcschool.online"} icon={ExternalLink} color="#2563eb" bg="rgba(37, 99, 235, 0.15)">
                 Admission Portal
               </NavItem>
-              <NavItem href="https://finance.thearcschool.online" icon={ExternalLink} color="#16a34a" bg="rgba(22, 163, 74, 0.15)">
+              <NavItem href={import.meta.env.VITE_FINANCE_URL || "https://finance.thearcschool.online"} icon={ExternalLink} color="#16a34a" bg="rgba(22, 163, 74, 0.15)">
                 Finance Portal
               </NavItem>
             </>

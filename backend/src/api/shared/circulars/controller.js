@@ -14,7 +14,9 @@ export const uploadCircularFile = async (req, res) => {
 
     let fileUrl;
     if (isVPS) {
-      const cdnBase = process.env.CDN_BASE_URL?.replace(/\/+$/, "") || "https://cdn.thearcschool.online";
+      const cdnBase = process.env.CDN_BASE_URL
+        ? process.env.CDN_BASE_URL.replace(/\/+$/, "")
+        : `${req.protocol}://${req.get("host")}/uploads`;
       fileUrl = `${cdnBase}/circular/${req.file.filename}`;
     } else {
       const protocol = req.protocol;

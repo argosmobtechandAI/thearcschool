@@ -64,7 +64,11 @@ const Communication = () => {
     useEffect(() => {
         if (!myself?.id) return;
 
-        const SOCKET_URL = (import.meta.env.VITE_API_URL || "http://localhost:3002/api").replace(/\/api\/?$/, '');
+        const SOCKET_URL =
+          import.meta.env.VITE_SOCKET_URL ||
+          (import.meta.env.VITE_API_URL
+            ? import.meta.env.VITE_API_URL.replace(/\/api\/?$/, '')
+            : "http://localhost:3003");
         setSocketUrl(SOCKET_URL);
 
         if (socket.connected) {

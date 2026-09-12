@@ -4,7 +4,7 @@ import { calculateStudentScore } from "../../../utils/helpers.js";
 export class UserService {
   static parseSafeDate(dateString) {
     if (!dateString) return null;
-    
+
     // Check if it's an Excel serial date (e.g., "44760")
     if (/^\d{4,5}$/.test(String(dateString))) {
       const excelEpoch = new Date(1899, 11, 30);
@@ -21,13 +21,13 @@ export class UserService {
         d = new Date(`${parts[2]}-${parts[1]}-${parts[0]}`);
       }
     }
-    
+
     if (isNaN(d.getTime())) return null;
-    
+
     // Sanity check: Ensure year is realistic
     const year = d.getFullYear();
     if (year < 1900 || year > 2100) return null;
-    
+
     return d.toISOString().split('T')[0];
   }
 
@@ -40,16 +40,16 @@ export class UserService {
       if (father_name.includes('&')) {
         [father_name, mother_name] = father_name.split('&').map(s => s.trim());
       }
-      
+
       const { data: parentData, error } = await supabase.from('parents').insert({
         father_name,
         mother_name,
         phone: data.phone || null,
         alternate_number: data.alternate_number || null,
       }).select().single();
-      
+
       if (error) throw error;
-      
+
       if (connections && connections.length > 0) {
         const studentParents = connections.map(studentId => ({
           parent_id: parentData.id,
@@ -124,7 +124,7 @@ export class UserService {
       };
       // Clean up undefined/null values so we don't override defaults
       Object.keys(studentFields).forEach(key => (studentFields[key] === undefined || studentFields[key] === '') && delete studentFields[key]);
-      
+
       if (Object.keys(studentFields).length > 0) {
         await supabase.from("user").update(studentFields).eq("id", newUserId);
       }
@@ -134,13 +134,13 @@ export class UserService {
         doj: UserService.parseSafeDate(data.doj) || data.doj,
         father_spouse_name: data.father_spouse_name
       };
-      
+
       const commonFields = { address: data.address, dob: data.dob };
       Object.keys(commonFields).forEach(key => (commonFields[key] === undefined || commonFields[key] === '') && delete commonFields[key]);
       if (Object.keys(commonFields).length > 0) {
         await supabase.from("user").update(commonFields).eq("id", newUserId);
       }
-      
+
       Object.keys(teacherDetails).forEach(key => (teacherDetails[key] === undefined || teacherDetails[key] === '') && delete teacherDetails[key]);
       if (Object.keys(teacherDetails).length > 1) {
         await supabase.from("teacher_details").insert([teacherDetails]);
@@ -152,7 +152,7 @@ export class UserService {
       if (Object.keys(commonFields).length > 0) {
         await supabase.from("user").update(commonFields).eq("id", newUserId);
       }
-      
+
       const staffDetails = {
         user_id: newUserId,
         access_level: userData.type,
@@ -214,7 +214,8 @@ export class UserService {
     };
   }
 
-  static async updateUser(data) { console.log('UPDATE USER DATA ID:', data.id, typeof data.id, JSON.stringify(data));
+  static async updateUser(data) {
+    console.log('UPDATE USER DATA ID:', data.id, typeof data.id, JSON.stringify(data));
     if (data.type === 'parent') {
       const parentId = data.id;
       let father_name = data.name || '';
@@ -222,16 +223,16 @@ export class UserService {
       if (father_name.includes('&')) {
         [father_name, mother_name] = father_name.split('&').map(s => s.trim());
       }
-      
+
       const { error } = await supabase.from('parents').update({
         father_name,
         mother_name,
         phone: data.phone || null,
         alternate_number: data.alternate_number || null,
       }).eq("id", parentId);
-      
+
       if (error) throw error;
-      
+
       if (data.connections !== undefined) {
         await supabase.from("student_parents").delete().eq("parent_id", parentId);
         if (data.connections.length > 0) {
@@ -265,7 +266,7 @@ export class UserService {
       });
       if (authError) throw authError;
     }
-    
+
     if (data.email && data.email !== existingUser[0].email) {
       if (!supabaseAdmin) throw new Error("Supabase Admin client missing for email updates.");
       const { error: emailAuthError } = await supabaseAdmin.auth.admin.updateUserById(userId, {
@@ -274,7 +275,7 @@ export class UserService {
       });
       if (emailAuthError) throw emailAuthError;
     }
-    
+
     delete data.password;
     delete data.id;
     delete data.createdAt;
@@ -282,7 +283,7 @@ export class UserService {
     const connections = data.connections;
     const classId = data.classId;
     const classes = data.classes;
-    
+
     let teacherDetailsData = null;
     if (existingUser[0].type === 'teacher') {
       teacherDetailsData = {
@@ -382,7 +383,7 @@ export class UserService {
       supabase.from("parents").select("id, father_name, mother_name, phone, alternate_number").then(res => res.error ? { data: [] } : res).catch(() => ({ data: [] })),
       supabase.from("student_parents").select("parent_id, student_id").then(res => res.error ? { data: [] } : res).catch(() => ({ data: [] }))
     ]);
-    
+
     const mappedUsers = users.map(user => {
       let connections = [];
       if (user.type === 'student') {
@@ -407,13 +408,13 @@ export class UserService {
         notification: [],
         activity: []
       };
-      
+
       const tDetails = (teacherDetailsData || []).filter(t => t.user_id === user.id);
       if (u.type === 'teacher' && tDetails.length > 0) {
         u.doj = tDetails[0].doj;
         u.father_spouse_name = tDetails[0].father_spouse_name;
       }
-      
+
       return u;
     });
 
@@ -460,7 +461,7 @@ export class UserService {
     if (!user || user.length === 0) {
       throw new Error("User not found");
     }
-    
+
     const u = user[0];
 
     // Fetch related data in parallel
@@ -477,7 +478,7 @@ export class UserService {
       supabase.from("activities").select("*").eq("user_id", u.id),
       supabase.from("user_connections").select("*").or(`student_id.eq.${u.id},parent_id.eq.${u.id}`)
     ]);
-      
+
     let connections = [];
     if (connectionsData) {
       if (u.type === 'student') {
@@ -486,7 +487,7 @@ export class UserService {
         connections = connectionsData.filter(c => c.parent_id === u.id).map(c => c.student_id);
       }
     }
-    
+
     return {
       ...u,
       connections,
@@ -503,7 +504,7 @@ export class UserService {
     // We must do this manually because some users might not exist in auth.users due to bulk import fallbacks.
     const { error } = await supabaseAdmin.from("user").delete().eq("id", id);
     if (error) throw new Error("User deletion from public schema failed: " + error.message);
-    
+
     // Also delete from auth.users if we have admin client
     if (supabaseAdmin) {
       const { error: authError } = await supabaseAdmin.auth.admin.deleteUser(id);
@@ -512,7 +513,7 @@ export class UserService {
         throw new Error("Auth user deletion failed: " + authError.message);
       }
     }
-    
+
     return true;
   }
 
@@ -547,7 +548,7 @@ export class UserService {
       if (!user.email || !user.password || !user.name || !user.type) {
         throw new Error(`Missing required fields for user: ${JSON.stringify(user)}. Name: ${user.name}, Email: ${user.email}, Password: ${user.password}, Type: ${user.type}`);
       }
-      
+
       const metadata = {
         name: user.name,
         type: user.type,
@@ -556,7 +557,7 @@ export class UserService {
         dob: user.dob,
         status: user.status || 'active'
       };
-      
+
       // Strip out empty string values to prevent Supabase 500 internal triggers from crashing on Date typecasts
       Object.keys(metadata).forEach(key => {
         if (metadata[key] == null || String(metadata[key]).trim() === '' || String(metadata[key]).trim() === 'undefined') {
@@ -601,7 +602,7 @@ export class UserService {
         console.warn(`Auth attempt ${attempt}/3 failed for ${user.email}: ${ae.message || 'AuthRetryableFetchError'}. Retrying in ${attempt * 1000}ms...`);
         await new Promise(r => setTimeout(r, attempt * 1000)); // 1s, 2s, 3s backoff
       }
-      
+
       if (lastAuthError) {
         console.error("Auth creation failed permanently for user:", user.email, lastAuthError);
         throw new Error(`Failed to create Auth user for ${user.email}: ${lastAuthError.message || JSON.stringify(lastAuthError)}`);
@@ -633,7 +634,7 @@ export class UserService {
             character_certificate_document_url: user.character_certificate_document_url
           };
           Object.keys(studentFields).forEach(key => (studentFields[key] === undefined || studentFields[key] === '') && delete studentFields[key]);
-          
+
           if (Object.keys(studentFields).length > 0) {
             const { error: updateError } = await supabaseAdmin.from("user").update(studentFields).eq("id", authData.user.id);
             if (updateError) {
@@ -645,13 +646,13 @@ export class UserService {
           // Handle Class Mapping
           let targetClassName = user.className || user.class;
           let targetSection = user.section || user.sec;
-          
+
           if (targetClassName) {
             targetClassName = String(targetClassName).trim().toUpperCase();
             targetSection = targetSection ? String(targetSection).trim().toUpperCase() : "A";
 
             let matchedClass = currentClasses.find(c => String(c.name).toUpperCase() === targetClassName && String(c.section).toUpperCase() === targetSection);
-            
+
             if (!matchedClass) {
               const { data: newClassData } = await supabaseAdmin.from("class").insert([{ name: targetClassName, section: targetSection }]).select("id, name, section");
               if (newClassData && newClassData.length > 0) {
@@ -659,7 +660,7 @@ export class UserService {
                 currentClasses.push(matchedClass);
               }
             }
-            
+
             if (matchedClass) {
               await supabaseAdmin.from("class_students").insert([{ class_id: matchedClass.id, student_id: authData.user.id }]);
             }
@@ -672,11 +673,11 @@ export class UserService {
             father_spouse_name: user.father_spouse_name
           };
           Object.keys(teacherDetails).forEach(key => (teacherDetails[key] === undefined || teacherDetails[key] === '') && delete teacherDetails[key]);
-          
+
           if (Object.keys(teacherDetails).length > 1) {
             await supabaseAdmin.from("teacher_details").insert([teacherDetails]);
           }
-          
+
           const commonFields = { address: user.address, dob: user.dob, phone: user.phone };
           Object.keys(commonFields).forEach(key => (commonFields[key] === undefined || commonFields[key] === '') && delete commonFields[key]);
           if (Object.keys(commonFields).length > 0) {
@@ -696,8 +697,8 @@ export class UserService {
     return createdUsers;
   }
 
-  
-  
+
+
   static async updateNotification(id) {
     const { error } = await supabase.from("notifications").update({ is_read: true }).eq("user_id", id);
     if (error) throw new Error("Could not update notifications: " + error.message);
