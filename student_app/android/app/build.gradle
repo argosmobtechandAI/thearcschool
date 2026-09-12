@@ -84,8 +84,8 @@ android {
         applicationId "com.student_app1"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 4
-        versionName "3.1"
+        versionCode 6
+        versionName "3.3"
     }
     signingConfigs {
         debug {

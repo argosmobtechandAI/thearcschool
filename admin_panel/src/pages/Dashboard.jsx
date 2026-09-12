@@ -523,8 +523,8 @@ const Dashboard = () => {
               Manage Admissions
             </button>
           </div>
-          <div style={{ height: "240px", width: "100%" }}>
-            <ResponsiveContainer width="100%" height="100%">
+          <div style={{ height: "240px", width: "100%", minWidth: 0 }}>
+            <ResponsiveContainer width="100%" height="100%" minWidth={0}>
               <BarChart
                 data={admissionStats}
                 margin={{ top: 15, right: 20, left: 10, bottom: 20 }}
@@ -557,8 +557,8 @@ const Dashboard = () => {
               User Distribution
             </h3>
           </div>
-          <div style={{ height: "240px", width: "100%" }}>
-            <ResponsiveContainer width="100%" height="100%">
+          <div style={{ height: "240px", width: "100%", minWidth: 0 }}>
+            <ResponsiveContainer width="100%" height="100%" minWidth={0}>
               <RadarChart cx="50%" cy="50%" outerRadius="75%" data={userDistributionStats}>
                 <PolarGrid stroke="rgba(0,0,0,0.08)" />
                 <PolarAngleAxis dataKey="subject" stroke="var(--text-primary)" fontSize={11} fontWeight={600} />

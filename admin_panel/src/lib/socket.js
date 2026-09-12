@@ -7,6 +7,6 @@ const SOCKET_URL =
     : "http://localhost:3003");
 
 export const socket = io(SOCKET_URL, {
-  transports: ["websocket", "polling"],
+  transports: ["polling", "websocket"],
   autoConnect: false,
 });

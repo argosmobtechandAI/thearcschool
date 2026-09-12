@@ -138,7 +138,7 @@ const AdminLayout = () => {
           if (permission === "granted") {
             const token = await getToken(messaging);
             if (token) {
-              await api.post('/notifications/register-token', {
+              await api.post('/admin_panel/notifications/register-token', {
                 fcm_token: token,
                 device_type: 'web'
               });

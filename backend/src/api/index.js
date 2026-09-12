@@ -14,6 +14,7 @@ import sharedStudentOfWeekRouter from "./shared/student_of_week/routes.js";
 import adminStudentOfWeekRouter from "./admin_panel/student_of_week/routes.js";
 import circularsRouter from "./shared/circulars/routes.js";
 import galleryRouter from "./shared/gallery/routes.js";
+import notificationsRouter from "./shared/notifications/routes.js";
 
 // Admin Web Panel Domains
 import adminPanelRouter from "./admin_panel/routes.js";
@@ -51,6 +52,7 @@ router.use("/gallery", galleryRouter);
 router.use("/live_chat", liveChatRouter);
 router.use("/thoughts", thoughtRouter);
 router.use("/spotlight", spotlightRouter);
+router.use("/notifications", notificationsRouter);
 router.use("/shared/student-of-week", sharedStudentOfWeekRouter);
 router.use("/admin/student-of-week", adminStudentOfWeekRouter);
 

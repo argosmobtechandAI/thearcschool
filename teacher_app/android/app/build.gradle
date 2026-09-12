@@ -83,8 +83,8 @@ android {
         applicationId "com.teacher_app1"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 7
-        versionName "7"
+        versionCode 8
+        versionName "8.0"
     }
     signingConfigs {
         debug {
