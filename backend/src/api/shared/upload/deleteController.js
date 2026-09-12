@@ -5,7 +5,7 @@ import path from "path";
  * Resolve where a file lives on disk given its public URL.
  *
  * Local dev URLs:  http://localhost:3003/uploads/<category>/<filename>
- * VPS CDN URLs:    https://cdn.arcschool.cloud/<category>/<filename>
+ * VPS CDN URLs:    https://cdn.thearcschool.online/<category>/<filename>
  *
  * Returns the absolute local filesystem path, or null if it can't be resolved.
  */
@@ -19,7 +19,7 @@ function resolveLocalPath(fileUrl) {
     const pathname = url.pathname; // e.g. /uploads/avatar/123-photo.jpg  OR  /avatar/123-photo.jpg
 
     if (isVPS) {
-      // CDN URL: https://cdn.arcschool.cloud/<category>/<filename>
+      // CDN URL: https://cdn.thearcschool.online/<category>/<filename>
       // pathname = /<category>/<filename>
       return path.join("/var/www/arcschool/uploads", pathname);
     } else {
@@ -38,7 +38,7 @@ function resolveLocalPath(fileUrl) {
 
 /**
  * DELETE /api/upload/file
- * Body: { url: "https://cdn.arcschool.cloud/avatar/123-photo.jpg" }
+ * Body: { url: "https://cdn.thearcschool.online/avatar/123-photo.jpg" }
  *
  * Deletes the physical file from the local or VPS filesystem.
  * Always returns 200 — a missing file is not an error (idempotent).

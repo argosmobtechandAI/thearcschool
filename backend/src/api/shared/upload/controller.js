@@ -33,7 +33,7 @@ function resolveCategory(rawCategory = "general") {
  *              returns   http://localhost:3003/uploads/<category>/<filename>
  *
  * VPS (Linux) → saves to  /var/www/arcschool/uploads/<category>/
- *               returns   https://cdn.arcschool.cloud/<category>/<filename>
+ *               returns   ${process.env.CDN_BASE_URL}/<category>/<filename>
  */
 export const uploadFile = async (req, res) => {
   try {
@@ -48,7 +48,8 @@ export const uploadFile = async (req, res) => {
 
     if (isVPS) {
       // On VPS the file is already saved to /var/www/arcschool/uploads/<category>/
-      fileUrl = `https://cdn.arcschool.cloud/${category}/${req.file.filename}`;
+      const cdnBase = process.env.CDN_BASE_URL?.replace(/\/+$/, "") || "https://cdn.thearcschool.online";
+      fileUrl = `${cdnBase}/${category}/${req.file.filename}`;
     } else {
       // On local dev, return a localhost-accessible URL.
       // The backend serves /uploads as a static directory (make sure this is in app.js).
