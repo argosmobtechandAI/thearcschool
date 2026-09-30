@@ -70,27 +70,26 @@ const StudentLedgerModal = ({ isOpen, onClose, student }) => {
         background: "rgba(15, 23, 42, 0.55)", 
         backdropFilter: "blur(6px)", 
         display: "flex", 
-        alignItems: "center", 
-        justifyContent: "center", 
-        zIndex: 1000,
-        padding: "1rem"
+        justifyContent: "flex-end", 
+        zIndex: 1000
       }} 
       onClick={onClose}
     >
       <div 
-        className="glass-panel modal-content" 
+        className="glass-panel" 
         style={{ 
           width: "100%", 
           maxWidth: "760px", 
-          maxHeight: "88vh", 
+          height: "100vh", 
           padding: "1.5rem", 
-          borderRadius: "14px", 
-          border: "1px solid var(--glass-border)", 
+          borderLeft: "1px solid var(--glass-border)", 
           background: "#ffffff",
-          boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.15)",
+          boxShadow: "-10px 0 40px rgba(0, 0, 0, 0.15)",
           display: "flex", 
           flexDirection: "column",
-          gap: "1.15rem"
+          gap: "1.15rem",
+          animation: "slideInRight 0.3s ease-out forwards",
+          overflow: "hidden"
         }} 
         onClick={(e) => e.stopPropagation()}
       >

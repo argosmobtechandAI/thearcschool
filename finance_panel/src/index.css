@@ -216,3 +216,8 @@ tr:hover {
 .modal-content {
   animation: modalScaleIn 0.22s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
+
+@keyframes slideInRight {
+  from { transform: translateX(100%); }
+  to { transform: translateX(0); }
+}

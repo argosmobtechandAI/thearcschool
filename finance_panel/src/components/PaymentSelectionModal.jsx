@@ -7,7 +7,7 @@ import { generateReceiptPDF } from "../utils/exportUtils";
 const PaymentSelectionModal = ({ isOpen, onClose, selectedStudent, onPaymentSuccess }) => {
   const [ledgerLoading, setLedgerLoading] = useState(false);
   const [studentLedger, setStudentLedger] = useState({ fees: [], payments: [] });
-  
+
   const [searchTerm, setSearchTerm] = useState("");
   const [showFuture, setShowFuture] = useState(false);
   const [paymentForm, setPaymentForm] = useState({ feeIds: [], amount: "", paymentMode: "Cash", remarks: "" });
@@ -91,11 +91,11 @@ const PaymentSelectionModal = ({ isOpen, onClose, selectedStudent, onPaymentSucc
     try {
       let remainingAmount = Number(paymentForm.amount);
       const paymentsPayload = [];
-      
+
       for (const feeId of paymentForm.feeIds) {
         const feeObj = studentLedger.fees.find(f => f.id === feeId);
         if (!feeObj) continue;
-        
+
         const dueAmount = Number(feeObj.fee?.amount || 0) - Number(feeObj.total_paid_amount || 0);
         if (remainingAmount <= 0) break;
 
@@ -123,7 +123,7 @@ const PaymentSelectionModal = ({ isOpen, onClose, selectedStudent, onPaymentSucc
 
       if (res.data.success) {
         toast.success("Payment recorded successfully");
-        
+
         const completePayments = res.data.payments.map((p, idx) => ({
           ...p,
           fee_title: paymentsPayload[idx]?.title || p.remarks,
@@ -154,34 +154,32 @@ const PaymentSelectionModal = ({ isOpen, onClose, selectedStudent, onPaymentSucc
   if (!isOpen || !selectedStudent) return null;
 
   return (
-    <div 
-      className="animate-fade-in" 
-      style={{ 
-        position: "fixed", 
-        inset: 0, 
-        background: "rgba(15, 23, 42, 0.55)", 
-        backdropFilter: "blur(6px)", 
-        display: "flex", 
-        alignItems: "center", 
-        justifyContent: "center", 
-        zIndex: 1000, 
-        padding: "1rem" 
-      }} 
+    <div
+      className="animate-fade-in"
+      style={{
+        position: "fixed",
+        inset: 0,
+        background: "rgba(15, 23, 42, 0.55)",
+        backdropFilter: "blur(6px)",
+        display: "flex",
+        justifyContent: "flex-end",
+        zIndex: 1000,
+      }}
       onClick={onClose}
     >
-      <div 
-        className="glass-panel modal-content" 
-        style={{ 
-          width: "100%", 
-          maxWidth: "840px", 
-          maxHeight: "88vh", 
-          display: "flex", 
-          flexDirection: "column", 
-          borderRadius: "14px", 
+      <div
+        className="glass-panel"
+        style={{
+          width: "100%",
+          maxWidth: "600px",
+          height: "100vh",
+          display: "flex",
+          flexDirection: "column",
           background: "#ffffff",
-          border: "1px solid var(--glass-border)",
-          boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.15)",
-          overflow: "hidden" 
+          borderLeft: "1px solid var(--glass-border)",
+          boxShadow: "-10px 0 40px rgba(0, 0, 0, 0.15)",
+          overflow: "hidden",
+          animation: "slideInRight 0.3s ease-out forwards"
         }}
         onClick={(e) => e.stopPropagation()}
       >
@@ -198,9 +196,9 @@ const PaymentSelectionModal = ({ isOpen, onClose, selectedStudent, onPaymentSucc
               </p>
             </div>
           </div>
-          <button 
-            onClick={onClose} 
-            className="btn btn-ghost" 
+          <button
+            onClick={onClose}
+            className="btn btn-ghost"
             style={{ width: "32px", height: "32px", padding: 0, borderRadius: "8px", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-secondary)" }}
             title="Close modal"
           >
@@ -210,7 +208,7 @@ const PaymentSelectionModal = ({ isOpen, onClose, selectedStudent, onPaymentSucc
 
         {/* Body */}
         <div style={{ flex: 1, overflowY: "auto", display: "flex", flexDirection: "column", padding: "1.25rem 1.5rem", gap: "1rem" }}>
-          
+
           {ledgerLoading ? (
             <div style={{ padding: "3rem", textAlign: "center", color: "var(--text-secondary)", fontSize: "0.85rem" }}>
               Checking fee records...
@@ -220,12 +218,6 @@ const PaymentSelectionModal = ({ isOpen, onClose, selectedStudent, onPaymentSucc
               <p style={{ fontWeight: "700", fontSize: "1.05rem" }}>Student is fee exempted.</p>
               <p style={{ fontSize: "0.82rem", marginTop: "0.35rem", color: "var(--text-secondary)" }}>No fee dues are active for this account.</p>
             </div>
-          ) : studentLedger.fees?.filter(f => f.status !== "paid").length === 0 ? (
-            <div style={{ padding: "2.5rem 1.5rem", textAlign: "center", background: "rgba(16, 185, 129, 0.05)", borderRadius: "10px", border: "1px dashed rgba(16, 185, 129, 0.4)", color: "var(--text-primary)", margin: "auto" }}>
-              <Check size={36} color="#059669" style={{ margin: "0 auto 0.5rem auto" }} />
-              <p style={{ fontWeight: "700", fontSize: "1.05rem" }}>No Pending Dues!</p>
-              <p style={{ fontSize: "0.82rem", color: "var(--text-secondary)", marginTop: "0.25rem" }}>All fee components for this student are fully settled.</p>
-            </div>
           ) : (
             <>
               {/* Filter Toolbar */}
@@ -234,33 +226,57 @@ const PaymentSelectionModal = ({ isOpen, onClose, selectedStudent, onPaymentSucc
                   <Search size={15} style={{ position: "absolute", left: "10px", top: "50%", transform: "translateY(-50%)", color: "var(--text-secondary)" }} />
                   <input
                     type="text"
-                    className="input-glass"
-                    placeholder="Search by fee title or due date..."
+                    placeholder="Search fee (e.g. Tuition)"
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    style={{ width: "100%", paddingLeft: "32px", fontSize: "0.82rem", height: "34px", margin: 0 }}
+                    className="input-glass"
+                    style={{ padding: "0.4rem 0.75rem 0.4rem 2.25rem", fontSize: "0.85rem", width: "100%", height: "36px", margin: 0 }}
                   />
                 </div>
-                <label style={{ display: "flex", alignItems: "center", gap: "0.5rem", cursor: "pointer", fontSize: "0.78rem", color: showFuture ? "#2563eb" : "var(--text-secondary)", fontWeight: "600", userSelect: "none" }}>
-                  <CalendarClock size={14} />
+                <label style={{ display: "flex", alignItems: "center", gap: "0.4rem", cursor: "pointer", fontSize: "0.78rem", color: showFuture ? "var(--accent-primary)" : "var(--text-secondary)", fontWeight: "600", userSelect: "none" }}>
+                  <CalendarClock size={16} />
                   Include Future Dues
-                  <input
-                    type="checkbox"
-                    checked={showFuture}
-                    onChange={() => setShowFuture(!showFuture)}
-                    style={{ cursor: "pointer", accentColor: "#2563eb" }}
-                  />
+                  <div
+                    onClick={() => {
+                      const newVal = !showFuture;
+                      setShowFuture(newVal);
+                      fetchLedgerData(newVal);
+                    }}
+                    style={{
+                      width: "36px",
+                      height: "20px",
+                      background: showFuture ? "var(--accent-primary)" : "#cbd5e1",
+                      borderRadius: "10px",
+                      position: "relative",
+                      transition: "0.3s",
+                      marginLeft: "0.5rem",
+                      cursor: "pointer"
+                    }}
+                  >
+                    <div
+                      style={{
+                        width: "16px",
+                        height: "16px",
+                        background: "#fff",
+                        borderRadius: "50%",
+                        position: "absolute",
+                        top: "2px",
+                        left: showFuture ? "18px" : "2px",
+                        transition: "0.3s"
+                      }}
+                    />
+                  </div>
                 </label>
               </div>
 
               {/* Dues Selection Table */}
-              <div style={{ maxHeight: "240px", overflowY: "auto", border: "1px solid var(--glass-border)", borderRadius: "8px", background: "#fff" }}>
+              <div style={{ flex: 1, overflowY: "auto", border: "1px solid var(--glass-border)", borderRadius: "8px", background: "#fff", minHeight: "200px" }}>
                 <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.82rem" }}>
                   <thead style={{ position: "sticky", top: 0, background: "#f8fafc", zIndex: 10, borderBottom: "2px solid var(--glass-border)" }}>
                     <tr>
                       <th style={{ padding: "0.6rem 0.75rem", textAlign: "center", width: "40px" }}>
-                        <input 
-                          type="checkbox" 
+                        <input
+                          type="checkbox"
                           checked={pendingDues.length > 0 && paymentForm.feeIds.length === pendingDues.length}
                           onChange={handleSelectAll}
                           style={{ cursor: "pointer", accentColor: "#059669" }}
@@ -279,10 +295,10 @@ const PaymentSelectionModal = ({ isOpen, onClose, selectedStudent, onPaymentSucc
                       const paid = Number(f.total_paid_amount || 0);
                       const due = amount - paid;
                       const isChecked = paymentForm.feeIds.includes(f.id);
-                      
+
                       return (
-                        <tr 
-                          key={f.id} 
+                        <tr
+                          key={f.id}
                           style={{ borderBottom: "1px solid var(--glass-border)", background: isChecked ? "rgba(5, 150, 105, 0.04)" : "transparent", cursor: "pointer" }}
                           onClick={(e) => {
                             if (e.target.tagName !== 'INPUT') {
@@ -291,8 +307,8 @@ const PaymentSelectionModal = ({ isOpen, onClose, selectedStudent, onPaymentSucc
                           }}
                         >
                           <td style={{ padding: "0.6rem 0.75rem", textAlign: "center" }}>
-                            <input 
-                              type="checkbox" 
+                            <input
+                              type="checkbox"
                               checked={isChecked}
                               onChange={(e) => handleSelectRow(e, f)}
                               style={{ cursor: "pointer", accentColor: "#059669" }}
@@ -327,22 +343,22 @@ const PaymentSelectionModal = ({ isOpen, onClose, selectedStudent, onPaymentSucc
                   <div style={{ display: "grid", gridTemplateColumns: "1.2fr 1fr 1.5fr", gap: "0.85rem", alignItems: "end" }}>
                     <div>
                       <label style={{ display: "block", fontSize: "0.72rem", fontWeight: "700", color: "var(--text-secondary)", marginBottom: "0.3rem", textTransform: "uppercase" }}>Amount Paying (₹) *</label>
-                      <input 
-                        type="number" 
-                        required 
-                        className="input-glass" 
+                      <input
+                        type="number"
+                        required
+                        className="input-glass"
                         placeholder="Amount (₹)"
                         value={paymentForm.amount}
-                        onChange={(e) => setPaymentForm({...paymentForm, amount: e.target.value})}
+                        onChange={(e) => setPaymentForm({ ...paymentForm, amount: e.target.value })}
                         style={{ width: "100%", fontSize: "0.95rem", fontWeight: "700", height: "36px", margin: 0 }}
                       />
                     </div>
                     <div>
                       <label style={{ display: "block", fontSize: "0.72rem", fontWeight: "700", color: "var(--text-secondary)", marginBottom: "0.3rem", textTransform: "uppercase" }}>Payment Mode</label>
-                      <select 
-                        className="input-glass" 
-                        value={paymentForm.paymentMode} 
-                        onChange={(e) => setPaymentForm({...paymentForm, paymentMode: e.target.value})}
+                      <select
+                        className="input-glass"
+                        value={paymentForm.paymentMode}
+                        onChange={(e) => setPaymentForm({ ...paymentForm, paymentMode: e.target.value })}
                         style={{ width: "100%", height: "36px", margin: 0, fontSize: "0.82rem", fontWeight: "600" }}
                       >
                         <option value="Cash">Cash</option>
@@ -354,17 +370,17 @@ const PaymentSelectionModal = ({ isOpen, onClose, selectedStudent, onPaymentSucc
                     </div>
                     <div>
                       <label style={{ display: "block", fontSize: "0.72rem", fontWeight: "700", color: "var(--text-secondary)", marginBottom: "0.3rem", textTransform: "uppercase" }}>Remarks / Ref No</label>
-                      <input 
-                        type="text" 
-                        className="input-glass" 
+                      <input
+                        type="text"
+                        className="input-glass"
                         placeholder="Receipt reference, check no..."
-                        value={paymentForm.remarks} 
-                        onChange={(e) => setPaymentForm({...paymentForm, remarks: e.target.value})}
+                        value={paymentForm.remarks}
+                        onChange={(e) => setPaymentForm({ ...paymentForm, remarks: e.target.value })}
                         style={{ width: "100%", height: "36px", margin: 0, fontSize: "0.82rem" }}
                       />
                     </div>
                   </div>
-                  
+
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingTop: "0.75rem", borderTop: "1px solid var(--glass-border)" }}>
                     <div>
                       <span style={{ color: "var(--text-secondary)", fontSize: "0.78rem" }}>Selected Total: </span>
@@ -376,10 +392,10 @@ const PaymentSelectionModal = ({ isOpen, onClose, selectedStudent, onPaymentSucc
                       <button type="button" onClick={onClose} className="btn btn-ghost" style={{ padding: "0.4rem 1rem", fontSize: "0.8rem", border: "1px solid var(--glass-border)" }}>
                         Cancel
                       </button>
-                      <button 
-                        type="submit" 
-                        disabled={isPaying || !paymentForm.amount} 
-                        className="btn btn-primary" 
+                      <button
+                        type="submit"
+                        disabled={isPaying || !paymentForm.amount}
+                        className="btn btn-primary"
                         style={{ padding: "0.4rem 1.25rem", fontSize: "0.82rem", fontWeight: "700", background: "#059669", borderColor: "#059669" }}
                       >
                         {isPaying ? "Recording..." : "Record & Print Receipt"}
