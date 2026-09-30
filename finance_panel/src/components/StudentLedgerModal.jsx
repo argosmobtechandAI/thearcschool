@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { Clock, CheckCircle2, Printer, Bus, Edit2, Save, X, Trash2, User } from "lucide-react";
 import { generateReceiptPDF } from "../utils/exportUtils";
 import api from "../services/api";
@@ -61,7 +62,7 @@ const StudentLedgerModal = ({ isOpen, onClose, student }) => {
   const pendingDues = (studentLedger?.fees || []).filter(f => f.status !== "paid");
   const paymentHistory = studentLedger?.payments || [];
 
-  return (
+  return createPortal(
     <div 
       className="animate-fade-in" 
       style={{ 
@@ -71,7 +72,7 @@ const StudentLedgerModal = ({ isOpen, onClose, student }) => {
         backdropFilter: "blur(6px)", 
         display: "flex", 
         justifyContent: "flex-end", 
-        zIndex: 1000
+        zIndex: 9999
       }} 
       onClick={onClose}
     >
@@ -356,7 +357,8 @@ const StudentLedgerModal = ({ isOpen, onClose, student }) => {
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };
 

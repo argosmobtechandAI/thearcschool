@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useMemo } from "react";
+import { createPortal } from "react-dom";
 import { Search, X, Check, CalendarClock, IndianRupee, CreditCard } from "lucide-react";
 import api from "../services/api";
 import { toast } from "react-toastify";
@@ -153,7 +154,7 @@ const PaymentSelectionModal = ({ isOpen, onClose, selectedStudent, onPaymentSucc
 
   if (!isOpen || !selectedStudent) return null;
 
-  return (
+  return createPortal(
     <div
       className="animate-fade-in"
       style={{
@@ -163,7 +164,7 @@ const PaymentSelectionModal = ({ isOpen, onClose, selectedStudent, onPaymentSucc
         backdropFilter: "blur(6px)",
         display: "flex",
         justifyContent: "flex-end",
-        zIndex: 1000,
+        zIndex: 9999,
       }}
       onClick={onClose}
     >
@@ -410,7 +411,8 @@ const PaymentSelectionModal = ({ isOpen, onClose, selectedStudent, onPaymentSucc
 
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };
 

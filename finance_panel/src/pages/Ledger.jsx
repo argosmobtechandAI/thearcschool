@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useMemo } from "react";
+import { createPortal } from "react-dom";
 import { useDispatch, useSelector } from "react-redux";
 import { fetchUsers, fetchClasses } from "../features/dataSlice";
 import api from "../services/api";
@@ -443,8 +444,8 @@ const Ledger = () => {
         student={selectedStudent}
       />
       {/* Payment Modal */}
-      {isPaymentModalOpen && selectedStudent && (
-        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)", display: "flex", justifyContent: "flex-end", zIndex: 50 }}>
+      {isPaymentModalOpen && selectedStudent && createPortal(
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)", display: "flex", justifyContent: "flex-end", zIndex: 9999 }}>
           <div className="glass-panel" style={{ width: "100%", maxWidth: "600px", height: "100%", display: "flex", flexDirection: "column", padding: "2rem", borderLeft: "1px solid var(--glass-border)", background: "#fff", animation: "slideInRight 0.3s ease-out forwards", overflow: "hidden", borderRadius: 0 }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.5rem", flexShrink: 0 }}>
               <h2 style={{ fontSize: "1.25rem", fontWeight: "700" }}>Log Payment for {selectedStudent.name}</h2>
@@ -605,7 +606,8 @@ const Ledger = () => {
               </form>
             )}
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
