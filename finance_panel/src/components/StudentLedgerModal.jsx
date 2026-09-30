@@ -60,8 +60,50 @@ const StudentLedgerModal = ({ isOpen, onClose, student }) => {
   if (!isOpen || !student) return null;
 
   const pendingDues = (studentLedger?.fees || []).filter(f => f.status !== "paid");
-  const paymentHistory = studentLedger?.payments || [];
+  const rawPayments = studentLedger?.payments || [];
+  
+  const grouped = rawPayments.reduce((acc, curr) => {
+    if (curr.receipt_id) {
+      if (!acc[curr.receipt_id]) {
+        acc[curr.receipt_id] = {
+          ...curr,
+          amount_paid: 0,
+          remarks: [],
+          isGrouped: true,
+          groupedPayments: []
+        };
+      }
+      acc[curr.receipt_id].amount_paid += Number(curr.amount_paid || 0);
+      
+      let title = 'General Fee';
+      if (curr.fee?.title) title = curr.fee.title;
+      else if (curr.fee_title) title = curr.fee_title;
+      else if (curr.remarks && curr.remarks.startsWith("Fee Payment: ")) {
+          title = curr.remarks.replace("Fee Payment: ", "").trim();
+      }
+      title = title.replace(/\(\+₹0 Late Fee\)/g, "").replace(/\(\+Rs\. 0 Late Fee\)/g, "").trim();
+      if (title.includes(",")) {
+          acc[curr.receipt_id].remarks.push(...title.split(",").map(s => s.trim()));
+      } else {
+          acc[curr.receipt_id].remarks.push(title);
+      }
+      
+      acc[curr.receipt_id].groupedPayments.push(curr);
+    } else {
+      acc[`no-receipt-${curr.id}`] = curr;
+    }
+    return acc;
+  }, {});
 
+  const paymentHistory = Object.values(grouped).map(p => {
+    if (p.isGrouped) {
+      return {
+        ...p,
+        remarks: `Fee Payment: ${[...new Set(p.remarks)].join(", ")}`
+      };
+    }
+    return p;
+  }).sort((a,b) => new Date(b.created_at) - new Date(a.created_at));
   return createPortal(
     <div 
       className="animate-fade-in" 
@@ -327,7 +369,7 @@ const StudentLedgerModal = ({ isOpen, onClose, student }) => {
                             className="btn btn-ghost" 
                             style={{ padding: "0.2rem 0.45rem", fontSize: "0.72rem", display: "flex", alignItems: "center", gap: "0.25rem", color: "#2563eb" }} 
                             title="Print Receipt"
-                            onClick={() => generateReceiptPDF(p, student, p.receipts)}
+                            onClick={() => generateReceiptPDF(p.isGrouped ? p.groupedPayments : [p], student, p.receipts)}
                           >
                             <Printer size={12} /> Receipt
                           </button>
