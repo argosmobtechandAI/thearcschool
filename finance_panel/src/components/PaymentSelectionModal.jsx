@@ -179,7 +179,8 @@ const PaymentSelectionModal = ({ isOpen, onClose, selectedStudent, onPaymentSucc
           borderLeft: "1px solid var(--glass-border)",
           boxShadow: "-10px 0 40px rgba(0, 0, 0, 0.15)",
           overflow: "hidden",
-          animation: "slideInRight 0.3s ease-out forwards"
+          animation: "slideInRight 0.3s ease-out forwards",
+          borderRadius: 0
         }}
         onClick={(e) => e.stopPropagation()}
       >

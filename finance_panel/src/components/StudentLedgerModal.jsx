@@ -89,7 +89,8 @@ const StudentLedgerModal = ({ isOpen, onClose, student }) => {
           flexDirection: "column",
           gap: "1.15rem",
           animation: "slideInRight 0.3s ease-out forwards",
-          overflow: "hidden"
+          overflow: "hidden",
+          borderRadius: 0
         }} 
         onClick={(e) => e.stopPropagation()}
       >
