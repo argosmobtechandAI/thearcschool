@@ -29,7 +29,10 @@ import {
   Sparkles, 
   Image as ImageIcon,
   GraduationCap,
-  Briefcase
+  Briefcase,
+  ChevronDown,
+  ChevronsUpDown,
+  ChevronsDownUp
 } from "lucide-react";
 import { toast } from "react-toastify";
 import { logout } from "../features/authSlice";
@@ -44,21 +47,21 @@ const NavItem = ({ to, href, icon: Icon, color, bg, children, badge }) => {
     <>
       <div 
         style={{ 
-          width: "26px", 
-          height: "26px", 
-          borderRadius: "7px", 
+          width: "22px", 
+          height: "22px", 
+          borderRadius: "5px", 
           background: bg, 
           color: color, 
           display: "flex", 
           alignItems: "center", 
           justifyContent: "center", 
           flexShrink: 0,
-          boxShadow: `0 1px 3px ${bg}`
+          boxShadow: `0 1px 2px ${bg}`
         }}
       >
-        <Icon size={14} strokeWidth={2.4} />
+        <Icon size={12.5} strokeWidth={2.4} />
       </div>
-      <span style={{ flex: 1, fontSize: "0.82rem", fontWeight: "600" }}>{children}</span>
+      <span style={{ flex: 1, fontSize: "0.82rem", fontWeight: "600", lineHeight: 1.2 }}>{children}</span>
       {badge}
     </>
   );
@@ -72,13 +75,12 @@ const NavItem = ({ to, href, icon: Icon, color, bg, children, badge }) => {
         style={{
           display: "flex",
           alignItems: "center",
-          gap: "0.6rem",
-          padding: "0.35rem 0.65rem",
-          borderRadius: "8px",
+          gap: "0.5rem",
+          padding: "0.18rem 0.5rem",
+          borderRadius: "6px",
           color: "var(--text-secondary)",
           textDecoration: "none",
-          transition: "all 0.2s ease",
-          marginBottom: "2px"
+          transition: "all 0.2s ease"
         }}
         className="table-row-hover"
       >
@@ -93,14 +95,13 @@ const NavItem = ({ to, href, icon: Icon, color, bg, children, badge }) => {
       style={({ isActive }) => ({
         display: "flex",
         alignItems: "center",
-        gap: "0.6rem",
-        padding: "0.35rem 0.65rem",
-        borderRadius: "8px",
+        gap: "0.5rem",
+        padding: "0.18rem 0.5rem",
+        borderRadius: "6px",
         color: isActive ? "var(--accent-primary)" : "var(--text-primary)",
         background: isActive ? "var(--accent-light)" : "transparent",
         textDecoration: "none",
         transition: "all 0.2s ease",
-        marginBottom: "2px",
         borderLeft: isActive ? "3px solid var(--accent-primary)" : "3px solid transparent"
       })}
     >
@@ -234,23 +235,115 @@ const AdminLayout = () => {
     }
   }, [location.pathname]);
 
-  const NavGroup = ({ title }) => (
-    <div style={{ 
-      marginTop: "1.1rem", 
-      marginBottom: "0.35rem", 
-      padding: "0 0.5rem", 
-      borderBottom: "1px solid var(--glass-border)", 
-      paddingBottom: "0.25rem" 
-    }}>
-      <span style={{ 
-        fontSize: "0.72rem", 
-        textTransform: "uppercase", 
-        letterSpacing: "0.08em", 
-        color: "var(--accent-primary)", 
-        fontWeight: "800" 
-      }}>{title}</span>
-    </div>
-  );
+  const ALL_GROUPS = ["people", "staff", "academics", "management", "portals"];
+  const DEFAULT_COLLAPSED_STATE = {
+    people: true,
+    staff: true,
+    academics: true,
+    management: true,
+    portals: true
+  };
+
+  const [collapsedGroups, setCollapsedGroups] = useState(() => {
+    try {
+      const saved = localStorage.getItem('admin_sidebar_collapsed');
+      if (saved !== null) {
+        return JSON.parse(saved);
+      }
+    } catch (e) {
+      console.error(e);
+    }
+    return DEFAULT_COLLAPSED_STATE;
+  });
+
+  const areAllExpanded = ALL_GROUPS.every(id => !collapsedGroups[id]);
+
+  const toggleAllGroups = () => {
+    const nextState = {};
+    const newCollapsedVal = areAllExpanded ? true : false;
+    ALL_GROUPS.forEach(id => {
+      nextState[id] = newCollapsedVal;
+    });
+    setCollapsedGroups(nextState);
+    try {
+      localStorage.setItem('admin_sidebar_collapsed', JSON.stringify(nextState));
+    } catch (e) {}
+  };
+
+  const toggleGroup = (groupId) => {
+    setCollapsedGroups(prev => {
+      const next = { ...prev, [groupId]: !prev[groupId] };
+      try {
+        localStorage.setItem('admin_sidebar_collapsed', JSON.stringify(next));
+      } catch (e) {}
+      return next;
+    });
+  };
+
+  const NavSection = ({ id, title, routes, children }) => {
+    const isCollapsed = !!collapsedGroups[id];
+    const hasActiveChild = routes ? routes.some(r => location.pathname.startsWith(r)) : false;
+
+    return (
+      <div style={{ display: "flex", flexDirection: "column" }}>
+        <div 
+          onClick={() => toggleGroup(id)}
+          style={{ 
+            marginTop: "0.45rem", 
+            marginBottom: "0.15rem", 
+            padding: "0.15rem 0.4rem", 
+            borderBottom: "1px solid var(--glass-border)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            cursor: "pointer",
+            userSelect: "none",
+            borderRadius: "4px"
+          }}
+          className="table-row-hover"
+          title={`Click to ${isCollapsed ? "expand" : "collapse"} ${title}`}
+        >
+          <span style={{ 
+            fontSize: "0.72rem", 
+            textTransform: "uppercase", 
+            letterSpacing: "0.08em", 
+            color: "var(--accent-primary)", 
+            fontWeight: "800",
+            lineHeight: 1.1
+          }}>
+            {title}
+          </span>
+          <div style={{ display: "flex", alignItems: "center", gap: "0.35rem" }}>
+            {isCollapsed && hasActiveChild && (
+              <span 
+                style={{ 
+                  width: "6px", 
+                  height: "6px", 
+                  borderRadius: "50%", 
+                  backgroundColor: "var(--accent-primary)" 
+                }} 
+                title="Active item inside"
+              />
+            )}
+            <ChevronDown 
+              size={12} 
+              strokeWidth={2.4}
+              style={{ 
+                color: "var(--text-secondary)", 
+                transform: isCollapsed ? "rotate(-90deg)" : "rotate(0deg)", 
+                transition: "transform 0.2s ease" 
+              }} 
+            />
+          </div>
+        </div>
+        {!isCollapsed && (
+          <div style={{ display: "flex", flexDirection: "column", gap: "1px" }}>
+            {children}
+          </div>
+        )}
+      </div>
+    );
+  };
 
   return (
     <div style={{ display: "flex", height: "100%", width: "100%", overflow: "hidden" }}>
@@ -263,19 +356,47 @@ const AdminLayout = () => {
       </style>
       
       {/* Sidebar */}
-      <aside className="glass-panel" style={{ width: "235px", padding: "0.85rem", display: "flex", flexDirection: "column", borderTopLeftRadius: 0, borderBottomLeftRadius: 0, height: "100%", overflow: "hidden" }}>
+      <aside className="glass-panel" style={{ width: "235px", padding: "0.55rem 0.6rem", display: "flex", flexDirection: "column", borderTopLeftRadius: 0, borderBottomLeftRadius: 0, height: "100%", overflow: "hidden" }}>
         
         {/* Brand Header */}
-        <div style={{ marginBottom: "1.25rem", display: "flex", alignItems: "center", gap: "0.75rem" }}>
-          <img src="/thearcschoollogo.jpeg" alt="The Arc School" style={{ height: "44px", width: "44px", borderRadius: "50%", objectFit: "cover", boxShadow: "0 2px 5px rgba(0,0,0,0.1)" }} />
-          <div>
-            <h2 style={{ fontSize: "1.15rem", fontWeight: "800", color: "var(--text-primary)", lineHeight: 1.2 }}>The Arc School</h2>
-            <p style={{ color: "var(--text-secondary)", fontSize: "0.78rem", fontWeight: "600" }}>Admin Portal</p>
+        <div style={{ marginBottom: "0.55rem", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "0.55rem" }}>
+            <img src="/thearcschoollogo.jpeg" alt="The Arc School" style={{ height: "34px", width: "34px", borderRadius: "50%", objectFit: "cover", boxShadow: "0 2px 4px rgba(0,0,0,0.08)" }} />
+            <div>
+              <h2 style={{ fontSize: "1.15rem", fontWeight: "800", color: "var(--text-primary)", lineHeight: 1.15 }}>The Arc School</h2>
+              <p style={{ color: "var(--text-secondary)", fontSize: "0.78rem", fontWeight: "600", lineHeight: 1.1 }}>Admin Portal</p>
+            </div>
           </div>
+          
+          <button 
+            onClick={toggleAllGroups}
+            title={areAllExpanded ? "Collapse all categories" : "Open all categories"}
+            style={{ 
+              width: "26px", 
+              height: "26px", 
+              display: "flex", 
+              alignItems: "center", 
+              justifyContent: "center", 
+              borderRadius: "6px", 
+              border: "1px solid var(--glass-border)", 
+              background: "rgba(255, 255, 255, 0.7)", 
+              color: "var(--text-secondary)", 
+              cursor: "pointer", 
+              transition: "all 0.2s ease",
+              flexShrink: 0
+            }}
+            className="table-row-hover"
+          >
+            {areAllExpanded ? (
+              <ChevronsDownUp size={14} strokeWidth={2.4} />
+            ) : (
+              <ChevronsUpDown size={14} strokeWidth={2.4} />
+            )}
+          </button>
         </div>
 
         {/* Navigation Items with Solid Colorful Badges */}
-        <nav className="sidebar-nav" style={{ flex: 1, display: "flex", flexDirection: "column", gap: "0.15rem", overflowY: "auto", overflowX: "hidden", scrollbarWidth: "none", msOverflowStyle: "none", paddingBottom: "1rem" }}>
+        <nav className="sidebar-nav" style={{ flex: 1, display: "flex", flexDirection: "column", gap: "1px", overflowY: "auto", overflowX: "hidden", scrollbarWidth: "none", msOverflowStyle: "none", paddingBottom: "0.35rem" }}>
           
           <NavItem to="/dashboard" icon={LayoutDashboard} color="#059669" bg="rgba(16, 185, 129, 0.15)">
             Dashboard
@@ -283,30 +404,48 @@ const AdminLayout = () => {
           
           {((user?.type === "admin" || user?.type === "super_admin") || user?.type === "principal") && (
             <>
-              <NavGroup title="People" />
-              <NavItem to="/users/parent" icon={Users} color="#db2777" bg="rgba(219, 39, 119, 0.15)">
-                Parents
-              </NavItem>
-              <NavItem to="/users/student" icon={GraduationCap} color="#2563eb" bg="rgba(37, 99, 235, 0.15)">
-                Students
-              </NavItem>
-              <NavItem to="/users/teacher" icon={UserCircle} color="#d97706" bg="rgba(217, 119, 6, 0.15)">
-                Teachers
-              </NavItem>
+              <NavSection
+                id="people"
+                title="People"
+                routes={["/users/parent", "/users/student", "/users/teacher"]}
+              >
+                <NavItem to="/users/parent" icon={Users} color="#db2777" bg="rgba(219, 39, 119, 0.15)">
+                  Parents
+                </NavItem>
+                <NavItem to="/users/student" icon={GraduationCap} color="#2563eb" bg="rgba(37, 99, 235, 0.15)">
+                  Students
+                </NavItem>
+                <NavItem to="/users/teacher" icon={UserCircle} color="#d97706" bg="rgba(217, 119, 6, 0.15)">
+                  Teachers
+                </NavItem>
+              </NavSection>
 
-              <NavGroup title="Staff" />
-              <NavItem to="/users/finance" icon={IndianRupee} color="#0d9488" bg="rgba(13, 148, 136, 0.15)">
-                Accountants
-              </NavItem>
-              <NavItem to="/users/admission" icon={UserCheck} color="#7c3aed" bg="rgba(124, 58, 237, 0.15)">
-                Counselors
-              </NavItem>
+              <NavSection
+                id="staff"
+                title="Staff"
+                routes={["/users/finance", "/users/admission"]}
+              >
+                <NavItem to="/users/finance" icon={IndianRupee} color="#0d9488" bg="rgba(13, 148, 136, 0.15)">
+                  Accountants
+                </NavItem>
+                <NavItem to="/users/admission" icon={UserCheck} color="#7c3aed" bg="rgba(124, 58, 237, 0.15)">
+                  Counselors
+                </NavItem>
+              </NavSection>
             </>
           )}
           
           {((user?.type === "admin" || user?.type === "super_admin") || user?.type === "principal") && (
-            <>
-              <NavGroup title="Academics" />
+            <NavSection
+              id="academics"
+              title="Academics"
+              routes={[
+                "/admissions", "/attendance", "/circulars", "/classes", 
+                "/coursework", "/communication", "/consents", "/exams", 
+                "/notification", "/school-info", "/subject-teachers", 
+                "/subjects", "/timetable"
+              ]}
+            >
               <NavItem to="/admissions" icon={TrendingUp} color="#0284c7" bg="rgba(2, 132, 199, 0.15)">
                 Admissions Pipeline
               </NavItem>
@@ -354,12 +493,18 @@ const AdminLayout = () => {
               <NavItem to="/timetable" icon={Clock} color="#6366f1" bg="rgba(99, 102, 241, 0.15)">
                 Timetable
               </NavItem>
-            </>
+            </NavSection>
           )}
 
           {((user?.type === "admin" || user?.type === "super_admin") || user?.type === "principal" || user?.type === "finance") && (
-            <>
-              <NavGroup title="Management" />
+            <NavSection
+              id="management"
+              title="Management"
+              routes={[
+                "/annual-planner", "/fees", "/gallery", "/pnl", 
+                "/rooms", "/spotlight", "/student-of-week", "/thoughts"
+              ]}
+            >
               {((user?.type === "admin" || user?.type === "super_admin") || user?.type === "principal") && (
                 <NavItem to="/annual-planner" icon={Calendar} color="#3b82f6" bg="rgba(59, 130, 246, 0.15)">
                   Annual Planner
@@ -392,31 +537,33 @@ const AdminLayout = () => {
                   </NavItem>
                 </>
               )}
-            </>
+            </NavSection>
           )}
 
           {((user?.type === "admin" || user?.type === "super_admin") || user?.type === "principal") && (
-            <>
-              <NavGroup title="Portals" />
+            <NavSection
+              id="portals"
+              title="Portals"
+            >
               <NavItem href={import.meta.env.VITE_ADMISSIONS_URL || "https://admissions.thearcschool.online"} icon={ExternalLink} color="#2563eb" bg="rgba(37, 99, 235, 0.15)">
                 Admission Portal
               </NavItem>
               <NavItem href={import.meta.env.VITE_FINANCE_URL || "https://finance.thearcschool.online"} icon={ExternalLink} color="#16a34a" bg="rgba(22, 163, 74, 0.15)">
                 Finance Portal
               </NavItem>
-            </>
+            </NavSection>
           )}
         </nav>
 
         {/* User profile & Logout */}
-        <div style={{ marginTop: "auto", borderTop: "1px solid var(--glass-border)", paddingTop: "0.85rem" }}>
-          <div style={{ marginBottom: "0.75rem", display: "flex", alignItems: "center", gap: "0.65rem" }}>
-            <div style={{ width: "36px", height: "36px", borderRadius: "50%", background: "rgba(27, 139, 59, 0.15)", color: "var(--accent-primary)", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: "700", fontSize: "0.95rem" }}>
+        <div style={{ marginTop: "auto", borderTop: "1px solid var(--glass-border)", paddingTop: "0.45rem" }}>
+          <div style={{ marginBottom: "0.35rem", display: "flex", alignItems: "center", gap: "0.55rem" }}>
+            <div style={{ width: "28px", height: "28px", borderRadius: "50%", background: "rgba(27, 139, 59, 0.15)", color: "var(--accent-primary)", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: "700", fontSize: "0.85rem", flexShrink: 0 }}>
               {user?.name?.charAt(0) || "A"}
             </div>
-            <div style={{ overflow: "hidden" }}>
-              <p style={{ fontSize: "0.82rem", fontWeight: "700", color: "var(--text-primary)", whiteSpace: "nowrap", textOverflow: "ellipsis", overflow: "hidden" }}>{user?.name || "System Admin"}</p>
-              <p style={{ fontSize: "0.72rem", color: "var(--text-secondary)", textTransform: "capitalize" }}>{user?.type || "Super_admin"}</p>
+            <div style={{ overflow: "hidden", flex: 1, minWidth: 0 }}>
+              <p style={{ fontSize: "0.82rem", fontWeight: "700", color: "var(--text-primary)", whiteSpace: "nowrap", textOverflow: "ellipsis", overflow: "hidden", lineHeight: 1.2 }}>{user?.name || "System Admin"}</p>
+              <p style={{ fontSize: "0.72rem", color: "var(--text-secondary)", textTransform: "capitalize", lineHeight: 1.1 }}>{user?.type || "Super_admin"}</p>
             </div>
           </div>
           
@@ -426,14 +573,16 @@ const AdminLayout = () => {
             style={{ 
               width: "100%", 
               justifyContent: "center", 
+              gap: "0.4rem",
               color: "#dc2626",
               backgroundColor: "rgba(220, 38, 38, 0.06)",
               border: "1px solid rgba(220, 38, 38, 0.15)",
               fontSize: "0.8rem",
-              padding: "0.4rem 0.75rem"
+              padding: "0.22rem 0.5rem",
+              borderRadius: "6px"
             }}
           >
-            <LogOut size={16} strokeWidth={2.4} /> Logout
+            <LogOut size={14} strokeWidth={2.4} /> Logout
           </button>
         </div>
       </aside>

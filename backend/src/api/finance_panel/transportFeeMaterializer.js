@@ -1,6 +1,10 @@
 import { supabaseAdmin as supabase } from "../../config/supabaseClient.js";
 
+let isMaterializing = false;
+
 export const autoMaterializeTransportFees = async () => {
+  if (isMaterializing) return;
+  isMaterializing = true;
   try {
     const today = new Date();
     const currentMonth = today.getMonth(); // 0 = Jan, 11 = Dec
@@ -190,5 +194,7 @@ export const autoMaterializeTransportFees = async () => {
     }
   } catch (err) {
     console.error("Error auto-materializing transport fees:", err);
+  } finally {
+    isMaterializing = false;
   }
 };

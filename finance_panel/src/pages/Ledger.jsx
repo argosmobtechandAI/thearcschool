@@ -458,11 +458,6 @@ const Ledger = () => {
                 <p style={{ fontWeight: "600" }}>Student is fee exempted.</p>
                 <button onClick={() => setIsPaymentModalOpen(false)} className="btn-ghost" style={{ marginTop: "1rem" }}>Close</button>
               </div>
-            ) : studentLedger.fees.filter(f => f.status !== "paid").length === 0 ? (
-              <div style={{ padding: "2rem", textAlign: "center", background: "rgba(0, 0, 0, 0.02)", borderRadius: "8px", color: "var(--text-secondary)" }}>
-                <p style={{ fontWeight: "500" }}>No pending dues. All clear!</p>
-                <button onClick={() => setIsPaymentModalOpen(false)} className="btn-ghost" style={{ marginTop: "1rem" }}>Close</button>
-              </div>
             ) : (
               <form onSubmit={handlePaymentSubmit} style={{ display: "flex", flexDirection: "column", gap: "1rem", flex: 1, overflow: "hidden" }}>
                 <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>

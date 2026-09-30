@@ -700,7 +700,7 @@ const DashboardMetrics = () => {
                         <button onClick={(e) => { e.stopPropagation(); setSelectedStudent(s); setIsLedgerModalOpen(true); }} className="btn-ghost" style={{ display: "inline-flex", alignItems: "center", padding: "0.5rem 1rem", borderRadius: "6px", fontSize: "0.875rem", fontWeight: "500", color: "var(--text-secondary)" }}>
                           <Receipt size={16} style={{ marginRight: "0.5rem" }} /> View Ledger
                         </button>
-                        {!s.fee_exempted && s.balance > 0 && isFinanceTeam && (
+                        {!s.fee_exempted && isFinanceTeam && (
                           <button onClick={(e) => { e.stopPropagation(); handleOpenPaymentModal(s); }} className="btn-primary" style={{ display: "inline-flex", alignItems: "center", padding: "0.5rem 1rem", borderRadius: "6px", fontSize: "0.875rem", fontWeight: "500" }}>
                             <PlusCircle size={16} style={{ marginRight: "0.5rem" }} /> Log Payment
                           </button>
