@@ -340,7 +340,7 @@ const PaymentSelectionModal = ({ isOpen, onClose, selectedStudent, onPaymentSucc
               </div>
 
               {/* Checkout Form Card */}
-              <div style={{ padding: "1rem 1.15rem", background: "rgba(248, 250, 252, 0.9)", borderRadius: "10px", border: "1px solid var(--glass-border)" }}>
+              <div style={{ marginTop: "auto", flexShrink: 0, padding: "1rem 1.15rem", background: "rgba(248, 250, 252, 0.9)", borderRadius: "10px", border: "1px solid var(--glass-border)" }}>
                 <form onSubmit={handlePaymentSubmit} style={{ display: "flex", flexDirection: "column", gap: "0.85rem" }}>
                   <div style={{ display: "grid", gridTemplateColumns: "1.2fr 1fr 1.5fr", gap: "0.85rem", alignItems: "end" }}>
                     <div>

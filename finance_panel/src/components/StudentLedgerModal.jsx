@@ -171,7 +171,7 @@ const StudentLedgerModal = ({ isOpen, onClose, student }) => {
         </div>
 
         {/* Scrollable Body */}
-        <div style={{ display: "flex", flexDirection: "column", gap: "1.15rem", overflowY: "auto", paddingRight: "0.25rem" }}>
+        <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", gap: "1.15rem", paddingRight: "0.25rem" }}>
           
           {/* Transport Settings Section */}
           {!student.fee_exempted && (
@@ -236,9 +236,9 @@ const StudentLedgerModal = ({ isOpen, onClose, student }) => {
               Loading ledger data...
             </div>
           ) : (
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1.15rem" }}>
+            <div style={{ flex: 1, minHeight: 0, display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1.15rem" }}>
               {/* Pending Dues Column */}
-              <div style={{ display: "flex", flexDirection: "column", gap: "0.65rem" }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: "0.65rem", height: "100%" }}>
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                   <h3 style={{ fontSize: "0.92rem", fontWeight: "700", display: "flex", alignItems: "center", gap: "0.4rem", color: "var(--text-primary)" }}>
                     <Clock size={16} color="#d97706" /> Pending Dues ({pendingDues.length})
@@ -247,7 +247,7 @@ const StudentLedgerModal = ({ isOpen, onClose, student }) => {
 
                 {!student.fee_exempted ? (
                   pendingDues.length > 0 ? (
-                    <div style={{ display: "flex", flexDirection: "column", gap: "0.6rem", maxHeight: "360px", overflowY: "auto", paddingRight: "0.2rem" }}>
+                    <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", gap: "0.6rem", overflowY: "auto", paddingRight: "0.2rem" }}>
                       {pendingDues.map(f => {
                         const dueAmount = Number(f.fee?.amount || 0) - Number(f.total_paid_amount || 0);
                         return (
@@ -324,14 +324,14 @@ const StudentLedgerModal = ({ isOpen, onClose, student }) => {
               </div>
 
               {/* Payment History Column */}
-              <div style={{ display: "flex", flexDirection: "column", gap: "0.65rem" }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: "0.65rem", height: "100%" }}>
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                   <h3 style={{ fontSize: "0.92rem", fontWeight: "700", display: "flex", alignItems: "center", gap: "0.4rem", color: "var(--text-primary)" }}>
                     <CheckCircle2 size={16} color="#059669" /> Payment History ({paymentHistory.length})
                   </h3>
                 </div>
 
-                <div style={{ display: "flex", flexDirection: "column", gap: "0.6rem", maxHeight: "360px", overflowY: "auto", paddingRight: "0.2rem" }}>
+                <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", gap: "0.6rem", overflowY: "auto", paddingRight: "0.2rem" }}>
                   {paymentHistory.length > 0 ? (
                     paymentHistory.map(p => (
                       <div 
@@ -388,7 +388,7 @@ const StudentLedgerModal = ({ isOpen, onClose, student }) => {
         </div>
 
         {/* Footer */}
-        <div style={{ display: "flex", justifyContent: "flex-end", paddingTop: "0.85rem", borderTop: "1px solid var(--glass-border)" }}>
+        <div style={{ marginTop: "auto", display: "flex", justifyContent: "flex-end", paddingTop: "0.85rem", borderTop: "1px solid var(--glass-border)", flexShrink: 0 }}>
           <button 
             type="button" 
             onClick={onClose} 
