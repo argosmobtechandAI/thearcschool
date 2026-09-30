@@ -445,7 +445,7 @@ const Ledger = () => {
       {/* Payment Modal */}
       {isPaymentModalOpen && selectedStudent && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)", display: "flex", justifyContent: "flex-end", zIndex: 50 }}>
-          <div className="glass-panel" style={{ width: "100%", maxWidth: "600px", height: "100vh", display: "flex", flexDirection: "column", padding: "2rem", borderLeft: "1px solid var(--glass-border)", background: "#fff", animation: "slideInRight 0.3s ease-out forwards", overflow: "hidden", borderRadius: 0 }}>
+          <div className="glass-panel" style={{ width: "100%", maxWidth: "600px", height: "100%", display: "flex", flexDirection: "column", padding: "2rem", borderLeft: "1px solid var(--glass-border)", background: "#fff", animation: "slideInRight 0.3s ease-out forwards", overflow: "hidden", borderRadius: 0 }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.5rem", flexShrink: 0 }}>
               <h2 style={{ fontSize: "1.25rem", fontWeight: "700" }}>Log Payment for {selectedStudent.name}</h2>
               <button onClick={() => setIsPaymentModalOpen(false)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: "1.5rem", color: "var(--text-secondary)" }}>&times;</button>

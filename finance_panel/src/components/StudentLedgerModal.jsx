@@ -80,7 +80,7 @@ const StudentLedgerModal = ({ isOpen, onClose, student }) => {
         style={{ 
           width: "100%", 
           maxWidth: "760px", 
-          height: "100vh", 
+          height: "100%", 
           padding: "1.5rem", 
           borderLeft: "1px solid var(--glass-border)", 
           background: "#ffffff",
@@ -95,7 +95,7 @@ const StudentLedgerModal = ({ isOpen, onClose, student }) => {
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingBottom: "0.85rem", borderBottom: "1px solid var(--glass-border)" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingBottom: "0.85rem", borderBottom: "1px solid var(--glass-border)", flexShrink: 0 }}>
           <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
             <div style={{ width: "42px", height: "42px", borderRadius: "10px", background: "linear-gradient(135deg, #6366f1, #4f46e5)", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: "700", fontSize: "1.1rem" }}>
               {student.name?.charAt(0) || "S"}

@@ -172,7 +172,7 @@ const PaymentSelectionModal = ({ isOpen, onClose, selectedStudent, onPaymentSucc
         style={{
           width: "100%",
           maxWidth: "600px",
-          height: "100vh",
+          height: "100%",
           display: "flex",
           flexDirection: "column",
           background: "#ffffff",
@@ -185,7 +185,7 @@ const PaymentSelectionModal = ({ isOpen, onClose, selectedStudent, onPaymentSucc
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div style={{ padding: "1.2rem 1.5rem", borderBottom: "1px solid var(--glass-border)", display: "flex", justifyContent: "space-between", alignItems: "center", background: "#f8fafc" }}>
+        <div style={{ padding: "1.2rem 1.5rem", borderBottom: "1px solid var(--glass-border)", display: "flex", justifyContent: "space-between", alignItems: "center", background: "#f8fafc", flexShrink: 0 }}>
           <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
             <div style={{ width: "38px", height: "38px", borderRadius: "9px", background: "rgba(5, 150, 105, 0.12)", color: "#059669", display: "flex", alignItems: "center", justifyContent: "center" }}>
               <CreditCard size={20} strokeWidth={2.4} />
