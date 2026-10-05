@@ -1,11 +1,12 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
-import { fetchUsers } from "../features/dataSlice";
+import { fetchUsers, fetchClasses } from "../features/dataSlice";
 import { ArrowLeft, User, Phone, Mail, Calendar, BookOpen, GraduationCap, CreditCard, Activity, FileText, Download } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
 import { generateReportCardPDF } from "../utils/reportCardPDF";
 import { toast } from "react-toastify";
+import api from "../services/api";
 
 const StudentProfile = () => {
   const { id } = useParams();
@@ -18,10 +19,56 @@ const StudentProfile = () => {
   }, [users, id]);
 
   const [activeTab, setActiveTab] = useState("overview");
+  const [studentLedger, setStudentLedger] = useState({ fees: [], payments: [] });
+  const [loadingLedger, setLoadingLedger] = useState(false);
 
   useEffect(() => {
     if (users.length === 0) dispatch(fetchUsers());
-  }, [dispatch, users.length]);
+    if (classes.length === 0) dispatch(fetchClasses());
+  }, [dispatch, users.length, classes.length]);
+
+  useEffect(() => {
+    if (id) {
+      setLoadingLedger(true);
+      api.get(`/finance_panel/getStudentLedger/${id}`)
+        .then((res) => {
+          if (res.data.success) {
+            setStudentLedger(res.data.data);
+          }
+        })
+        .catch((err) => {
+          console.error("Error loading student ledger:", err);
+        })
+        .finally(() => setLoadingLedger(false));
+    }
+  }, [id]);
+
+  const monthlyTuitionFee = useMemo(() => {
+    if (student?.monthly_fee && Number(student.monthly_fee) > 0) {
+      return Number(student.monthly_fee);
+    }
+    const monthlyFeeItem = (studentLedger?.fees || []).find(
+      (f) => f.category?.includes("monthly") && !f.fee?.title?.toLowerCase().includes("transport")
+    );
+    if (monthlyFeeItem && monthlyFeeItem.fee?.amount) {
+      return Number(monthlyFeeItem.fee.amount);
+    }
+    return 0;
+  }, [student, studentLedger]);
+
+  const busFee = useMemo(() => {
+    return Number(studentLedger?.studentDetails?.bus_fee ?? student?.bus_fee ?? 0);
+  }, [student, studentLedger]);
+
+  const totalMonthlyObligation = monthlyTuitionFee + busFee;
+
+  const totalPendingBalance = useMemo(() => {
+    return (studentLedger?.fees || []).reduce((sum, f) => {
+      const due = Number(f.fee?.amount || 0);
+      const paid = Number(f.total_paid_amount || 0);
+      return sum + Math.max(0, due - paid);
+    }, 0);
+  }, [studentLedger]);
 
   const studentClass = useMemo(() => {
     if (!student || !student.classes || student.classes.length === 0) return null;
@@ -268,21 +315,33 @@ const StudentProfile = () => {
                 
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "1rem", marginBottom: "2rem" }}>
                   <div style={{ padding: "1rem", background: "rgba(59, 130, 246, 0.1)", border: "1px solid rgba(59, 130, 246, 0.3)", borderRadius: "8px" }}>
-                    <div style={{ color: "#3b82f6", fontSize: "0.875rem", marginBottom: "0.25rem" }}>Monthly Fee</div>
-                    <div style={{ fontSize: "1.5rem", fontWeight: "700" }}>₹{student.monthly_fee || 0}</div>
+                    <div style={{ color: "#3b82f6", fontSize: "0.875rem", marginBottom: "0.25rem" }}>Monthly Fee (Tuition)</div>
+                    <div style={{ fontSize: "1.5rem", fontWeight: "700" }}>₹{monthlyTuitionFee}</div>
+                    {studentClass && (
+                      <div style={{ fontSize: "0.75rem", color: "var(--text-secondary)", marginTop: "0.25rem" }}>
+                        Structure: {studentClass.name}
+                      </div>
+                    )}
                   </div>
                   <div style={{ padding: "1rem", background: "rgba(168, 85, 247, 0.1)", border: "1px solid rgba(168, 85, 247, 0.3)", borderRadius: "8px" }}>
                     <div style={{ color: "#a855f7", fontSize: "0.875rem", marginBottom: "0.25rem" }}>Bus Fee</div>
-                    <div style={{ fontSize: "1.5rem", fontWeight: "700" }}>₹{student.bus_fee || 0}</div>
-                    {student.bus_start_date && (
+                    <div style={{ fontSize: "1.5rem", fontWeight: "700" }}>₹{busFee}</div>
+                    {(studentLedger?.studentDetails?.bus_start_date || student?.bus_start_date) && (
                       <div style={{ fontSize: "0.75rem", color: "var(--text-secondary)", marginTop: "0.25rem" }}>
-                        Starts: {new Date(student.bus_start_date).toLocaleDateString()}
+                        Starts: {new Date(studentLedger?.studentDetails?.bus_start_date || student?.bus_start_date).toLocaleDateString()}
                       </div>
                     )}
                   </div>
                   <div style={{ padding: "1rem", background: "rgba(16, 185, 129, 0.1)", border: "1px solid rgba(16, 185, 129, 0.3)", borderRadius: "8px" }}>
                     <div style={{ color: "#10b981", fontSize: "0.875rem", marginBottom: "0.25rem" }}>Total Monthly Obligation</div>
-                    <div style={{ fontSize: "1.5rem", fontWeight: "700" }}>₹{Number(student.monthly_fee || 0) + Number(student.bus_fee || 0)}</div>
+                    <div style={{ fontSize: "1.5rem", fontWeight: "700" }}>₹{totalMonthlyObligation}</div>
+                  </div>
+                  <div style={{ padding: "1rem", background: totalPendingBalance > 0 ? "rgba(239, 68, 68, 0.1)" : "rgba(16, 185, 129, 0.1)", border: `1px solid ${totalPendingBalance > 0 ? "rgba(239, 68, 68, 0.3)" : "rgba(16, 185, 129, 0.3)"}`, borderRadius: "8px" }}>
+                    <div style={{ color: totalPendingBalance > 0 ? "#ef4444" : "#10b981", fontSize: "0.875rem", marginBottom: "0.25rem" }}>Total Balance Due</div>
+                    <div style={{ fontSize: "1.5rem", fontWeight: "700" }}>₹{totalPendingBalance}</div>
+                    <div style={{ fontSize: "0.75rem", color: "var(--text-secondary)", marginTop: "0.25rem" }}>
+                      {student.fee_exempted ? "Fee Exempted" : totalPendingBalance > 0 ? "Outstanding" : "All Clear"}
+                    </div>
                   </div>
                 </div>
 
@@ -293,10 +352,65 @@ const StudentProfile = () => {
                   </div>
                 </div>
 
-                <h4 style={{ fontSize: "1rem", fontWeight: "600", marginBottom: "1rem" }}>Recent Transactions</h4>
-                {(!student.fees || student.fees.length === 0) ? (
+                <h4 style={{ fontSize: "1rem", fontWeight: "600", marginBottom: "1rem", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                  <span>Fee Ledger & Pending Dues</span>
+                  {loadingLedger && <span style={{ fontSize: "0.8rem", color: "var(--text-secondary)" }}>Refreshing ledger...</span>}
+                </h4>
+                
+                {(!studentLedger?.fees || studentLedger.fees.length === 0) ? (
+                  <div style={{ textAlign: "center", padding: "1.5rem", color: "var(--text-secondary)", background: "rgba(0,0,0,0.1)", borderRadius: "8px", marginBottom: "1.5rem" }}>
+                    <p>No fee dues generated for this student.</p>
+                  </div>
+                ) : (
+                  <div style={{ overflowX: "auto", marginBottom: "2rem" }}>
+                    <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left" }}>
+                      <thead>
+                        <tr style={{ borderBottom: "1px solid var(--glass-border)", color: "var(--text-secondary)", fontSize: "0.875rem" }}>
+                          <th style={{ padding: "0.5rem" }}>Fee Title</th>
+                          <th style={{ padding: "0.5rem" }}>Due Date</th>
+                          <th style={{ padding: "0.5rem" }}>Amount</th>
+                          <th style={{ padding: "0.5rem" }}>Paid</th>
+                          <th style={{ padding: "0.5rem" }}>Balance</th>
+                          <th style={{ padding: "0.5rem" }}>Status</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {studentLedger.fees.map((due, idx) => {
+                          const amount = Number(due.fee?.amount || 0);
+                          const paid = Number(due.total_paid_amount || 0);
+                          const balance = Math.max(0, amount - paid);
+                          const isPaid = balance === 0;
+                          return (
+                            <tr key={idx} style={{ borderBottom: "1px solid rgba(0,0,0,0.05)" }}>
+                              <td style={{ padding: "0.5rem", fontWeight: "500" }}>{due.fee?.title || "Fee"}</td>
+                              <td style={{ padding: "0.5rem" }}>{due.fee?.due_date ? new Date(due.fee.due_date).toLocaleDateString() : "N/A"}</td>
+                              <td style={{ padding: "0.5rem" }}>₹{amount}</td>
+                              <td style={{ padding: "0.5rem", color: paid > 0 ? "#10b981" : "inherit" }}>₹{paid}</td>
+                              <td style={{ padding: "0.5rem", fontWeight: "600", color: isPaid ? "#10b981" : "#ef4444" }}>₹{balance}</td>
+                              <td style={{ padding: "0.5rem" }}>
+                                <span style={{
+                                  color: isPaid ? '#10b981' : '#ef4444',
+                                  background: isPaid ? 'rgba(16, 185, 129, 0.1)' : 'rgba(239, 68, 68, 0.1)',
+                                  padding: "2px 8px",
+                                  borderRadius: "12px",
+                                  fontSize: "0.75rem",
+                                  fontWeight: "600"
+                                }}>
+                                  {isPaid ? "Paid" : "Pending"}
+                                </span>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+
+                <h4 style={{ fontSize: "1rem", fontWeight: "600", marginBottom: "1rem" }}>Payment Receipts & Transactions</h4>
+                {(!studentLedger?.payments || studentLedger.payments.length === 0) ? (
                   <div style={{ textAlign: "center", padding: "2rem", color: "var(--text-secondary)", background: "rgba(0,0,0,0.1)", borderRadius: "8px" }}>
-                    <p>No fee records found.</p>
+                    <p>No payment records found yet.</p>
                   </div>
                 ) : (
                   <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left" }}>
@@ -304,21 +418,17 @@ const StudentProfile = () => {
                       <tr style={{ borderBottom: "1px solid var(--glass-border)", color: "var(--text-secondary)", fontSize: "0.875rem" }}>
                         <th style={{ padding: "0.5rem" }}>Receipt No</th>
                         <th style={{ padding: "0.5rem" }}>Amount</th>
-                        <th style={{ padding: "0.5rem" }}>Status</th>
+                        <th style={{ padding: "0.5rem" }}>Payment Mode</th>
                         <th style={{ padding: "0.5rem" }}>Date</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {student.fees.map((fee, idx) => (
+                      {studentLedger.payments.map((pmt, idx) => (
                         <tr key={idx} style={{ borderBottom: "1px solid rgba(0,0,0,0.05)" }}>
-                          <td style={{ padding: "0.5rem" }}>{fee.fee?.receipt_number || "N/A"}</td>
-                          <td style={{ padding: "0.5rem" }}>₹{fee.amount}</td>
-                          <td style={{ padding: "0.5rem" }}>
-                            <span style={{ color: fee.status === 'paid' ? '#10b981' : '#f59e0b', background: fee.status === 'paid' ? 'rgba(16, 185, 129, 0.1)' : 'rgba(245, 158, 11, 0.1)', padding: "2px 8px", borderRadius: "12px", fontSize: "0.75rem", fontWeight: "600" }}>
-                              {fee.status}
-                            </span>
-                          </td>
-                          <td style={{ padding: "0.5rem" }}>{fee.created_at ? new Date(fee.created_at).toLocaleDateString() : "N/A"}</td>
+                          <td style={{ padding: "0.5rem", fontWeight: "600" }}>#{pmt.receipt_number || pmt.receipt_id || idx + 1}</td>
+                          <td style={{ padding: "0.5rem", color: "#10b981", fontWeight: "600" }}>₹{pmt.amount_paid || pmt.amount}</td>
+                          <td style={{ padding: "0.5rem" }}>{pmt.payment_mode || "Cash"}</td>
+                          <td style={{ padding: "0.5rem" }}>{pmt.created_at ? new Date(pmt.created_at).toLocaleDateString() : "N/A"}</td>
                         </tr>
                       ))}
                     </tbody>

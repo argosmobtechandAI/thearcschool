@@ -71,7 +71,9 @@ const Communication = () => {
             : "http://localhost:3003");
         setSocketUrl(SOCKET_URL);
 
-        if (socket.connected) {
+        if (!socket.connected) {
+            socket.connect();
+        } else {
             setSocketStatus('Connected');
             socket.emit('identify', myself.id);
             if (selectedChatUserRef.current?.id) {
@@ -247,7 +249,7 @@ const Communication = () => {
 
         const sortedChats = [...chats].sort((a, b) => new Date(b.created_at || b.createdAt) - new Date(a.created_at || a.createdAt));
 
-        const adminUserIds = new Set(users.filter(u => u.type === 'admin' || u.type === 'principal').map(u => u.id));
+        const adminUserIds = new Set(users.filter(u => u.type === 'admin' || u.type === 'principal' || u.type === 'super_admin' || u.name === 'System Admin').map(u => u.id));
         if (myself?.id) adminUserIds.add(myself.id);
 
         sortedChats.filter(c => c.type === "live_chat" && (adminUserIds.has(c.sender_id) || adminUserIds.has(c.receiver_id)))
@@ -284,7 +286,7 @@ const Communication = () => {
 
     const myChatMessages = useMemo(() => {
         if (!selectedChatUser || !chats || !myself || !users) return [];
-        const adminUserIds = new Set(users.filter(u => u.type === 'admin' || u.type === 'principal').map(u => u.id));
+        const adminUserIds = new Set(users.filter(u => u.type === 'admin' || u.type === 'principal' || u.type === 'super_admin' || u.name === 'System Admin').map(u => u.id));
         if (myself?.id) adminUserIds.add(myself.id);
 
         return chats.filter(c => c.type === "live_chat" &&
