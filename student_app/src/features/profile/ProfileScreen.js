@@ -12,6 +12,7 @@ import AppModal from '../../components/AppModal';
 import { useDrawer } from '../../navigation/DrawerContext';
 import Card from '../../components/Card';
 import Button from '../../components/Button';
+import UserAvatar from '../../components/UserAvatar';
 
 const InfoRow = ({ icon, label, value }) => (
   <View style={styles.infoRow}>
@@ -90,13 +91,16 @@ const ProfileScreen = ({ navigation }) => {
       >
         {/* Profile Hero */}
         <View style={styles.heroCard}>
-          <View style={styles.avatarCircle}>
-            {profile?.avatar_url ? (
-              <Image source={{ uri: profile.avatar_url }} style={styles.avatarImage} />
-            ) : (
-              <Text style={styles.avatarText}>{initials}</Text>
-            )}
-          </View>
+          <UserAvatar
+            url={profile?.avatar_url || user?.avatar_url}
+            name={profile?.name || user?.name || 'S'}
+            size={74}
+            placeholderBg="rgba(255,255,255,0.25)"
+            borderWidth={2}
+            borderColor="rgba(255,255,255,0.4)"
+            placeholderColor="#fff"
+            style={{ marginBottom: theme.spacing.md }}
+          />
           <Text style={styles.nameText}>{profile.name || user?.name || 'Student'}</Text>
           <Text style={styles.classText}>
             Class {classInfo?.name || '—'} {classInfo?.section ? `- ${classInfo.section}` : ''}
@@ -107,7 +111,8 @@ const ProfileScreen = ({ navigation }) => {
           {/* Student Info */}
           <Card variant="elevated">
             <Text style={styles.cardTitle}>Student Information</Text>
-            <InfoRow icon="hash"      label="Admission Number" value={profile.admission_number} />
+            <InfoRow icon="hash"      label="Roll Number" value={profile.roll_number || 'N/A'} />
+            <InfoRow icon="hash"      label="Admission Number" value={profile.admission_number || 'N/A'} />
             <InfoRow icon="calendar"  label="Date of Birth"    value={profile.dob} />
             <InfoRow icon="home"      label="House"            value={profile.house} />
           </Card>

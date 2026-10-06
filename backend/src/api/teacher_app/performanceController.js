@@ -24,7 +24,7 @@ export const getClassPerformance = async (req, res) => {
     // Fetch full student details from user table
     const { data: studentsData, error: usersError } = await supabase
       .from("user")
-      .select("id, name, admission_number, email, father_name, mother_name, phone, address, dob, house, admission_date") 
+      .select("id, name, admission_number, email, father_name, mother_name, phone, address, dob, house, admission_date, avatar_url") 
       .in("id", studentIds);
 
     if (usersError) throw usersError;

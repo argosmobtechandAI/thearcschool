@@ -9,6 +9,7 @@ import Icon from 'react-native-vector-icons/Feather';
 import { colors, shadows } from '../../theme/colors';
 import { useGetTeachersQuery, useGetPrincipalQuery, useGetLiveChatsListQuery } from '../../store/apiSlice';
 import { useDrawer } from '../../navigation/DrawerContext';
+import UserAvatar from '../../components/UserAvatar';
 
 const formatTime = (dateString) => {
   if (!dateString) return '';
@@ -61,9 +62,14 @@ const CommunicationScreen = ({ navigation }) => {
 
   const renderUserCard = ({ item }) => (
     <TouchableOpacity style={styles.userCard} onPress={() => handleOpenChat(item)}>
-      <View style={styles.avatar}>
-        <Text style={styles.avatarText}>{item.name ? item.name.substring(0, 1) : 'U'}</Text>
-      </View>
+      <UserAvatar
+        url={item.avatar_url || item.avatar}
+        name={item.name || 'U'}
+        size={44}
+        placeholderBg={colors.primary + '20'}
+        placeholderColor={colors.primary}
+        style={{ marginRight: 12 }}
+      />
       <View style={styles.userInfo}>
         <Text style={styles.userName}>{item.name}</Text>
         <Text style={styles.userEmail}>{item.email || item.type}</Text>
@@ -76,8 +82,14 @@ const CommunicationScreen = ({ navigation }) => {
     const isUnread = item.unread > 0 && !readThreadIds.has(item.id);
     return (
       <TouchableOpacity style={styles.userCard} onPress={() => handleOpenChat(item)}>
-        <View style={[styles.avatar, { position: 'relative' }]}>
-          <Text style={styles.avatarText}>{item.name ? item.name.substring(0, 1).toUpperCase() : 'U'}</Text>
+        <View style={{ position: 'relative', marginRight: 12 }}>
+          <UserAvatar
+            url={item.avatar_url || item.avatar}
+            name={item.name || 'U'}
+            size={44}
+            placeholderBg={colors.primary + '20'}
+            placeholderColor={colors.primary}
+          />
           {isUnread && (
             <View style={{
               position: 'absolute', top: -2, right: -2,

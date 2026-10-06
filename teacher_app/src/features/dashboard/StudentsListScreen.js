@@ -6,6 +6,7 @@ import { colors, shadows } from '../../theme/colors';
 import { useGetClassStudentsQuery } from '../../store/apiSlice';
 import CustomHeader from '../../components/CustomHeader';
 import CustomModal from '../../components/CustomModal';
+import UserAvatar from '../../components/UserAvatar';
 
 const StudentsListScreen = ({ navigation }) => {
   const { activeClassId, activeClassName } = useSelector((state) => state.app);
@@ -31,6 +32,7 @@ const StudentsListScreen = ({ navigation }) => {
       const q = searchQuery.toLowerCase();
       result = result.filter(s => 
         (s.name && s.name.toLowerCase().includes(q)) || 
+        (s.roll_number && s.roll_number.toLowerCase().includes(q)) ||
         (s.admission_number && s.admission_number.toLowerCase().includes(q))
       );
     }
@@ -70,12 +72,17 @@ const StudentsListScreen = ({ navigation }) => {
       onPress={() => handleSelectStudent(item)}
       activeOpacity={0.8}
     >
-      <View style={styles.avatar}>
-        <Text style={styles.avatarText}>{item.name?.charAt(0) || 'S'}</Text>
-      </View>
+      <UserAvatar
+        url={item.avatar_url}
+        name={item.name || 'S'}
+        size={44}
+        placeholderBg={colors.primary + '15'}
+        placeholderColor={colors.primary}
+        style={{ marginRight: 12 }}
+      />
       <View style={styles.studentInfo}>
         <Text style={styles.studentName} numberOfLines={1}>{item.name || 'Unknown Student'}</Text>
-        <Text style={styles.studentDetails}>ID: {item.admission_number || item.id?.substring(0, 8) || 'N/A'}</Text>
+        <Text style={styles.studentDetails}>ID: {item.roll_number || item.admission_number || item.id?.substring(0, 8) || 'N/A'}</Text>
       </View>
       
       <View style={styles.actionsContainer}>

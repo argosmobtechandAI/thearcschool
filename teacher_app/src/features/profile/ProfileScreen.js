@@ -9,6 +9,7 @@ import { apiSlice, useGetTeacherProfileQuery } from '../../store/apiSlice';
 import { clearAppState } from '../../store/appSlice';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { colors } from '../../theme/colors';
+import UserAvatar from '../../components/UserAvatar';
 
 const ProfileScreen = ({ navigation }) => {
   const { user } = useSelector((state) => state.auth);
@@ -89,15 +90,16 @@ const ProfileScreen = ({ navigation }) => {
         
         {/* Profile Header */}
         <View style={styles.header}>
-          <View style={styles.avatar}>
-            {user?.avatar_url ? (
-              <Image source={{ uri: user.avatar_url }} style={styles.avatarImage} />
-            ) : (
-              <Text style={styles.avatarText}>
-                {user?.name ? user.name.charAt(0).toUpperCase() : 'T'}
-              </Text>
-            )}
-          </View>
+          <UserAvatar
+            url={user?.avatar_url}
+            name={user?.name || 'T'}
+            size={96}
+            placeholderBg={colors.primary}
+            placeholderColor={colors.background}
+            borderWidth={3}
+            borderColor={colors.primary}
+            style={{ marginBottom: 16 }}
+          />
           <Text style={styles.name}>{user?.name || 'Teacher Name'}</Text>
           <Text style={styles.email}>{user?.email || 'teacher@school.com'}</Text>
           <View style={styles.badge}>

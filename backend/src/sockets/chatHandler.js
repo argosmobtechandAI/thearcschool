@@ -114,10 +114,10 @@ export const initSocket = (server) => {
         let senderName = "User";
         let senderAvatar = null;
         try {
-          const { data: sData } = await supabase.from("user").select("name, avatar").eq("id", sender_id).single();
+          const { data: sData } = await supabase.from("user").select("name, avatar_url").eq("id", sender_id).single();
           if (sData) {
             senderName = sData.name || "User";
-            senderAvatar = sData.avatar;
+            senderAvatar = sData.avatar_url;
           }
         } catch (e) {}
 

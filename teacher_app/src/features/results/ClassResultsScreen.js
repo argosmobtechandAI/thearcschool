@@ -82,7 +82,7 @@ const ClassResultsScreen = ({ route, navigation }) => {
 
   const handleStudentPress = (student) => {
     navigation.navigate('StudentAcademicHistoryScreen', { 
-      student: { id: student.student_id, name: student.name, admission_number: student.admission_number } 
+      student: { id: student.student_id, name: student.name, roll_number: student.roll_number, admission_number: student.admission_number } 
     });
   };
 
@@ -199,7 +199,7 @@ const ClassResultsScreen = ({ route, navigation }) => {
                   >
                     <View style={[styles.cell, styles.nameCol]}>
                       <Text style={styles.studentName} numberOfLines={1}>{student.name}</Text>
-                      <Text style={styles.studentRoll}>{student.admission_number}</Text>
+                      <Text style={styles.studentRoll}>{student.roll_number || student.admission_number || 'N/A'}</Text>
                     </View>
                     
                     {subjects.map((sub, i) => {

@@ -163,14 +163,21 @@ export const getStudents = async (req, res) => {
   try {
     const { data: students, error } = await supabase
       .from("user")
-      .select("id, name, email, type")
+      .select("id, name, email, type, avatar_url")
       .eq("type", "student");
 
     if (error) throw error;
 
+    const sanitizedStudents = (students || []).map(s => ({
+      ...s,
+      avatar_url: s.avatar_url && s.avatar_url.startsWith('http://') && !s.avatar_url.includes('localhost')
+        ? s.avatar_url.replace(/^http:\/\//i, 'https://')
+        : s.avatar_url
+    }));
+
     return res.status(200).json({
       success: true,
-      students: students || []
+      students: sanitizedStudents
     });
   } catch (e) {
     return res.status(500).json({
@@ -184,7 +191,7 @@ export const getPrincipal = async (req, res) => {
   try {
     const { data: adminUsers } = await supabase
       .from("user")
-      .select("id, name, email, type")
+      .select("id, name, email, type, avatar_url")
       .or("type.eq.admin,type.eq.principal,type.eq.super_admin,name.eq.System Admin")
       .limit(1);
 
@@ -201,6 +208,7 @@ export const getPrincipal = async (req, res) => {
     });
   }
 };
+
 export const getLiveChatsList = async (req, res) => {
   const currentUserId = req.user?.id;
   if (!currentUserId) return res.status(401).json({ success: false, message: "Unauthorized" });
@@ -209,7 +217,7 @@ export const getLiveChatsList = async (req, res) => {
     // Fetch all admin/principal user IDs to group admin desk entries
     const { data: adminUsers } = await supabase
       .from("user")
-      .select("id, type, name")
+      .select("id, type, name, avatar_url")
       .or("type.eq.admin,type.eq.principal,type.eq.super_admin,name.eq.System Admin");
     const adminIds = new Set(adminUsers ? adminUsers.map(u => u.id) : []);
 
@@ -233,12 +241,15 @@ export const getLiveChatsList = async (req, res) => {
       if (isOtherAdmin) {
         if (!hasAdminThread) {
           hasAdminThread = true;
-          const primaryAdminId = Array.from(adminIds)[0] || otherId || "admin";
+          const adminUser = adminUsers?.find(u => adminIds.has(u.id)) || null;
+          const primaryAdminId = adminUser?.id || otherId || "admin";
           const isUnread = chat.sender_id !== currentUserId;
           userMap.set("ADMIN_DESK", {
             id: primaryAdminId,
             name: "System Admin",
             role: "admin",
+            avatar_url: adminUser?.avatar_url || null,
+            avatar: adminUser?.avatar_url || null,
             lastMessage: chat.message,
             time: chat.created_at,
             unread: isUnread ? 1 : 0
@@ -261,7 +272,7 @@ export const getLiveChatsList = async (req, res) => {
     if (userIdsToFetch.size > 0) {
       const { data: usersData, error: usersError } = await supabase
         .from("user")
-        .select("id, name, type")
+        .select("id, name, type, avatar_url")
         .in("id", Array.from(userIdsToFetch));
 
       if (!usersError && usersData) {
@@ -277,6 +288,8 @@ export const getLiveChatsList = async (req, res) => {
                 id: u.id,
                 name: "System Admin",
                 role: "admin",
+                avatar_url: u.avatar_url || null,
+                avatar: u.avatar_url || null,
                 lastMessage: orphanThread?.lastMessage || "",
                 time: orphanThread?.time || new Date().toISOString(),
                 unread: 0
@@ -292,6 +305,11 @@ export const getLiveChatsList = async (req, res) => {
             const mapped = userMap.get(u.id);
             mapped.name = u.name;
             mapped.role = u.type;
+            const safeAvatar = u.avatar_url && u.avatar_url.startsWith('http://') && !u.avatar_url.includes('localhost')
+              ? u.avatar_url.replace(/^http:\/\//i, 'https://')
+              : u.avatar_url;
+            mapped.avatar_url = safeAvatar || null;
+            mapped.avatar = safeAvatar || null;
           }
         }
       }

@@ -7,6 +7,7 @@ import { Calendar } from 'react-native-calendars';
 import { useGetClassStudentsQuery, useSubmitBulkAttendanceMutation, useGetAttendanceQuery } from '../../store/apiSlice';
 import { colors, shadows } from '../../theme/colors';
 import CustomModal from '../../components/CustomModal';
+import UserAvatar from '../../components/UserAvatar';
 
 const getTodayString = () => {
   const d = new Date();
@@ -303,12 +304,17 @@ const AttendanceMarkingScreen = ({ route, navigation }) => {
                   activeOpacity={0.7}
                   onPress={() => navigation.navigate('StudentProfile', { student })}
                 >
-                  <View style={[styles.studentAvatar, { backgroundColor: isPresent ? colors.success + '15' : isAbsent ? colors.danger + '15' : isLate ? colors.warning + '15' : colors.primary + '15' }]}>
-                    <Text style={[styles.avatarText, { color: isPresent ? colors.success : isAbsent ? colors.danger : isLate ? colors.warning : colors.primary }]}>{student.name?.charAt(0)}</Text>
-                  </View>
+                  <UserAvatar
+                    url={student.avatar_url}
+                    name={student.name || 'S'}
+                    size={42}
+                    placeholderBg={isPresent ? colors.success + '15' : isAbsent ? colors.danger + '15' : isLate ? colors.warning + '15' : colors.primary + '15'}
+                    placeholderColor={isPresent ? colors.success : isAbsent ? colors.danger : isLate ? colors.warning : colors.primary}
+                    style={{ marginRight: 12 }}
+                  />
                   <View style={styles.studentInfo}>
                     <Text style={styles.studentName}>{student.name}</Text>
-                    <Text style={styles.studentRoll}>ID: {student.admission_number || student.id?.substring(0, 8) || 'N/A'}</Text>
+                    <Text style={styles.studentRoll}>ID: {student.roll_number || student.admission_number || student.id?.substring(0, 8) || 'N/A'}</Text>
                   </View>
                 </TouchableOpacity>
                 

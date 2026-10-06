@@ -349,7 +349,7 @@ export const getClassStudents = async (req, res) => {
     // Get student IDs in the class
     const { data: classStudents, error: csError } = await supabase
       .from("class_students")
-      .select("student_id")
+      .select("student_id, roll_number")
       .eq("class_id", id);
       
     if (csError) throw csError;
@@ -362,14 +362,25 @@ export const getClassStudents = async (req, res) => {
     // Fetch full student details from user table
     const { data: users, error: usersError } = await supabase
       .from("user")
-      .select("id, name, email, admission_number, father_name, mother_name, phone, address, dob, house, admission_date, leave_school") 
+      .select("id, name, email, admission_number, father_name, mother_name, phone, address, dob, house, admission_date, leave_school, avatar_url") 
       .in("id", studentIds);
 
     if (usersError) throw usersError;
 
+    const sanitizedUsers = (users || []).map(u => {
+      const cs = classStudents.find(c => c.student_id === u.id);
+      return {
+        ...u,
+        roll_number: cs?.roll_number || null,
+        avatar_url: u.avatar_url && u.avatar_url.startsWith('http://') && !u.avatar_url.includes('localhost')
+          ? u.avatar_url.replace(/^http:\/\//i, 'https://')
+          : u.avatar_url
+      };
+    });
+
     return res.status(200).json({
       success: true,
-      students: users || []
+      students: sanitizedUsers
     });
 
   } catch (e) {

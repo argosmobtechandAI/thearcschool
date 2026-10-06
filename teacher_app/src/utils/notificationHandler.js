@@ -142,3 +142,23 @@ export const setupForegroundHandler = () => {
     invalidateNotificationsCache();
   });
 };
+
+export const setupBackgroundFCMListeners = () => {
+  // 1. Handle notification that caused app to open from quit state
+  messaging()
+    .getInitialNotification()
+    .then(remoteMessage => {
+      if (remoteMessage) {
+        console.log('FCM Notification caused app to open from quit state:', remoteMessage);
+        handleNotificationEvent({ type: EventType.PRESS, detail: { notification: remoteMessage } });
+      }
+    });
+
+  // 2. Handle notification that caused app to open from background state
+  const unsubscribeOnOpen = messaging().onNotificationOpenedApp(remoteMessage => {
+    console.log('FCM Notification caused app to open from background state:', remoteMessage);
+    handleNotificationEvent({ type: EventType.PRESS, detail: { notification: remoteMessage } });
+  });
+
+  return unsubscribeOnOpen;
+};

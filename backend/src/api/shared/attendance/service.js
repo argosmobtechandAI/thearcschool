@@ -11,7 +11,7 @@ export class AttendanceService {
     // Find existing record to upsert by primary key or user_id + date
     const { data: existing } = await supabase
       .from("attendance")
-      .select("id")
+      .select("id, status")
       .match({ user_id: id, date: data.date })
       .maybeSingle();
 
@@ -33,15 +33,29 @@ export class AttendanceService {
 
     try {
       const { FCMService } = await import("../../../services/fcmService.js");
-      const todayStr = new Date().toISOString().split('T')[0];
-      const isBackdated = data.date < todayStr;
-      const title = isBackdated ? "Backdated Attendance Update" : "Attendance Update";
-      const message = isBackdated 
-        ? `Your attendance for past date (${data.date}) has been marked as ${formattedStatus}.`
-        : `Your attendance for ${data.date} is marked as ${formattedStatus}.`;
+      const statusLower = formattedStatus?.toLowerCase();
+      const prevStatusLower = existing?.status?.toLowerCase();
 
-      await FCMService.sendToUsers([id], title, message, { type: "attendance", date: data.date, status: formattedStatus });
-      await supabase.from("notifications").insert([{ user_id: id, title, message, type: "attendance", is_read: false }]);
+      // Only notify if:
+      // 1. Status is Absent or Late (do not spam students marked Present)
+      // 2. OR status changed from Absent to Present
+      const statusChanged = statusLower !== prevStatusLower;
+      const shouldNotify = statusChanged && (
+        (statusLower === 'absent' || statusLower === 'late') ||
+        (prevStatusLower === 'absent' && statusLower === 'present')
+      );
+
+      if (shouldNotify) {
+        const todayStr = new Date().toISOString().split('T')[0];
+        const isBackdated = data.date < todayStr;
+        const title = isBackdated ? "Backdated Attendance Update" : "Attendance Update";
+        const message = isBackdated 
+          ? `Your attendance for past date (${data.date}) has been marked as ${formattedStatus}.`
+          : `Your attendance for ${data.date} is marked as ${formattedStatus}.`;
+
+        await FCMService.sendToUsers([id], title, message, { type: "attendance", date: data.date, status: formattedStatus });
+        await supabase.from("notifications").insert([{ user_id: id, title, message, type: "attendance", is_read: false }]);
+      }
     } catch (notifErr) {
       console.error("Attendance Notification Error:", notifErr);
     }
@@ -58,7 +72,7 @@ export class AttendanceService {
     // Fetch existing records for these users and dates
     const { data: existingRecords } = await supabase
       .from("attendance")
-      .select("id, user_id, date")
+      .select("id, user_id, date, status")
       .in("user_id", userIds)
       .in("date", dates);
 
@@ -71,13 +85,16 @@ export class AttendanceService {
         status: formattedStatus,
         marked_by: markedBy
       };
-      if (existing) record.id = existing.id;
+      if (existing) {
+        record.id = existing.id;
+        record.prevStatus = existing.status;
+      }
       return record;
     });
 
     const { error } = await supabase
       .from("attendance")
-      .upsert(dbRecords, { onConflict: 'user_id, date' });
+      .upsert(dbRecords.map(({ prevStatus, ...r }) => r), { onConflict: 'user_id, date' });
     if (error) throw new Error("Could not bulk update attendance: " + error.message);
 
     try {
@@ -87,13 +104,26 @@ export class AttendanceService {
       
       for (const rec of dbRecords) {
          if (!rec.status) continue;
+
+         const statusLower = rec.status.toLowerCase();
+         const prevStatusLower = rec.prevStatus ? rec.prevStatus.toLowerCase() : null;
+
+         // Do NOT notify for default "Present" attendance — only notify if Absent, Late, or updated from Absent to Present
+         const statusChanged = statusLower !== prevStatusLower;
+         const shouldNotify = statusChanged && (
+           (statusLower === 'absent' || statusLower === 'late') ||
+           (prevStatusLower === 'absent' && statusLower === 'present')
+         );
+
+         if (!shouldNotify) continue;
+
          const isBackdated = rec.date < todayStr;
          const title = isBackdated ? "Backdated Attendance Update" : "Attendance Update";
          const message = isBackdated
            ? `Your attendance for past date (${rec.date}) has been marked as ${rec.status}.`
            : `Your attendance for ${rec.date} is marked as ${rec.status}.`;
 
-         // Sending push per user in a loop
+         // Sending push per user
          await FCMService.sendToUsers([rec.user_id], title, message, { type: "attendance", date: rec.date, status: rec.status }).catch(e => console.error(e));
          notifsToInsert.push({ user_id: rec.user_id, title, message, type: "attendance", is_read: false });
       }

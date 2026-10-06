@@ -292,7 +292,7 @@ const AttendanceReportsScreen = ({ navigation }) => {
                           </View>
                           <View>
                             <Text style={styles.studentName}>{student.name}</Text>
-                            <Text style={styles.studentDetails}>ID: {student.admission_number || student.id?.substring(0, 8) || 'N/A'} • Absent: {student.absent}</Text>
+                            <Text style={styles.studentDetails}>ID: {student.roll_number || student.admission_number || student.id?.substring(0, 8) || 'N/A'} • Absent: {student.absent}</Text>
                           </View>
                         </View>
                         <Text style={[styles.studentPercent, { color: student.percentage >= 85 ? colors.success : student.percentage >= 70 ? colors.warning : colors.error }]}>

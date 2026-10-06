@@ -5,6 +5,7 @@ import Icon from 'react-native-vector-icons/Feather';
 import { useSelector, useDispatch } from 'react-redux';
 import { colors, shadows } from '../../theme/colors';
 import CustomHeader from '../../components/CustomHeader';
+import UserAvatar from '../../components/UserAvatar';
 import { useGetExamsQuery, useGetCoursesQuery, useGetTimetableQuery, useGetTeacherClassesQuery, useGetClassStudentsQuery, useGetAttendanceQuery, useGetEventsQuery, useGetClassPerformanceQuery, useGetSpotlightOfTodayQuery } from '../../store/apiSlice';
 import { setAvailableClasses, setActiveClass } from '../../store/appSlice';
 
@@ -152,11 +153,14 @@ const DashboardScreen = ({ navigation }) => {
       style={[styles.studentCard, { borderColor: isWeak ? colors.danger + '30' : colors.success + '30' }]}
       onPress={() => navigation.navigate('StudentProfile', { student })}
     >
-      <View style={[styles.studentAvatar, { backgroundColor: isWeak ? colors.danger + '15' : colors.success + '15' }]}>
-        <Text style={[styles.studentAvatarText, { color: isWeak ? colors.danger : colors.success }]}>
-          {student.name ? student.name.charAt(0) : 'S'}
-        </Text>
-      </View>
+      <UserAvatar
+        url={student.avatar_url}
+        name={student.name || 'S'}
+        size={40}
+        placeholderBg={isWeak ? colors.danger + '15' : colors.success + '15'}
+        placeholderColor={isWeak ? colors.danger : colors.success}
+        style={{ marginRight: 12 }}
+      />
       <View style={styles.studentInfo}>
         <Text style={styles.studentName} numberOfLines={1}>{student.name}</Text>
         <Text style={styles.studentScore}>Score: {student.overallScore ? student.overallScore.toFixed(1) + '%' : 'N/A'}</Text>
@@ -177,9 +181,16 @@ const DashboardScreen = ({ navigation }) => {
         {/* Profile Card */}
         <View style={styles.profileCard}>
           <View style={styles.profileInfoRow}>
-            <View style={styles.avatarCircle}>
-              <Text style={styles.avatarText}>{user?.name?.charAt(0) || 'S'}</Text>
-            </View>
+            <UserAvatar
+              url={user?.avatar_url}
+              name={user?.name || 'T'}
+              size={54}
+              placeholderBg={colors.primary}
+              placeholderColor={colors.surface}
+              borderWidth={2}
+              borderColor="rgba(255,255,255,0.4)"
+              style={{ marginRight: 16 }}
+            />
             <View style={styles.profileTextCol}>
               <Text style={styles.profileName}>{user?.name || 'Sarah Mitchell'}</Text>
             </View>
@@ -346,13 +357,17 @@ const DashboardScreen = ({ navigation }) => {
                   </View>
 
                   <View style={{ flexDirection: 'row', alignItems: 'center', paddingRight: 60 }}>
-                    {winner.student?.avatar_url ? (
-                      <Image source={{ uri: winner.student.avatar_url }} style={{ width: 48, height: 48, borderRadius: 24, marginRight: 12, borderWidth: 2, borderColor: '#fbbf24' }} />
-                    ) : (
-                      <View style={{ width: 48, height: 48, borderRadius: 24, marginRight: 12, backgroundColor: '#fbbf24', justifyContent: 'center', alignItems: 'center', shadowColor: '#fbbf24', shadowOpacity: 0.4, shadowRadius: 4, elevation: 2 }}>
-                        <Icon name="award" size={24} color="#fff" />
-                      </View>
-                    )}
+                    <View style={{ marginRight: 12 }}>
+                      <UserAvatar
+                        url={winner.student?.avatar_url}
+                        name={winner.student?.name || 'S'}
+                        size={48}
+                        borderWidth={2}
+                        borderColor="#fbbf24"
+                        placeholderBg="#fef3c7"
+                        placeholderColor="#d97706"
+                      />
+                    </View>
                     <View style={{ flex: 1 }}>
                       <Text style={{ fontSize: 16, color: '#1f2937', fontWeight: 'bold' }} numberOfLines={1}>{winner.student?.name}</Text>
                       <Text style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>{winner.reason}</Text>

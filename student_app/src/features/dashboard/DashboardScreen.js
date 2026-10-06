@@ -18,6 +18,7 @@ import Icon from 'react-native-vector-icons/Feather';
 import { theme } from '../../theme/theme';
 import { useDrawer } from '../../navigation/DrawerContext';
 import { PieChart } from 'react-native-gifted-charts';
+import UserAvatar from '../../components/UserAvatar';
 
 const { width } = Dimensions.get('window');
 
@@ -278,13 +279,15 @@ const DashboardScreen = ({ navigation }) => {
             </View>
           </TouchableOpacity>
           <TouchableOpacity style={styles.headerBtn} onPress={() => navigation.navigate('Profile')}>
-            <View style={styles.headerAvatarCircle}>
-              {profile?.avatar_url ? (
-                <Image source={{ uri: profile.avatar_url }} style={styles.headerAvatarImage} />
-              ) : (
-                <Text style={styles.headerAvatarText}>{initials}</Text>
-              )}
-            </View>
+            <UserAvatar 
+              url={profile?.avatar_url} 
+              name={profile?.name || 'S'} 
+              size={34} 
+              placeholderBg="rgba(255,255,255,0.25)"
+              borderWidth={1.5}
+              borderColor="rgba(255,255,255,0.5)"
+              placeholderColor="#fff"
+            />
           </TouchableOpacity>
         </View>
       </View>
@@ -304,7 +307,7 @@ const DashboardScreen = ({ navigation }) => {
                 <Text style={styles.heroGreeting}>Welcome back,</Text>
                 <Text style={styles.heroName}>{profile?.name || 'Student'}</Text>
                 <Text style={styles.heroSubText}>
-                  Class {classInfo?.name}-{classInfo?.section} • Roll {profile?.admission_number || 'N/A'}
+                  Class {classInfo?.name}-{classInfo?.section} • Roll {profile?.roll_number || profile?.admission_number || 'N/A'}
                 </Text>
               </View>
             </View>
@@ -469,13 +472,17 @@ const DashboardScreen = ({ navigation }) => {
                     </View>
 
                     <View style={{ flexDirection: 'row', alignItems: 'flex-start', paddingRight: 60 }}>
-                      {winner.student?.avatar_url ? (
-                        <Image source={{ uri: winner.student.avatar_url }} style={{ width: 56, height: 56, borderRadius: 28, marginRight: 12, borderWidth: 3, borderColor: '#fbbf24' }} />
-                      ) : (
-                        <View style={{ width: 56, height: 56, borderRadius: 28, marginRight: 12, backgroundColor: '#fef3c7', justifyContent: 'center', alignItems: 'center', borderWidth: 2, borderColor: '#fbbf24' }}>
-                          <Icon name="award" size={28} color="#f59e0b" />
-                        </View>
-                      )}
+                      <View style={{ marginRight: 12 }}>
+                        <UserAvatar 
+                          url={winner.student?.avatar_url} 
+                          name={winner.student?.name || 'S'} 
+                          size={56} 
+                          borderWidth={3} 
+                          borderColor="#fbbf24" 
+                          placeholderBg="#fef3c7"
+                          placeholderColor="#d97706"
+                        />
+                      </View>
                       <View style={{ flex: 1, paddingTop: 2 }}>
                         <Text style={{ fontSize: 18, color: '#1e293b', fontWeight: '900', letterSpacing: -0.5 }} numberOfLines={1}>{winner.student?.name}</Text>
                         <Text style={{ fontSize: 12, color: '#64748b', marginTop: 4, lineHeight: 16 }}>{winner.reason}</Text>

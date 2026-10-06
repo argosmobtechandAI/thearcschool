@@ -13,6 +13,7 @@ import {
   handleNotificationEvent,
   setupForegroundHandler,
   requestUserPermission,
+  setupBackgroundFCMListeners,
 } from './src/utils/notificationHandler';
 
 const App = () => {
@@ -22,6 +23,7 @@ const App = () => {
     // 1. Set up foreground notification handlers
     const unsubscribeNotifee = notifee.onForegroundEvent(handleNotificationEvent);
     const unsubscribeFCM = setupForegroundHandler();
+    const unsubscribeFCMBackground = setupBackgroundFCMListeners();
 
     // 2. Request notification permissions at startup (needed for Android 13+)
     const initNotifications = async () => {
@@ -38,6 +40,7 @@ const App = () => {
     return () => {
       unsubscribeNotifee();
       if (unsubscribeFCM) unsubscribeFCM();
+      if (unsubscribeFCMBackground) unsubscribeFCMBackground();
     };
   }, []);
 

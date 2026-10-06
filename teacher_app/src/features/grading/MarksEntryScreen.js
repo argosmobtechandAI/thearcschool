@@ -143,7 +143,7 @@ const MarksEntryScreen = ({ route, navigation }) => {
                 activeOpacity={0.7}
               >
                 <Text style={styles.studentName}>{student.name}</Text>
-                <Text style={styles.studentRoll}>ID: {student.admission_number || student.id?.substring(0, 8) || 'N/A'}</Text>
+                <Text style={styles.studentRoll}>ID: {student.roll_number || student.admission_number || student.id?.substring(0, 8) || 'N/A'}</Text>
               </TouchableOpacity>
               <View style={styles.marksContainer}>
                 <TextInput

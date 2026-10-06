@@ -10,17 +10,17 @@ export const uploadCircularFile = async (req, res) => {
       return res.status(400).json({ success: false, message: "No file uploaded" });
     }
 
-    const isVPS = fs.existsSync("/var/www") && process.platform === "linux";
+    const host = req.get("host") || "";
+    const isLocalhost = host.includes("localhost") || host.includes("127.0.0.1") || host.includes("10.0.2.2");
+    const protocol = (req.headers["x-forwarded-proto"] || req.protocol || "").includes("https") || !isLocalhost
+      ? "https"
+      : "http";
 
     let fileUrl;
-    if (isVPS) {
-      const cdnBase = process.env.CDN_BASE_URL
-        ? process.env.CDN_BASE_URL.replace(/\/+$/, "")
-        : `${req.protocol}://${req.get("host")}/uploads`;
+    if (process.env.CDN_BASE_URL) {
+      const cdnBase = process.env.CDN_BASE_URL.replace(/\/+$/, "");
       fileUrl = `${cdnBase}/circular/${req.file.filename}`;
     } else {
-      const protocol = req.protocol;
-      const host = req.get("host"); // localhost:3003
       fileUrl = `${protocol}://${host}/uploads/circular/${req.file.filename}`;
     }
 

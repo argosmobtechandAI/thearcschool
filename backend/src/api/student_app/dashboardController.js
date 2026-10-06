@@ -13,14 +13,22 @@ export const getDashboardData = async (req, res) => {
 
     if (studentError) throw studentError;
 
+    if (studentData && studentData.avatar_url && studentData.avatar_url.startsWith('http://') && !studentData.avatar_url.includes('localhost')) {
+      studentData.avatar_url = studentData.avatar_url.replace(/^http:\/\//i, 'https://');
+    }
+
     // Get class info
     const { data: classData, error: classError } = await supabase
       .from('class_students')
-      .select('class_id, class(name, section)')
+      .select('class_id, roll_number, class(name, section)')
       .eq('student_id', studentId)
       .maybeSingle();
 
     if (classError) throw classError;
+
+    if (classData && classData.roll_number) {
+      studentData.roll_number = classData.roll_number;
+    }
 
     // 2. Fetch today's schedule (Timetable)
     const today = new Date().toLocaleDateString('en-US', { weekday: 'long' });

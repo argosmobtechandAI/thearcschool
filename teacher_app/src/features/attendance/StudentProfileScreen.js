@@ -5,6 +5,7 @@ import Icon from 'react-native-vector-icons/Feather';
 import { colors, shadows } from '../../theme/colors';
 
 import CustomHeader from '../../components/CustomHeader';
+import UserAvatar from '../../components/UserAvatar';
 
 const StudentProfileScreen = ({ route, navigation }) => {
   const { student } = route.params;
@@ -13,7 +14,7 @@ const StudentProfileScreen = ({ route, navigation }) => {
   const motherName = student?.mother_name || 'Not Provided';
   const guardianPhone = student?.phone || student?.guardianPhone || '+1 234 567 8900';
   const guardianEmail = student?.email || student?.guardianEmail || 'guardian@example.com';
-  const displayId = student?.admission_number || student?.id?.substring(0, 8) || 'N/A';
+  const displayId = student?.roll_number || student?.admission_number || student?.id?.substring(0, 8) || 'N/A';
 
   // Placeholder calculated data (ideally this comes from an API hook)
   const attendancePercentage = 85; 
@@ -41,9 +42,16 @@ const StudentProfileScreen = ({ route, navigation }) => {
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         {/* Floating Avatar Header */}
         <View style={styles.profileCard}>
-          <View style={styles.avatarCircle}>
-            <Text style={styles.avatarText}>{student?.name?.charAt(0) || 'S'}</Text>
-          </View>
+          <UserAvatar
+            url={student?.avatar_url}
+            name={student?.name || 'S'}
+            size={80}
+            placeholderBg={colors.primary + '15'}
+            placeholderColor={colors.primary}
+            borderWidth={3}
+            borderColor="#fff"
+            style={{ marginBottom: 12, ...shadows.medium }}
+          />
           <Text style={styles.studentName}>{student?.name || 'Student Name'}</Text>
           <Text style={styles.studentRoll}>Admission ID: {displayId}</Text>
           
