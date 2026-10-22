@@ -16,6 +16,8 @@ const ClassManagement = () => {
   // Main Page States
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedColumns, setSelectedColumns] = useState(["className", "section", "teachers", "students"]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(25);
   
   // Modal States
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -52,19 +54,46 @@ const ClassManagement = () => {
 
   // Main page classes filtering
   const filteredClasses = useMemo(() => {
-    return classes.filter(
-      (c) =>
-        c.className.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        c.section.toLowerCase().includes(searchQuery.toLowerCase())
-    );
-  }, [classes, searchQuery]);
+    if (!Array.isArray(classes)) return [];
+    const query = (searchQuery || "").trim().toLowerCase();
+    if (!query) return classes;
+
+    const queryWords = query.split(/\s+/).filter(Boolean);
+
+    return classes.filter((c) => {
+      const clsName = String(c.className || c.name || "").trim().toLowerCase();
+      const secName = String(c.section || "").trim().toLowerCase();
+      const fullClass = `class ${clsName}`;
+
+      const teacherNames = Array.isArray(c.teacher)
+        ? c.teacher.map(tId => teachers.find(u => u.id === tId)?.name || "").join(" ").toLowerCase()
+        : "";
+
+      const searchable = `${fullClass} ${clsName} ${secName} ${clsName}-${secName} ${clsName}${secName} ${teacherNames}`;
+
+      return queryWords.every((word) => searchable.includes(word));
+    });
+  }, [classes, searchQuery, teachers]);
 
   const customGetters = useMemo(() => ({
+    className: (c) => c.className || c.name || "",
+    section: (c) => c.section || "",
     teachers: (c) => c.teacher?.length > 0 ? c.teacher.map(t => teachers.find(u => u.id === t)?.name || "Unassigned").join(", ") : "Unassigned",
     students: (c) => c.student?.length || 0
   }), [teachers]);
 
   const { items: sortedClasses, requestSort, sortConfig } = useSortableData(filteredClasses, null, customGetters);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery]);
+
+  const totalPages = Math.ceil(sortedClasses.length / itemsPerPage);
+
+  const paginatedClasses = useMemo(() => {
+    const start = (currentPage - 1) * itemsPerPage;
+    return sortedClasses.slice(start, start + itemsPerPage);
+  }, [sortedClasses, currentPage, itemsPerPage]);
 
   // Teacher selection filtering
   const filteredTeachersForSelect = useMemo(() => {
@@ -225,41 +254,40 @@ const ClassManagement = () => {
   };
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", height: "100%", overflow: "hidden" }}>
-      <div style={{ flexShrink: 0 }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "2rem" }}>
-        <div>
-          <h1 style={{ fontSize: "2rem", fontWeight: "700" }}>Class Management</h1>
-          <p style={{ color: "var(--text-secondary)" }}>Manage your academic classes</p>
+    <div style={{ display: "flex", flexDirection: "column", height: "100%", minHeight: 0, overflow: "hidden" }}>
+      <div style={{ flexShrink: 0, marginBottom: "1.5rem" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <div>
+            <h1 style={{ fontSize: "2rem", fontWeight: "700" }}>Class Management</h1>
+            <p style={{ color: "var(--text-secondary)" }}>Manage your academic classes</p>
+          </div>
+          <button onClick={() => handleOpenModal()} className="btn btn-primary">
+            <Plus size={18} /> Add Class
+          </button>
         </div>
-        <button onClick={() => handleOpenModal()} className="btn btn-primary">
-          <Plus size={18} /> Add Class
-        </button>
       </div>
 
-      <div className="glass-panel" style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden", padding: "1rem" }}>
+      <div className="glass-panel" style={{ flex: 1, display: "flex", flexDirection: "column", minHeight: 0, overflow: "hidden", padding: "1rem" }}>
         <div style={{ flexShrink: 0 }}>
-          <div style={{ flexShrink: 0 }}>
           <TableFilterHeader
-          searchQuery={searchQuery}
-          setSearchQuery={setSearchQuery}
-          searchPlaceholder="Search classes or sections..."
-          filters={[]}
-          exportColumns={exportColumnsList}
-          selectedColumns={selectedColumns}
-          setSelectedColumns={setSelectedColumns}
-          onExportExcel={() => {}}
-          onExportPDF={() => {}}
-        />
-        </div>
+            searchQuery={searchQuery}
+            setSearchQuery={setSearchQuery}
+            searchPlaceholder="Search classes or sections..."
+            filters={[]}
+            exportColumns={exportColumnsList}
+            selectedColumns={selectedColumns}
+            setSelectedColumns={setSelectedColumns}
+            onExportExcel={() => {}}
+            onExportPDF={() => {}}
+          />
         </div>
 
-        <div style={{ flex: 1, overflowY: "auto", overflowX: "auto" }}>
+        <div style={{ flex: 1, overflowY: "auto", overflowX: "auto", minHeight: 0 }}>
           <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left" }}>
             <thead>
               <tr>
                 {exportColumnsList.map(col => selectedColumns.includes(col.key) && (
-                  <th key={col.key} style={{ cursor: "pointer", position: "sticky", top: 0, background: "var(--background-primary)", zIndex: 10, padding: "1rem", borderBottom: "2px solid var(--glass-border)", color: "var(--text-secondary)", fontWeight: "600" }} onClick={() => requestSort(col.key)}>
+                  <th key={col.key} style={{ cursor: "pointer", position: "sticky", top: 0, background: "var(--bg-secondary, #ffffff)", zIndex: 10, padding: "1rem", borderBottom: "2px solid var(--glass-border)", color: "var(--text-secondary)", fontWeight: "600" }} onClick={() => requestSort(col.key)}>
                     <div style={{ display: "flex", alignItems: "center", gap: "4px", whiteSpace: "nowrap" }}>
                       {col.label}
                       {sortConfig?.key === col.key ? (
@@ -270,7 +298,7 @@ const ClassManagement = () => {
                     </div>
                   </th>
                 ))}
-                <th style={{ textAlign: "right", position: "sticky", top: 0, background: "var(--background-primary)", zIndex: 10, padding: "1rem", borderBottom: "2px solid var(--glass-border)", color: "var(--text-secondary)", fontWeight: "600" }}>Actions</th>
+                <th style={{ textAlign: "right", position: "sticky", top: 0, background: "var(--bg-secondary, #ffffff)", zIndex: 10, padding: "1rem", borderBottom: "2px solid var(--glass-border)", color: "var(--text-secondary)", fontWeight: "600" }}>Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -283,7 +311,7 @@ const ClassManagement = () => {
                   <td colSpan={selectedColumns.length + 1} style={{ padding: "2rem", textAlign: "center", color: "var(--text-secondary)" }}>No classes found.</td>
                 </tr>
               ) : (
-                sortedClasses.map(cls => (
+                paginatedClasses.map(cls => (
                   <tr key={cls.id}>
                     {exportColumnsList.map(col => {
                       if (!selectedColumns.includes(col.key)) return null;
@@ -308,7 +336,53 @@ const ClassManagement = () => {
             </tbody>
           </table>
         </div>
-      </div>
+
+        {sortedClasses.length > 0 && (
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "1rem", paddingTop: "0.75rem", borderTop: "1px solid var(--glass-border)", flexWrap: "wrap", gap: "1rem", flexShrink: 0 }}>
+            <div style={{ fontSize: "0.875rem", color: "var(--text-secondary)" }}>
+              Showing {Math.min((currentPage - 1) * itemsPerPage + 1, sortedClasses.length)} to {Math.min(currentPage * itemsPerPage, sortedClasses.length)} of {sortedClasses.length} entries
+            </div>
+            
+            <div style={{ display: "flex", alignItems: "center", gap: "1.5rem" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                <span style={{ fontSize: "0.875rem", color: "var(--text-secondary)" }}>Rows per page:</span>
+                <select 
+                  className="input-glass" 
+                  style={{ padding: "4px 8px", fontSize: "0.875rem", minWidth: "70px" }}
+                  value={itemsPerPage}
+                  onChange={(e) => { setItemsPerPage(Number(e.target.value)); setCurrentPage(1); }}
+                >
+                  <option value={10}>10</option>
+                  <option value={25}>25</option>
+                  <option value={50}>50</option>
+                  <option value={100}>100</option>
+                </select>
+              </div>
+              
+              <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                <button 
+                  className="btn btn-ghost" 
+                  style={{ padding: "4px 10px", fontSize: "0.85rem", opacity: currentPage === 1 ? 0.5 : 1 }}
+                  disabled={currentPage === 1}
+                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                >
+                  Prev
+                </button>
+                <span style={{ display: "flex", alignItems: "center", padding: "0 8px", fontSize: "0.875rem", fontWeight: "500" }}>
+                  {currentPage} / {totalPages || 1}
+                </span>
+                <button 
+                  className="btn btn-ghost" 
+                  style={{ padding: "4px 10px", fontSize: "0.85rem", opacity: currentPage >= totalPages ? 0.5 : 1 }}
+                  disabled={currentPage >= totalPages}
+                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {isModalOpen && (
@@ -323,8 +397,8 @@ const ClassManagement = () => {
                 <input required className="input-glass" value={formData.className} onChange={(e) => setFormData({ ...formData, className: e.target.value })} />
               </div>
               <div>
-                <label style={{ display: "block", marginBottom: "0.5rem", fontSize: "0.875rem" }}>Section (e.g. A, B)</label>
-                <input required className="input-glass" maxLength={1} value={formData.section} onChange={(e) => setFormData({ ...formData, section: e.target.value.toUpperCase() })} />
+                <label style={{ display: "block", marginBottom: "0.5rem", fontSize: "0.875rem" }}>Section (e.g. A, B, Sunlight)</label>
+                <input required className="input-glass" value={formData.section} onChange={(e) => setFormData({ ...formData, section: e.target.value.toUpperCase() })} />
               </div>
               <div>
                 <label style={{ display: "block", marginBottom: "0.5rem", fontSize: "0.875rem" }}>Teachers</label>

@@ -43,6 +43,9 @@ const UserManagement = () => {
   const [bulkUploadReport, setBulkUploadReport] = useState([]);
 
   const [selectedColumns, setSelectedColumns] = useState([]);
+  const [selectedUserIds, setSelectedUserIds] = useState([]);
+  const [isDeletingBulk, setIsDeletingBulk] = useState(false);
+  const [bulkDeleteProgress, setBulkDeleteProgress] = useState({ done: 0, total: 0 });
   const [editingUser, setEditingUser] = useState(null);
   const [formData, setFormData] = useState({
     name: "",
@@ -108,6 +111,7 @@ const UserManagement = () => {
   // Reset pagination when filters change
   useEffect(() => {
     setCurrentPage(1);
+    setSelectedUserIds([]);
   }, [searchQuery, classFilter, formSubmittedFilter, leftSchoolFilter, tcStatusFilter, genderFilter, siblingCountFilter, type]);
 
   const filteredUsers = useMemo(() => {
@@ -451,6 +455,53 @@ const UserManagement = () => {
       } catch (error) {
         toast.error("Failed to delete user");
       }
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedUserIds.length === 0) return;
+    const count = selectedUserIds.length;
+    const roleLabel = getRoleSingular(type).toLowerCase();
+    const confirmMsg = `Are you sure you want to delete ${count} selected ${roleLabel}${count > 1 ? "s" : ""}? This action cannot be undone.`;
+    if (!window.confirm(confirmMsg)) return;
+
+    setIsDeletingBulk(true);
+    setBulkDeleteProgress({ done: 0, total: count });
+
+    try {
+      let bulkSuccess = false;
+      try {
+        const res = await api.post("/admin_panel/users/bulk-delete", { userIds: selectedUserIds });
+        if (res.data?.success) {
+          bulkSuccess = true;
+        }
+      } catch (err) {
+        if (err.response?.status !== 404 && err.response?.status !== 501) {
+          throw err;
+        }
+      }
+
+      if (!bulkSuccess) {
+        // Fallback: Delete concurrently in batches of 5
+        const chunkSize = 5;
+        let completed = 0;
+        for (let i = 0; i < selectedUserIds.length; i += chunkSize) {
+          const chunk = selectedUserIds.slice(i, i + chunkSize);
+          await Promise.all(chunk.map(id => api.delete(`/admin_panel/users/${id}`)));
+          completed += chunk.length;
+          setBulkDeleteProgress({ done: Math.min(completed, count), total: count });
+        }
+      }
+
+      toast.success(`${count} ${roleLabel}${count > 1 ? "s" : ""} deleted successfully`);
+      setSelectedUserIds([]);
+      dispatch(fetchUsers());
+    } catch (error) {
+      console.error("Bulk delete error:", error);
+      toast.error(error.response?.data?.message || "Failed to delete selected users");
+    } finally {
+      setIsDeletingBulk(false);
+      setBulkDeleteProgress({ done: 0, total: 0 });
     }
   };
 
@@ -838,10 +889,102 @@ const UserManagement = () => {
           onExportPDF={handleExportPDF}
         />
         </div>
+
+        {selectedUserIds.length > 0 && (
+          <div style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            padding: "0.6rem 1rem",
+            marginBottom: "0.75rem",
+            background: "rgba(239, 68, 68, 0.08)",
+            border: "1px solid rgba(239, 68, 68, 0.25)",
+            borderRadius: "8px",
+            flexWrap: "wrap",
+            gap: "0.5rem"
+          }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", flexWrap: "wrap" }}>
+              <span style={{ fontSize: "0.875rem", fontWeight: "600", color: "#dc2626" }}>
+                {selectedUserIds.length} {getRoleSingular(type)}{selectedUserIds.length > 1 ? "s" : ""} selected
+              </span>
+              {filteredUsers.length > paginatedUsers.length && selectedUserIds.length < filteredUsers.length && (
+                <button
+                  type="button"
+                  onClick={() => setSelectedUserIds(filteredUsers.map(u => u.id))}
+                  style={{
+                    background: "none",
+                    border: "none",
+                    color: "#2563eb",
+                    fontSize: "0.85rem",
+                    cursor: "pointer",
+                    textDecoration: "underline",
+                    fontWeight: "500",
+                    padding: 0
+                  }}
+                >
+                  Select all {filteredUsers.length} {getRoleSingular(type).toLowerCase()}s
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => setSelectedUserIds([])}
+                style={{
+                  background: "none",
+                  border: "none",
+                  color: "var(--text-secondary)",
+                  fontSize: "0.85rem",
+                  cursor: "pointer",
+                  padding: 0
+                }}
+              >
+                Clear selection
+              </button>
+            </div>
+
+            <button
+              onClick={handleBulkDelete}
+              disabled={isDeletingBulk}
+              className="btn"
+              style={{
+                background: "#dc2626",
+                color: "white",
+                fontSize: "0.85rem",
+                padding: "0.4rem 0.85rem",
+                display: "flex",
+                alignItems: "center",
+                gap: "0.4rem",
+                border: "none",
+                borderRadius: "6px",
+                cursor: isDeletingBulk ? "not-allowed" : "pointer",
+                boxShadow: "0 2px 6px rgba(220, 38, 38, 0.25)"
+              }}
+            >
+              <Trash2 size={15} /> {isDeletingBulk ? `Deleting (${bulkDeleteProgress.done}/${bulkDeleteProgress.total})...` : `Delete Selected (${selectedUserIds.length})`}
+            </button>
+          </div>
+        )}
+
         <div style={{ flex: 1, overflowX: "auto", overflowY: "auto", minHeight: 0 }}>
           <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left", position: "relative" }}>
             <thead>
               <tr>
+                <th style={{ width: "42px", textAlign: "center", padding: "6px" }}>
+                  <input
+                    type="checkbox"
+                    aria-label="Select all on current page"
+                    style={{ width: "16px", height: "16px", cursor: "pointer", accentColor: "var(--accent-primary)" }}
+                    checked={paginatedUsers.length > 0 && paginatedUsers.every(u => selectedUserIds.includes(u.id))}
+                    onChange={(e) => {
+                      if (e.target.checked) {
+                        const newIds = new Set([...selectedUserIds, ...paginatedUsers.map(u => u.id)]);
+                        setSelectedUserIds(Array.from(newIds));
+                      } else {
+                        const pageIdSet = new Set(paginatedUsers.map(u => u.id));
+                        setSelectedUserIds(selectedUserIds.filter(id => !pageIdSet.has(id)));
+                      }
+                    }}
+                  />
+                </th>
                 <th>S.No.</th>
                 {exportColumnsList.map(col => selectedColumns.includes(col.key) && (
                   <th key={col.key} style={{ cursor: "pointer" }} onClick={() => requestSort(col.key)}>
@@ -861,15 +1004,28 @@ const UserManagement = () => {
             <tbody>
               {loadingUsers ? (
                 <tr>
-                  <td colSpan={selectedColumns.length + 2} style={{ padding: "2rem", textAlign: "center" }}>Loading...</td>
+                  <td colSpan={selectedColumns.length + 3} style={{ padding: "2rem", textAlign: "center" }}>Loading...</td>
                 </tr>
               ) : filteredUsers.length === 0 ? (
                 <tr>
-                  <td colSpan={selectedColumns.length + 2} style={{ padding: "2rem", textAlign: "center", color: "var(--text-secondary)" }}>No {type}s found.</td>
+                  <td colSpan={selectedColumns.length + 3} style={{ padding: "2rem", textAlign: "center", color: "var(--text-secondary)" }}>No {type}s found.</td>
                 </tr>
               ) : (
                 paginatedUsers.map((user, index) => (
-                  <tr key={user.id}>
+                  <tr key={user.id} style={{ background: selectedUserIds.includes(user.id) ? "rgba(239, 68, 68, 0.05)" : undefined }}>
+                    <td style={{ width: "42px", textAlign: "center", padding: "6px" }}>
+                      <input
+                        type="checkbox"
+                        aria-label={`Select ${user.name}`}
+                        style={{ width: "16px", height: "16px", cursor: "pointer", accentColor: "var(--accent-primary)" }}
+                        checked={selectedUserIds.includes(user.id)}
+                        onChange={() => {
+                          setSelectedUserIds(prev => 
+                            prev.includes(user.id) ? prev.filter(id => id !== user.id) : [...prev, user.id]
+                          );
+                        }}
+                      />
+                    </td>
                     <td>{(currentPage - 1) * itemsPerPage + index + 1}</td>
                     {exportColumnsList.map(col => {
                       if (!selectedColumns.includes(col.key)) return null;
