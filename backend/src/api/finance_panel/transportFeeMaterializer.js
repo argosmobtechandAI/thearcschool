@@ -2,7 +2,7 @@ import { supabaseAdmin as supabase } from "../../config/supabaseClient.js";
 
 let isMaterializing = false;
 
-export const autoMaterializeTransportFees = async () => {
+export const autoMaterializeTransportFees = async (targetStudentId = null) => {
   if (isMaterializing) return;
   isMaterializing = true;
   try {
@@ -17,22 +17,49 @@ export const autoMaterializeTransportFees = async () => {
 
     let monthsPassed = 12; // Always materialize for the full year
 
-    // Fetch all active students with bus_fee > 0
-    const { data: students, error: studentError } = await supabase
+    // Fetch active students with bus_fee > 0 (or specifically targeted student)
+    let studentQuery = supabase
       .from("user")
       .select("id, bus_fee, bus_start_date")
       .eq("type", "student")
       .gt("bus_fee", 0);
 
+    if (targetStudentId) {
+      studentQuery = studentQuery.eq("id", targetStudentId);
+    }
+
+    const { data: students, error: studentError } = await studentQuery;
+
     if (studentError) throw studentError;
     if (!students || students.length === 0) return;
 
-    // Fetch existing transport fees in student_fees for this session to avoid duplicates
-    // We need to fetch the fee relation to get the title
-    const { data: existingFees } = await supabase
-      .from("student_fees")
-      .select("id, student_id, fee_id, payment_status, total_paid_amount, fee!inner(title, amount)")
-      .like("fee.title", "Transport Fee - %");
+    // Fetch existing transport fees in student_fees to avoid duplicates
+    let existingFees = [];
+    if (targetStudentId) {
+      const { data, error } = await supabase
+        .from("student_fees")
+        .select("id, student_id, fee_id, payment_status, total_paid_amount, fee!inner(title, amount)")
+        .eq("student_id", targetStudentId)
+        .like("fee.title", "Transport Fee - %");
+      if (error) throw error;
+      existingFees = data || [];
+    } else {
+      // Safe pagination to avoid PostgREST 1000-row query truncation
+      let from = 0;
+      const PAGE_SIZE = 1000;
+      while (true) {
+        const { data, error } = await supabase
+          .from("student_fees")
+          .select("id, student_id, fee_id, payment_status, total_paid_amount, fee!inner(title, amount)")
+          .like("fee.title", "Transport Fee - %")
+          .range(from, from + PAGE_SIZE - 1);
+        if (error) throw error;
+        if (!data || data.length === 0) break;
+        existingFees = existingFees.concat(data);
+        if (data.length < PAGE_SIZE) break;
+        from += PAGE_SIZE;
+      }
+    }
 
     const existingFeeMap = new Map();
     (existingFees || []).forEach(f => {
@@ -119,6 +146,7 @@ export const autoMaterializeTransportFees = async () => {
       // Now insert or update student_fees
       const studentFeesToInsert = [];
       const studentFeesToUpdate = [];
+      const scheduledKeys = new Set();
 
       for (let i = 0; i < monthsPassed; i++) {
         const mIndex = (3 + i) % 12;
@@ -151,8 +179,9 @@ export const autoMaterializeTransportFees = async () => {
 
           const existingFee = existingFeeMap.get(`${s.id}-${feeTitle}`);
           const feeId = feeTemplateMap.get(`${finalFeeTitle}-${amount}`);
+          const insertKey = `${s.id}-${feeId}`;
 
-          if (!existingFee) {
+          if (!existingFee && !scheduledKeys.has(insertKey)) {
             if (feeId) {
               studentFeesToInsert.push({
                 student_id: s.id,
@@ -160,9 +189,10 @@ export const autoMaterializeTransportFees = async () => {
                 payment_status: "Unpaid",
                 total_paid_amount: 0
               });
+              scheduledKeys.add(insertKey);
               existingFeeMap.set(`${s.id}-${feeTitle}`, { fee: { title: finalFeeTitle, amount } });
             }
-          } else if (existingFee.payment_status === "Unpaid" && existingFee.total_paid_amount === 0) {
+          } else if (existingFee && existingFee.payment_status === "Unpaid" && existingFee.total_paid_amount === 0) {
             if (existingFee.fee.title !== finalFeeTitle || existingFee.fee.amount !== amount) {
               if (feeId) {
                 studentFeesToUpdate.push({

@@ -2,7 +2,6 @@ import { supabase, supabaseAdmin } from "../../config/supabaseClient.js";
 
 export const getDashboardStats = async (req, res) => {
   try {
-    await autoMaterializeTransportFees();
     const { startDate, endDate, academic_year } = req.query;
 
     const { count: totalStudents, error: countError } = await supabase
@@ -197,9 +196,6 @@ import { autoMaterializeTransportFees } from "./transportFeeMaterializer.js";
 
 export const getStudentBalances = async (req, res) => {
   try {
-    // Auto-materialize transport fees before generating balances
-    await autoMaterializeTransportFees();
-
     const { students, startDate, endDate, includeFuture, academic_year } = req.body;
     if (!students || !Array.isArray(students)) {
       return res.status(400).json({ success: false, message: "Students array is required" });
@@ -390,8 +386,8 @@ export const deleteFeeStructureController = async (req, res) => {
 
 export const getStudentLedger = async (req, res) => {
   try {
-    await autoMaterializeTransportFees();
     const { studentId } = req.params;
+    await autoMaterializeTransportFees(studentId);
     const { includeFuture, academic_year } = req.query;
 
     const { getCurrentAcademicYear } = await import("./virtualFeeCalculator.js");

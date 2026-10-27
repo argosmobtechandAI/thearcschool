@@ -13,17 +13,19 @@ const StudentLedgerModal = ({ isOpen, onClose, student }) => {
   const [transportForm, setTransportForm] = useState({ bus_fee: "", bus_start_date: "" });
   const [updatingTransport, setUpdatingTransport] = useState(false);
   const [feeDeleting, setFeeDeleting] = useState(null);
+  const [feeTab, setFeeTab] = useState("all"); // "all", "pending", "paid"
+  const [showFuture, setShowFuture] = useState(false);
 
   useEffect(() => {
     if (isOpen && student?.id) {
-      fetchLedger(student.id);
+      fetchLedger(student.id, showFuture);
     }
-  }, [isOpen, student]);
+  }, [isOpen, student, showFuture]);
 
-  const fetchLedger = async (studentId) => {
+  const fetchLedger = async (studentId, includeFuture = showFuture) => {
     try {
       setLedgerLoading(true);
-      const response = await api.get(`/finance_panel/getStudentLedger/${studentId}`);
+      const response = await api.get(`/finance_panel/getStudentLedger/${studentId}?includeFuture=${includeFuture}`);
       if (response.data.success) {
         setStudentLedger(response.data.data);
         if (response.data.data.studentDetails) {
@@ -59,7 +61,16 @@ const StudentLedgerModal = ({ isOpen, onClose, student }) => {
 
   if (!isOpen || !student) return null;
 
-  const pendingDues = (studentLedger?.fees || []).filter(f => f.status !== "paid");
+  const allDues = studentLedger?.fees || [];
+  const pendingDues = allDues.filter(f => f.status !== "paid");
+  const paidDues = allDues.filter(f => f.status === "paid");
+
+  const displayedFees = feeTab === "pending"
+    ? pendingDues
+    : feeTab === "paid"
+      ? paidDues
+      : allDues;
+
   const rawPayments = studentLedger?.payments || [];
   
   const grouped = rawPayments.reduce((acc, curr) => {
@@ -104,6 +115,7 @@ const StudentLedgerModal = ({ isOpen, onClose, student }) => {
     }
     return p;
   }).sort((a,b) => new Date(b.created_at) - new Date(a.created_at));
+
   return createPortal(
     <div 
       className="animate-fade-in" 
@@ -130,7 +142,7 @@ const StudentLedgerModal = ({ isOpen, onClose, student }) => {
           boxShadow: "-10px 0 40px rgba(0, 0, 0, 0.15)",
           display: "flex", 
           flexDirection: "column",
-          gap: "1.15rem",
+          gap: "1rem",
           animation: "slideInRight 0.3s ease-out forwards",
           overflow: "hidden",
           borderRadius: 0
@@ -171,11 +183,11 @@ const StudentLedgerModal = ({ isOpen, onClose, student }) => {
         </div>
 
         {/* Scrollable Body */}
-        <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", gap: "1.15rem", paddingRight: "0.25rem" }}>
+        <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", gap: "0.85rem", overflow: "hidden" }}>
           
           {/* Transport Settings Section */}
           {!student.fee_exempted && (
-            <div style={{ padding: "0.85rem 1rem", background: "rgba(248, 250, 252, 0.8)", borderRadius: "10px", border: "1px solid var(--glass-border)", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "0.75rem" }}>
+            <div style={{ flexShrink: 0, padding: "0.75rem 1rem", background: "rgba(248, 250, 252, 0.8)", borderRadius: "10px", border: "1px solid var(--glass-border)", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "0.75rem" }}>
               <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
                 <div style={{ background: "rgba(124, 58, 237, 0.12)", color: "#7c3aed", padding: "0.5rem", borderRadius: "8px", display: "flex", alignItems: "center", justifyContent: "center" }}>
                   <Bus size={18} strokeWidth={2.4} />
@@ -236,29 +248,89 @@ const StudentLedgerModal = ({ isOpen, onClose, student }) => {
               Loading ledger data...
             </div>
           ) : (
-            <div style={{ flex: 1, minHeight: 0, display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1.15rem" }}>
-              {/* Pending Dues Column */}
-              <div style={{ display: "flex", flexDirection: "column", gap: "0.65rem", height: "100%" }}>
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                  <h3 style={{ fontSize: "0.92rem", fontWeight: "700", display: "flex", alignItems: "center", gap: "0.4rem", color: "var(--text-primary)" }}>
-                    <Clock size={16} color="#d97706" /> Pending Dues ({pendingDues.length})
-                  </h3>
+            <div style={{ flex: 1, minHeight: 0, display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1.15rem", overflow: "hidden" }}>
+              {/* Fee Ledger Column (Pending & Paid) */}
+              <div style={{ display: "flex", flexDirection: "column", gap: "0.6rem", height: "100%", minHeight: 0, overflow: "hidden" }}>
+                
+                {/* Header & Filter Controls */}
+                <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem", flexShrink: 0 }}>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "0.35rem" }}>
+                      <button 
+                        onClick={() => setFeeTab("all")} 
+                        style={{ 
+                          fontSize: "0.74rem", 
+                          padding: "2px 7px", 
+                          borderRadius: "5px", 
+                          border: feeTab === "all" ? "1px solid #6366f1" : "1px solid #e2e8f0", 
+                          background: feeTab === "all" ? "#ede9fe" : "#fff", 
+                          color: feeTab === "all" ? "#4f46e5" : "#64748b",
+                          fontWeight: "700",
+                          cursor: "pointer"
+                        }}
+                      >
+                        All ({allDues.length})
+                      </button>
+                      <button 
+                        onClick={() => setFeeTab("pending")} 
+                        style={{ 
+                          fontSize: "0.74rem", 
+                          padding: "2px 7px", 
+                          borderRadius: "5px", 
+                          border: feeTab === "pending" ? "1px solid #f59e0b" : "1px solid #e2e8f0", 
+                          background: feeTab === "pending" ? "#fef3c7" : "#fff", 
+                          color: feeTab === "pending" ? "#b45309" : "#64748b",
+                          fontWeight: "700",
+                          cursor: "pointer"
+                        }}
+                      >
+                        Pending ({pendingDues.length})
+                      </button>
+                      <button 
+                        onClick={() => setFeeTab("paid")} 
+                        style={{ 
+                          fontSize: "0.74rem", 
+                          padding: "2px 7px", 
+                          borderRadius: "5px", 
+                          border: feeTab === "paid" ? "1px solid #10b981" : "1px solid #e2e8f0", 
+                          background: feeTab === "paid" ? "#d1fae5" : "#fff", 
+                          color: feeTab === "paid" ? "#047857" : "#64748b",
+                          fontWeight: "700",
+                          cursor: "pointer"
+                        }}
+                      >
+                        Paid ({paidDues.length})
+                      </button>
+                    </div>
+
+                    <label style={{ display: "flex", alignItems: "center", gap: "0.35rem", fontSize: "0.72rem", color: "var(--text-secondary)", cursor: "pointer", userSelect: "none" }}>
+                      <input 
+                        type="checkbox" 
+                        checked={showFuture} 
+                        onChange={(e) => setShowFuture(e.target.checked)} 
+                        style={{ width: "13px", height: "13px", cursor: "pointer" }}
+                      />
+                      <span>Future Dues</span>
+                    </label>
+                  </div>
                 </div>
 
                 {!student.fee_exempted ? (
-                  pendingDues.length > 0 ? (
-                    <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", gap: "0.6rem", overflowY: "auto", paddingRight: "0.2rem" }}>
-                      {pendingDues.map(f => {
-                        const dueAmount = Number(f.fee?.amount || 0) - Number(f.total_paid_amount || 0);
+                  displayedFees.length > 0 ? (
+                    <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", gap: "0.55rem", overflowY: "auto", paddingRight: "0.35rem" }}>
+                      {displayedFees.map(f => {
+                        const isPaid = f.status === "paid";
+                        const dueAmount = isPaid ? 0 : (Number(f.fee?.amount || 0) - Number(f.total_paid_amount || 0));
+                        
                         return (
                           <div 
                             key={f.id} 
                             style={{ 
-                              padding: "0.75rem 0.85rem", 
-                              background: "#fff", 
+                              padding: "0.7rem 0.8rem", 
+                              background: isPaid ? "#f8fafc" : "#fff", 
                               borderRadius: "9px", 
                               border: "1px solid var(--glass-border)", 
-                              borderLeft: "4px solid #ef4444", 
+                              borderLeft: isPaid ? "4px solid #10b981" : "4px solid #ef4444", 
                               position: "relative" 
                             }}
                           >
@@ -289,23 +361,29 @@ const StudentLedgerModal = ({ isOpen, onClose, student }) => {
                               </button>
                             )}
 
-                            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.3rem", alignItems: "flex-start", paddingRight: f.id?.startsWith("physical-") ? "1.5rem" : "0" }}>
+                            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.25rem", alignItems: "flex-start", paddingRight: f.id?.startsWith("physical-") ? "1.5rem" : "0" }}>
                               <div>
-                                <div style={{ fontWeight: "700", fontSize: "0.84rem", color: "var(--text-primary)" }}>{f.fee?.title || "Fee Item"}</div>
+                                <div style={{ fontWeight: "700", fontSize: "0.82rem", color: "var(--text-primary)" }}>{f.fee?.title || "Fee Item"}</div>
                                 {f.fee?.due_date && (
-                                  <div style={{ fontSize: "0.72rem", color: "var(--text-secondary)", marginTop: "1px" }}>
+                                  <div style={{ fontSize: "0.7rem", color: "var(--text-secondary)", marginTop: "1px" }}>
                                     Due: <span style={{ fontWeight: "600", color: "var(--text-primary)" }}>{new Date(f.fee.due_date).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}</span>
                                   </div>
                                 )}
                               </div>
-                              <span style={{ fontWeight: "800", color: "#dc2626", fontSize: "0.85rem", whiteSpace: "nowrap" }}>
-                                ₹{dueAmount.toLocaleString()} due
-                              </span>
+                              {isPaid ? (
+                                <span style={{ fontWeight: "700", color: "#059669", background: "rgba(16, 185, 129, 0.12)", padding: "1px 6px", borderRadius: "4px", fontSize: "0.72rem", whiteSpace: "nowrap" }}>
+                                  ✓ Paid
+                                </span>
+                              ) : (
+                                <span style={{ fontWeight: "800", color: "#dc2626", fontSize: "0.82rem", whiteSpace: "nowrap" }}>
+                                  ₹{dueAmount.toLocaleString()} due
+                                </span>
+                              )}
                             </div>
 
-                            <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.75rem", color: "var(--text-secondary)", marginTop: "0.25rem", borderTop: "1px dashed var(--glass-border)", paddingTop: "0.35rem" }}>
+                            <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.72rem", color: "var(--text-secondary)", marginTop: "0.25rem", borderTop: "1px dashed var(--glass-border)", paddingTop: "0.3rem" }}>
                               <span>Total: ₹{Number(f.fee?.amount || 0).toLocaleString()}</span>
-                              <span style={{ color: "#059669", fontWeight: "600" }}>Paid: ₹{Number(f.total_paid_amount || 0).toLocaleString()}</span>
+                              <span style={{ color: "#059669", fontWeight: "600" }}>Paid: ₹{Number(isPaid ? (f.total_paid_amount || f.fee?.amount || 0) : (f.total_paid_amount || 0)).toLocaleString()}</span>
                             </div>
                           </div>
                         );
@@ -313,7 +391,7 @@ const StudentLedgerModal = ({ isOpen, onClose, student }) => {
                     </div>
                   ) : (
                     <div style={{ color: "#059669", fontSize: "0.82rem", fontWeight: "600", padding: "1.5rem 1rem", background: "rgba(16, 185, 129, 0.05)", borderRadius: "9px", border: "1px dashed rgba(16, 185, 129, 0.4)", textAlign: "center" }}>
-                      ✓ No pending dues. All clear!
+                      ✓ No fees to display for this filter.
                     </div>
                   )
                 ) : (
@@ -324,20 +402,20 @@ const StudentLedgerModal = ({ isOpen, onClose, student }) => {
               </div>
 
               {/* Payment History Column */}
-              <div style={{ display: "flex", flexDirection: "column", gap: "0.65rem", height: "100%" }}>
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                  <h3 style={{ fontSize: "0.92rem", fontWeight: "700", display: "flex", alignItems: "center", gap: "0.4rem", color: "var(--text-primary)" }}>
-                    <CheckCircle2 size={16} color="#059669" /> Payment History ({paymentHistory.length})
+              <div style={{ display: "flex", flexDirection: "column", gap: "0.6rem", height: "100%", minHeight: 0, overflow: "hidden" }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0 }}>
+                  <h3 style={{ fontSize: "0.88rem", fontWeight: "700", display: "flex", alignItems: "center", gap: "0.4rem", color: "var(--text-primary)" }}>
+                    <CheckCircle2 size={16} color="#059669" /> Receipts / Payment History ({paymentHistory.length})
                   </h3>
                 </div>
 
-                <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", gap: "0.6rem", overflowY: "auto", paddingRight: "0.2rem" }}>
+                <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", gap: "0.55rem", overflowY: "auto", paddingRight: "0.35rem" }}>
                   {paymentHistory.length > 0 ? (
                     paymentHistory.map(p => (
                       <div 
                         key={p.id} 
                         style={{ 
-                          padding: "0.75rem 0.85rem", 
+                          padding: "0.7rem 0.8rem", 
                           background: "#fff", 
                           borderRadius: "9px", 
                           border: "1px solid var(--glass-border)", 
@@ -346,8 +424,8 @@ const StudentLedgerModal = ({ isOpen, onClose, student }) => {
                         }}
                       >
                         <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.25rem", alignItems: "center" }}>
-                          <span style={{ fontWeight: "700", fontSize: "0.84rem", color: "var(--text-primary)" }}>{p.description || "Fee Payment"}</span>
-                          <span style={{ fontWeight: "800", color: p.payment_mode === "Concession" ? "#9333ea" : "#059669", fontSize: "0.85rem" }}>
+                          <span style={{ fontWeight: "700", fontSize: "0.82rem", color: "var(--text-primary)" }}>{p.description || "Fee Payment"}</span>
+                          <span style={{ fontWeight: "800", color: p.payment_mode === "Concession" ? "#9333ea" : "#059669", fontSize: "0.82rem" }}>
                             + ₹{Number(p.amount_paid).toLocaleString()}
                           </span>
                         </div>
@@ -359,7 +437,7 @@ const StudentLedgerModal = ({ isOpen, onClose, student }) => {
                         </div>
                         
                         {p.remarks && (
-                          <div style={{ fontSize: "0.72rem", color: "var(--text-secondary)", marginTop: "0.2rem", fontStyle: "italic" }}>
+                          <div style={{ fontSize: "0.7rem", color: "var(--text-secondary)", marginTop: "0.2rem", fontStyle: "italic" }}>
                             Note: {p.remarks}
                           </div>
                         )}
@@ -388,7 +466,7 @@ const StudentLedgerModal = ({ isOpen, onClose, student }) => {
         </div>
 
         {/* Footer */}
-        <div style={{ marginTop: "auto", display: "flex", justifyContent: "flex-end", paddingTop: "0.85rem", borderTop: "1px solid var(--glass-border)", flexShrink: 0 }}>
+        <div style={{ marginTop: "auto", display: "flex", justifyContent: "flex-end", paddingTop: "0.75rem", borderTop: "1px solid var(--glass-border)", flexShrink: 0 }}>
           <button 
             type="button" 
             onClick={onClose} 
