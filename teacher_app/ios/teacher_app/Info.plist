@@ -24,6 +24,8 @@
 	<string>????</string>
 	<key>CFBundleVersion</key>
 	<string>$(CURRENT_PROJECT_VERSION)</string>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>NSAppTransportSecurity</key>
@@ -33,6 +35,14 @@
 		<key>NSAllowsLocalNetworking</key>
 		<true/>
 	</dict>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>This app uses your location to provide relevant school-related features.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>The Arc School requires access to the camera to take and upload photos.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>The Arc School requires access to save photos or downloaded documents to your photo library.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>The Arc School accesses your photo library only when you choose a photo or document to upload.</string>
 	<key>RCTNewArchEnabled</key>
 	<true/>
 	<key>UIAppFonts</key>
@@ -80,10 +90,6 @@
 		<string>UIInterfaceOrientationPortraitUpsideDown</string>
 	</array>
 	<key>UIViewControllerBasedStatusBarAppearance</key>
-	<false/>
-	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>This app uses your location to provide relevant school-related features.</string>
-	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
 </dict>
 </plist>
