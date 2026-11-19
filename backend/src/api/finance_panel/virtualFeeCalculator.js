@@ -39,10 +39,12 @@ export const calculateVirtualDues = async (studentId, academicYear = getCurrentA
   }
 
   // 2. Fetch ALL fee structures for this student's class (or generic) to do global waterfall
-  const { data: structures, error: structErr } = await supabase
-    .from("fee_structures")
-    .select("*")
-    .or(`class_name.eq.${className},class_name.is.null`);
+  // Class names like "Pre-Nursery (PLAY)" contain reserved characters for PostgREST `or`
+  // filters, so the value must be double quoted or the filter silently matches nothing.
+  const structuresQuery = supabase.from("fee_structures").select("*");
+  const { data: structures, error: structErr } = className
+    ? await structuresQuery.or(`class_name.eq."${className.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}",class_name.is.null`)
+    : await structuresQuery.is("class_name", null);
 
   if (structErr) throw new Error("Failed to fetch fee structures");
 

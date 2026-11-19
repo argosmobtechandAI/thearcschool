@@ -151,7 +151,7 @@ const Ledger = () => {
     }
 
     return enriched;
-  }, [filteredStudents, globalClasses, statusFilter]);
+  }, [filteredStudents, globalClasses, statusFilter, balancesMap]);
 
   const { items: sortedData, requestSort, sortConfig } = useSortableData(enrichedStudents);
 

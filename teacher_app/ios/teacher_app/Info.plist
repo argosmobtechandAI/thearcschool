@@ -35,10 +35,10 @@
 		<key>NSAllowsLocalNetworking</key>
 		<true/>
 	</dict>
-	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>This app uses your location to provide relevant school-related features.</string>
 	<key>NSCameraUsageDescription</key>
 	<string>The Arc School requires access to the camera to take and upload photos.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>This app uses your location to provide relevant school-related features.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
 	<string>The Arc School requires access to save photos or downloaded documents to your photo library.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
@@ -78,6 +78,8 @@
 	<array>
 		<string>arm64</string>
 	</array>
+	<key>UIRequiresFullScreen</key>
+	<true/>
 	<key>UISupportedInterfaceOrientations</key>
 	<array>
 		<string>UIInterfaceOrientationPortrait</string>

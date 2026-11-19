@@ -722,16 +722,23 @@ export const createFeeStructureController = async (req, res) => {
       return res.status(400).json({ success: false, message: "Missing required fields" });
     }
     
-    // Check for existing to prevent duplicate custom fees
-    const { data: existing } = await supabase
+    // Check for existing to prevent duplicate custom fees (category match is case-insensitive,
+    // and a generic fee must be compared with IS NULL rather than EQ NULL)
+    const existingQuery = supabase
       .from("fee_structures")
-      .select("id")
-      .eq("fee_category", fee_category)
-      .eq("academic_year", academic_year)
-      .eq("class_name", class_name || null)
-      .single();
+      .select("id, fee_category")
+      .eq("academic_year", academic_year);
+    const { data: existingRows, error: existingError } = class_name
+      ? await existingQuery.eq("class_name", class_name)
+      : await existingQuery.is("class_name", null);
 
-    if (existing) {
+    if (existingError) throw existingError;
+
+    const isDuplicate = (existingRows || []).some(
+      (row) => (row.fee_category || "").toLowerCase() === fee_category.toLowerCase()
+    );
+
+    if (isDuplicate) {
       return res.status(400).json({ success: false, message: "This fee category already exists for this class in the selected academic year." });
     }
 
